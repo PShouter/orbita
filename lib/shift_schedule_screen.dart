@@ -1,10 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ShiftScheduleScreen extends StatefulWidget {
   final bool isDarkMode;
+
   const ShiftScheduleScreen({super.key, required this.isDarkMode});
 
   @override
@@ -12,274 +14,886 @@ class ShiftScheduleScreen extends StatefulWidget {
 }
 
 class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
-  List<String> _schedules = ['Основной график'];
-  String _selectedSchedule = 'Основной график';
-  DateTime _displayedMonth = DateTime(
+  DateTime _currentMonth = DateTime(
     DateTime.now().year,
     DateTime.now().month,
     1,
   );
+  bool _showWeekNumbers = true;
 
-  List<Map<String, dynamic>> _shiftTypes = [
-    {'id': 'type_1', 'name': 'Тип 1', 'color': 0xFF38BDF8},
-    {'id': 'type_2', 'name': 'Тип 2', 'color': 0xFF4ADE80},
-    {'id': 'type_3', 'name': 'Тип 3', 'color': 0xFFFACC15},
-    {'id': 'type_4', 'name': 'Тип 4', 'color': 0xFFFB7185},
-    {'id': 'type_5', 'name': 'Заменить текст', 'color': 0xFFA78BFA},
-  ];
+  // Список всех работ
+  List<Map<String, dynamic>> _jobs = [];
 
-  Map<String, Map<String, dynamic>> _dayData = {};
-  bool _showWeekNumber = false;
-  bool _showSummaryCard = false;
+  // Активная выбранная работа для быстрого проставления смен ("кисть")
+  String? _selectedJobId;
+
+  // Карта назначенных смен: key = "YYYY-MM-DD", value = List<String> (jobId)
+  Map<String, List<String>> _assignedShifts = {};
 
   @override
   void initState() {
     super.initState();
-    _loadScheduleData();
+    _loadData();
   }
 
-  Future<void> _loadScheduleData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawSchedules = prefs.getString('user_schedules_list');
-    final rawTypes = prefs.getString('user_shift_types');
-    final rawDays = prefs.getString('user_shift_days_$_selectedSchedule');
-    final showWeek = prefs.getBool('user_shift_show_week') ?? false;
+  double _calculateHours(TimeOfDay start, TimeOfDay end) {
+    double startMin = (start.hour * 60 + start.minute).toDouble();
+    double endMin = (end.hour * 60 + end.minute).toDouble();
+    if (endMin < startMin) endMin += 24 * 60;
+    return (endMin - startMin) / 60.0;
+  }
 
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      if (rawSchedules != null) {
-        _schedules = List<String>.from(jsonDecode(rawSchedules));
+      _showWeekNumbers = prefs.getBool('shift_show_week_numbers') ?? true;
+
+      final rawJobs = prefs.getString('user_shift_jobs');
+      if (rawJobs != null) {
+        try {
+          final List decoded = jsonDecode(rawJobs);
+          _jobs = decoded.map((e) {
+            final m = Map<String, dynamic>.from(e);
+            m['color'] = Color(m['color'] as int);
+            return m;
+          }).toList();
+        } catch (_) {}
       }
-      if (rawTypes != null) {
-        _shiftTypes = List<Map<String, dynamic>>.from(jsonDecode(rawTypes));
+
+      if (_jobs.isEmpty) {
+        _jobs = [
+          {
+            'id': 'job_1',
+            'name': 'Основная работа',
+            'color': const Color(0xFFFF5252),
+            'startHour': 8,
+            'startMin': 0,
+            'endHour': 20,
+            'endMin': 0,
+          },
+          {
+            'id': 'job_2',
+            'name': 'Подработка',
+            'color': const Color(0xFF40C4FF),
+            'startHour': 18,
+            'startMin': 0,
+            'endHour': 23,
+            'endMin': 0,
+          },
+        ];
       }
-      if (rawDays != null) {
-        _dayData = Map<String, Map<String, dynamic>>.from(
-          jsonDecode(rawDays)
-              .map((k, v) => MapEntry(k, Map<String, dynamic>.from(v))),
-        );
+
+      _selectedJobId = _jobs.first['id'];
+
+      final rawShifts = prefs.getString('calendar_assigned_shifts');
+      if (rawShifts != null) {
+        try {
+          final Map decoded = jsonDecode(rawShifts);
+          _assignedShifts = decoded.map(
+            (k, v) => MapEntry(
+              k.toString(),
+              (v as List).map((id) => id.toString()).toList(),
+            ),
+          );
+        } catch (_) {}
       }
-      _showWeekNumber = showWeek;
     });
   }
 
-  Future<void> _saveCurrentScheduleData() async {
+  Future<void> _saveData() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_schedules_list', jsonEncode(_schedules));
-    await prefs.setString('user_shift_types', jsonEncode(_shiftTypes));
+    await prefs.setBool('shift_show_week_numbers', _showWeekNumbers);
+
+    final jobsToSave = _jobs.map((j) {
+      return {
+        'id': j['id'].toString(),
+        'name': j['name'].toString(),
+        'color': (j['color'] as Color).toARGB32(),
+        'startHour': j['startHour'] as int,
+        'startMin': j['startMin'] as int,
+        'endHour': j['endHour'] as int,
+        'endMin': j['endMin'] as int,
+      };
+    }).toList();
+
+    await prefs.setString('user_shift_jobs', jsonEncode(jobsToSave));
     await prefs.setString(
-      'user_shift_days_$_selectedSchedule',
-      jsonEncode(_dayData),
+      'calendar_assigned_shifts',
+      jsonEncode(_assignedShifts),
     );
-    await prefs.setBool('user_shift_show_week', _showWeekNumber);
   }
 
-  Map<String, num> _calculateMonthStats() {
-    int totalDays = DateTime(
-      _displayedMonth.year,
-      _displayedMonth.month + 1,
-      0,
-    ).day;
-    int filledDays = 0;
-    double totalHours = 0;
-    double totalValue = 0;
+  String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-    for (int day = 1; day <= totalDays; day++) {
-      final key =
-          '${_displayedMonth.year}-${_displayedMonth.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
-      if (_dayData.containsKey(key)) {
-        filledDays++;
-        final data = _dayData[key]!;
-        totalHours += (double.tryParse(data['hours']?.toString() ?? '0') ?? 0);
-        totalValue += (double.tryParse(data['rate']?.toString() ?? '0') ?? 0);
-      }
+  // Тап по числу в режиме кисти
+  void _onDayTapped(DateTime date) {
+    if (_selectedJobId == null) return;
+    HapticFeedback.selectionClick();
+
+    final key = _dateKey(date);
+    final currentList = List<String>.from(_assignedShifts[key] ?? []);
+
+    if (currentList.contains(_selectedJobId)) {
+      currentList.remove(_selectedJobId);
+    } else {
+      currentList.add(_selectedJobId!);
     }
 
-    return {
-      'totalDays': totalDays,
-      'filledDays': filledDays,
-      'freeDays': totalDays - filledDays,
-      'hours': totalHours,
-      'value': totalValue,
-    };
+    setState(() {
+      if (currentList.isEmpty) {
+        _assignedShifts.remove(key);
+      } else {
+        _assignedShifts[key] = currentList;
+      }
+    });
+
+    _saveData();
+    // Моментальная синхронизация при каждом нажатии
+    _syncWithMainCalendarSilently();
+  }
+
+  // Долгий тап для открытия меню выбора всех доступных работ
+  void _openDayJobSelector(DateTime date) {
+    final key = _dateKey(date);
+    final assigned = List<String>.from(_assignedShifts[key] ?? []);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: widget.isDarkMode
+          ? const Color(0xFF161B22)
+          : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setMState) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Смены на ${date.day}.${date.month}.${date.year}',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ..._jobs.map((j) {
+                final isAssigned = assigned.contains(j['id']);
+                final col = j['color'] as Color;
+
+                return CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: CircleAvatar(radius: 8, backgroundColor: col),
+                  title: Text(
+                    j['name'],
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    '${j['startHour'].toString().padLeft(2, '0')}:${j['startMin'].toString().padLeft(2, '0')} — ${j['endHour'].toString().padLeft(2, '0')}:${j['endMin'].toString().padLeft(2, '0')}',
+                  ),
+                  value: isAssigned,
+                  activeColor: col,
+                  onChanged: (v) {
+                    setMState(() {
+                      if (v == true) {
+                        assigned.add(j['id']);
+                      } else {
+                        assigned.remove(j['id']);
+                      }
+                    });
+                    setState(() {
+                      if (assigned.isEmpty) {
+                        _assignedShifts.remove(key);
+                      } else {
+                        _assignedShifts[key] = List.from(assigned);
+                      }
+                    });
+                    _saveData();
+                    _syncWithMainCalendarSilently();
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+              if (assigned.isNotEmpty)
+                Center(
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                    ),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Очистить день полностью'),
+                    onPressed: () {
+                      setState(() {
+                        _assignedShifts.remove(key);
+                      });
+                      _saveData();
+                      _syncWithMainCalendarSilently();
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Полная моментальная синхронизация с основным календарём
+  Future<void> _syncWithMainCalendarSilently({bool notifyUser = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawEvents = prefs.getString('cached_calendar_events');
+    List<Map<String, dynamic>> events = [];
+
+    if (rawEvents != null) {
+      try {
+        final List decoded = jsonDecode(rawEvents);
+        events = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+      } catch (_) {}
+    }
+
+    // Регистрация категорий в календаре
+    final rawCals = prefs.getString('saved_user_calendars');
+    List<Map<String, dynamic>> userCalendars = [];
+    if (rawCals != null) {
+      try {
+        final List decoded = jsonDecode(rawCals);
+        userCalendars = decoded
+            .map((c) => Map<String, dynamic>.from(c))
+            .toList();
+      } catch (_) {}
+    }
+
+    for (final j in _jobs) {
+      final name = j['name'].toString();
+      final col = (j['color'] as Color).toARGB32();
+      if (!userCalendars.any((c) => c['name'] == name)) {
+        userCalendars.add({
+          'id': 'shift_${j['id']}',
+          'name': name,
+          'color': col,
+          'enabled': true,
+        });
+      }
+    }
+    await prefs.setString('saved_user_calendars', jsonEncode(userCalendars));
+
+    // Удаляем все старые события смен (префикс shift_event_)
+    events.removeWhere((e) => e['id'].toString().startsWith('shift_event_'));
+
+    int syncedCount = 0;
+
+    // Генерируем актуальные события по карте
+    _assignedShifts.forEach((dateKey, jobIds) {
+      final dateParts = dateKey.split('-');
+      if (dateParts.length == 3) {
+        final year = int.parse(dateParts[0]);
+        final month = int.parse(dateParts[1]);
+        final day = int.parse(dateParts[2]);
+        final shiftDate = DateTime(year, month, day);
+
+        for (final jId in jobIds) {
+          final job = _jobs.firstWhere(
+            (element) => element['id'] == jId,
+            orElse: () => {},
+          );
+          if (job.isNotEmpty) {
+            final sHour = job['startHour'] as int;
+            final sMin = job['startMin'] as int;
+            final eHour = job['endHour'] as int;
+            final eMin = job['endMin'] as int;
+
+            final startStr =
+                '${sHour.toString().padLeft(2, '0')}:${sMin.toString().padLeft(2, '0')}';
+            final endStr =
+                '${eHour.toString().padLeft(2, '0')}:${eMin.toString().padLeft(2, '0')}';
+
+            events.add({
+              'id': 'shift_event_${jId}_$dateKey',
+              'title': job['name'],
+              'date': shiftDate.toIso8601String(),
+              'endDate': shiftDate.toIso8601String(),
+              'startTime': startStr,
+              'endTime': endStr,
+              'isAllDay': false,
+              'calendar': job['name'],
+              'color': (job['color'] as Color).toARGB32(),
+              'location': '',
+              'desc': 'Смена по графику',
+            });
+            syncedCount++;
+          }
+        }
+      }
+    });
+
+    await prefs.setString('cached_calendar_events', jsonEncode(events));
+
+    if (notifyUser && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Синхронизировано: $syncedCount смен в основном календаре',
+          ),
+          backgroundColor: const Color(0xFF2C69D1),
+        ),
+      );
+    }
+  }
+
+  // Рассинхронизация (удаление всех смен в рамках выбранного месяца)
+  Future<void> _unsyncCurrentMonth() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawEvents = prefs.getString('cached_calendar_events');
+    if (rawEvents == null) return;
+
+    List<Map<String, dynamic>> events = [];
+    try {
+      final List decoded = jsonDecode(rawEvents);
+      events = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return;
+    }
+
+    final m = _currentMonth.month;
+    final y = _currentMonth.year;
+
+    // Удаляем из основного календаря только смены этого месяца
+    events.removeWhere((e) {
+      if (e['id'].toString().startsWith('shift_event_')) {
+        final d = DateTime.tryParse(e['date'] ?? '');
+        if (d != null && d.year == y && d.month == m) {
+          return true;
+        }
+      }
+      return false;
+    });
+
+    await prefs.setString('cached_calendar_events', jsonEncode(events));
+
+    // Очищаем назначенные смены в модели графика для этого месяца
+    setState(() {
+      _assignedShifts.removeWhere((key, val) {
+        final parts = key.split('-');
+        return int.parse(parts[0]) == y && int.parse(parts[1]) == m;
+      });
+    });
+
+    await _saveData();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Все смены за ${_monthName(m)} удалены из основного календаря',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  int _getWeekNumber(DateTime date) {
+    final firstDayOfYear = DateTime(date.year, 1, 1);
+    final days = date.difference(firstDayOfYear).inDays;
+    return ((days + firstDayOfYear.weekday - 1) ~/ 7) + 1;
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkMode;
+    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
+    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
     final textPrimary = isDark
         ? const Color(0xFFF0F6FC)
         : const Color(0xFF24292F);
     final textSecondary = isDark
         ? const Color(0xFF8B949E)
         : const Color(0xFF57606A);
-    final stats = _calculateMonthStats();
+    final borderColor = isDark
+        ? const Color(0xFF30363D)
+        : const Color(0xFFD0D7DE);
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFF6F8FA),
+      backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white,
+        backgroundColor: bg,
         elevation: 0,
-        title: _buildScheduleDropdown(textPrimary, isDark),
-        actions: [
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: textPrimary),
-            onSelected: (val) {
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(SnackBar(content: Text('Выбран фильтр: $val')));
-            },
-            itemBuilder: (ctx) => [
-              ..._shiftTypes.map(
-                (t) => PopupMenuItem(value: t['name'], child: Text(t['name'])),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(value: 'Поиск', child: Text('Поиск по дате')),
-            ],
+        title: Text(
+          'График смен',
+          style: TextStyle(
+            color: textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
+        ),
+        actions: [
           IconButton(
-            icon: Icon(Icons.settings_outlined, color: textPrimary),
-            onPressed: () => _openSettingsDialog(isDark),
+            tooltip: 'Добавить новую работу',
+            icon: const Icon(
+              Icons.add_business_outlined,
+              color: Color(0xFF38BDF8),
+            ),
+            onPressed: () => _openJobEditor(),
           ),
         ],
       ),
-      body: Column(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          // Панель выбора активной работы для проставления (Кисть)
+          Text(
+            'Выберите работу для проставления на дату:',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${_monthName(_displayedMonth.month)} ${_displayedMonth.year}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+              children: _jobs.map((job) {
+                final isSelected = _selectedJobId == job['id'];
+                final col = job['color'] as Color;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    selected: isSelected,
+                    showCheckmark: false,
+                    avatar: CircleAvatar(radius: 6, backgroundColor: col),
+                    label: Text(
+                      job['name'],
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Colors.white : textPrimary,
+                      ),
+                    ),
+                    selectedColor: col,
+                    backgroundColor: cardBg,
+                    side: BorderSide(color: isSelected ? col : borderColor),
+                    onSelected: (val) {
+                      setState(() => _selectedJobId = job['id']);
+                    },
                   ),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.chevron_left, color: textPrimary),
-                      onPressed: () => setState(
-                        () => _displayedMonth = DateTime(
-                          _displayedMonth.year,
-                          _displayedMonth.month - 1,
-                          1,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.chevron_right, color: textPrimary),
-                      onPressed: () => setState(
-                        () => _displayedMonth = DateTime(
-                          _displayedMonth.year,
-                          _displayedMonth.month + 1,
-                          1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                );
+              }).toList(),
             ),
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: _buildGridCalendar(isDark, textPrimary, textSecondary),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF161B22) : Colors.white,
-              border: Border(
-                top: BorderSide(
-                  color: isDark
-                      ? const Color(0xFF30363D)
-                      : const Color(0xFFD0D7DE),
+          const SizedBox(height: 12),
+
+          // Кнопки управления синхронизацией
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2C69D1),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.sync, size: 18),
+                  label: const Text(
+                    'Синхронизировать',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  onPressed: () =>
+                      _syncWithMainCalendarSilently(notifyUser: true),
                 ),
               ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    _showSummaryCard ? Icons.info : Icons.info_outline,
-                    color: const Color(0xFF38BDF8),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  side: const BorderSide(color: Colors.redAccent),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
                   ),
-                  tooltip: 'Сводные данные',
-                  onPressed: () =>
-                      setState(() => _showSummaryCard = !_showSummaryCard),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-                TextButton.icon(
-                  icon: const Icon(Icons.sync, size: 18),
-                  label: const Text('В основной календарь'),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Смены синхронизированы с разделом календаря',
-                        ),
-                      ),
+                icon: const Icon(Icons.sync_disabled, size: 18),
+                label: const Text(
+                  'Рассинхронизировать',
+                  style: TextStyle(fontSize: 12),
+                ),
+                onPressed: _unsyncCurrentMonth,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Переключатель месяца
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: () {
+                  setState(() {
+                    _currentMonth = DateTime(
+                      _currentMonth.year,
+                      _currentMonth.month - 1,
+                      1,
                     );
-                  },
+                  });
+                },
+              ),
+              Text(
+                '${_monthName(_currentMonth.month)} ${_currentMonth.year}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
                 ),
-              ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: () {
+                  setState(() {
+                    _currentMonth = DateTime(
+                      _currentMonth.year,
+                      _currentMonth.month + 1,
+                      1,
+                    );
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+
+          // Сетка календаря с быстрым кликом
+          _buildMonthGrid(cardBg, borderColor, textPrimary, textSecondary),
+          const SizedBox(height: 12),
+
+          const Center(
+            child: Text(
+              '💡 Тап по числу: проставить/снять выбранную работу. Долгий тап: список всех смен.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+              textAlign: TextAlign.center,
             ),
           ),
-          if (_showSummaryCard)
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: isDark ? const Color(0xFF161B22) : Colors.white,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 16),
+
+          // Список работ для редактирования/удаления
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Управление работами:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: textPrimary,
+                ),
+              ),
+              TextButton(
+                onPressed: () => _openJobEditor(),
+                child: const Text('+ Добавить'),
+              ),
+            ],
+          ),
+          ..._jobs.map((job) {
+            final col = job['color'] as Color;
+            final sTime = TimeOfDay(
+              hour: job['startHour'],
+              minute: job['startMin'],
+            );
+            final eTime = TimeOfDay(
+              hour: job['endHour'],
+              minute: job['endMin'],
+            );
+            final hours = _calculateHours(sTime, eTime);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Сводка за месяц',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: textPrimary,
+                  CircleAvatar(radius: 8, backgroundColor: col),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          job['name'],
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: textPrimary,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 18),
-                        onPressed: () =>
-                            setState(() => _showSummaryCard = false),
-                      ),
-                    ],
-                  ),
-                  const Divider(),
-                  Text(
-                    'Календарных дней: ${stats['totalDays']}',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
-                  ),
-                  Text(
-                    'Заполненных дней: ${stats['filledDays']}',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
-                  ),
-                  Text(
-                    'Свободных дней: ${stats['freeDays']}',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
-                  ),
-                  Text(
-                    'Всего часов: ${stats['hours']}',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
-                  ),
-                  Text(
-                    'Расчётное значение: ${stats['value']} ₽',
-                    style: TextStyle(
-                      color: textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                        Text(
+                          '${sTime.format(context)} — ${eTime.format(context)} (${hours.toStringAsFixed(1)} ч.)',
+                          style: TextStyle(color: textSecondary, fontSize: 12),
+                        ),
+                      ],
                     ),
                   ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      size: 20,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () => _openJobEditor(existingJob: job),
+                  ),
+                  if (_jobs.length > 1)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 20,
+                        color: Colors.redAccent,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _jobs.remove(job);
+                          if (_selectedJobId == job['id']) {
+                            _selectedJobId = _jobs.first['id'];
+                          }
+                        });
+                        _saveData();
+                      },
+                    ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthGrid(
+    Color cardBg,
+    Color borderColor,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final firstDay = DateTime(_currentMonth.year, _currentMonth.month, 1);
+    final daysInMonth = DateTime(
+      _currentMonth.year,
+      _currentMonth.month + 1,
+      0,
+    ).day;
+    final int startingOffset = (firstDay.weekday - 1);
+    final totalCells = ((startingOffset + daysInMonth + 6) ~/ 7) * 7;
+    final int weeksCount = totalCells ~/ 7;
+
+    const weekDays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              if (_showWeekNumbers)
+                SizedBox(
+                  width: 26,
+                  child: Center(
+                    child: Text(
+                      '№',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              for (final wd in weekDays)
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      wd,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+
+          for (int w = 0; w < weeksCount; w++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(
+                children: [
+                  if (_showWeekNumbers)
+                    Builder(
+                      builder: (ctx) {
+                        final sampleDayIndex = (w * 7) - startingOffset + 1;
+                        DateTime weekDate;
+                        if (sampleDayIndex < 1) {
+                          weekDate = DateTime(
+                            _currentMonth.year,
+                            _currentMonth.month,
+                            1,
+                          );
+                        } else if (sampleDayIndex > daysInMonth) {
+                          weekDate = DateTime(
+                            _currentMonth.year,
+                            _currentMonth.month,
+                            daysInMonth,
+                          );
+                        } else {
+                          weekDate = DateTime(
+                            _currentMonth.year,
+                            _currentMonth.month,
+                            sampleDayIndex,
+                          );
+                        }
+                        return SizedBox(
+                          width: 26,
+                          child: Center(
+                            child: Text(
+                              '${_getWeekNumber(weekDate)}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: textSecondary.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                  for (int d = 0; d < 7; d++)
+                    Expanded(
+                      child: Builder(
+                        builder: (ctx) {
+                          final cellIndex = (w * 7) + d;
+                          final dayNumber = cellIndex - startingOffset + 1;
+
+                          if (dayNumber < 1 || dayNumber > daysInMonth) {
+                            return const SizedBox(height: 44);
+                          }
+
+                          final date = DateTime(
+                            _currentMonth.year,
+                            _currentMonth.month,
+                            dayNumber,
+                          );
+                          final key = _dateKey(date);
+                          final assignedJobIds = _assignedShifts[key] ?? [];
+                          final hasJobs = assignedJobIds.isNotEmpty;
+                          final isToday =
+                              date.year == DateTime.now().year &&
+                              date.month == DateTime.now().month &&
+                              date.day == DateTime.now().day;
+
+                          final assignedColors = assignedJobIds
+                              .map(
+                                (id) => _jobs.firstWhere(
+                                  (j) => j['id'] == id,
+                                  orElse: () => {},
+                                )['color'],
+                              )
+                              .whereType<Color>()
+                              .toList();
+
+                          return GestureDetector(
+                            onTap: () => _onDayTapped(date),
+                            onLongPress: () => _openDayJobSelector(date),
+                            child: Container(
+                              height: 44,
+                              margin: const EdgeInsets.all(1.5),
+                              decoration: BoxDecoration(
+                                color: hasJobs
+                                    ? assignedColors.first.withValues(
+                                        alpha: 0.18,
+                                      )
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isToday
+                                      ? const Color(0xFF38BDF8)
+                                      : (hasJobs
+                                            ? assignedColors.first.withValues(
+                                                alpha: 0.8,
+                                              )
+                                            : borderColor.withValues(
+                                                alpha: 0.2,
+                                              )),
+                                  width: isToday ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    '$dayNumber',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: hasJobs || isToday
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isToday
+                                          ? const Color(0xFF38BDF8)
+                                          : textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  if (hasJobs)
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: assignedColors.take(3).map((
+                                        col,
+                                      ) {
+                                        return Container(
+                                          margin: const EdgeInsets.symmetric(
+                                            horizontal: 1.5,
+                                          ),
+                                          width: 5,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: col,
+                                          ),
+                                        );
+                                      }).toList(),
+                                    )
+                                  else
+                                    const SizedBox(height: 5),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -288,452 +902,214 @@ class _ShiftScheduleScreenState extends State<ShiftScheduleScreen> {
     );
   }
 
-  Widget _buildScheduleDropdown(Color textPrimary, bool isDark) {
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: _selectedSchedule,
-        dropdownColor: isDark ? const Color(0xFF161B22) : Colors.white,
-        style: TextStyle(
-          color: textPrimary,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
-        items: [
-          ..._schedules.map((s) => DropdownMenuItem(value: s, child: Text(s))),
-          const DropdownMenuItem(
-            value: '__NEW__',
-            child: Row(
-              children: [
-                Icon(Icons.add, size: 18, color: Color(0xFF38BDF8)),
-                SizedBox(width: 6),
-                Text(
-                  'Новый график',
-                  style: TextStyle(color: Color(0xFF38BDF8)),
-                ),
-              ],
+  // Диалог создания/редактирования работы
+  void _openJobEditor({Map<String, dynamic>? existingJob}) {
+    final nameCtrl = TextEditingController(text: existingJob?['name'] ?? '');
+    TimeOfDay startTime = TimeOfDay(
+      hour: existingJob?['startHour'] ?? 8,
+      minute: existingJob?['startMin'] ?? 0,
+    );
+    TimeOfDay endTime = TimeOfDay(
+      hour: existingJob?['endHour'] ?? 20,
+      minute: existingJob?['endMin'] ?? 0,
+    );
+
+    Color pickedColor = existingJob?['color'] ?? const Color(0xFFFF5252);
+
+    final palette = [
+      const Color(0xFFFF5252),
+      const Color(0xFF40C4FF),
+      const Color(0xFF66BB6A),
+      const Color(0xFFFFB300),
+      const Color(0xFFE040FB),
+      const Color(0xFF7C4DFF),
+      const Color(0xFFFF9100),
+      const Color(0xFF00E676),
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDState) {
+          final hours = _calculateHours(startTime, endTime);
+
+          return AlertDialog(
+            title: Text(
+              existingJob == null ? 'Новая работа' : 'Редактировать работу',
             ),
-          ),
-        ],
-        onChanged: (val) {
-          if (val == '__NEW__') {
-            _showCreateScheduleDialog();
-          } else if (val != null) {
-            setState(() {
-              _selectedSchedule = val;
-              _loadScheduleData();
-            });
-          }
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Название (Основная, Подработка, Дежурство)',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Начало смены',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    trailing: Text(
+                      startTime.format(context),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onTap: () async {
+                      final t = await showTimePicker(
+                        context: context,
+                        initialTime: startTime,
+                      );
+                      if (t != null) setDState(() => startTime = t);
+                    },
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Конец смены',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                    trailing: Text(
+                      endTime.format(context),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onTap: () async {
+                      final t = await showTimePicker(
+                        context: context,
+                        initialTime: endTime,
+                      );
+                      if (t != null) setDState(() => endTime = t);
+                    },
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: pickedColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Длительность смены:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${hours.toStringAsFixed(1)} ч.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: pickedColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Цвет смены:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    children: palette.map((col) {
+                      final isSel = pickedColor == col;
+                      return GestureDetector(
+                        onTap: () => setDState(() => pickedColor = col),
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: col,
+                            shape: BoxShape.circle,
+                            border: isSel
+                                ? Border.all(color: Colors.white, width: 2.5)
+                                : null,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final name = nameCtrl.text.trim().isEmpty
+                      ? 'Работа'
+                      : nameCtrl.text.trim();
+
+                  if (existingJob == null) {
+                    final newJob = {
+                      'id': 'job_${DateTime.now().millisecondsSinceEpoch}',
+                      'name': name,
+                      'color': pickedColor,
+                      'startHour': startTime.hour,
+                      'startMin': startTime.minute,
+                      'endHour': endTime.hour,
+                      'endMin': endTime.minute,
+                    };
+                    _jobs.add(newJob);
+                    _selectedJobId = newJob['id'].toString();
+                  } else {
+                    existingJob['name'] = name;
+                    existingJob['color'] = pickedColor;
+                    existingJob['startHour'] = startTime.hour;
+                    existingJob['startMin'] = startTime.minute;
+                    existingJob['endHour'] = endTime.hour;
+                    existingJob['endMin'] = endTime.minute;
+                  }
+
+                  setState(() {});
+                  _saveData();
+                  _syncWithMainCalendarSilently();
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Сохранить'),
+              ),
+            ],
+          );
         },
       ),
     );
   }
 
-  void _showCreateScheduleDialog() {
-    final ctrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Создать график'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(
-            labelText: 'Название графика',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (ctrl.text.trim().isNotEmpty) {
-                setState(() {
-                  _schedules.add(ctrl.text.trim());
-                  _selectedSchedule = ctrl.text.trim();
-                  _dayData.clear();
-                });
-                _saveCurrentScheduleData();
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Создать'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGridCalendar(
-    bool isDark,
-    Color textPrimary,
-    Color textSecondary,
-  ) {
-    const daysHeader = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-    final firstDay = DateTime(_displayedMonth.year, _displayedMonth.month, 1);
-    final daysInMonth = DateTime(
-      _displayedMonth.year,
-      _displayedMonth.month + 1,
-      0,
-    ).day;
-    final startingOffset = firstDay.weekday - 1;
-    final totalRows = ((startingOffset + daysInMonth) / 7).ceil();
-
-    return Column(
-      children: [
-        Row(
-          children: daysHeader
-              .map(
-                (d) => Expanded(
-                  child: Center(
-                    child: Text(
-                      d,
-                      style: TextStyle(
-                        color: textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-        const SizedBox(height: 8),
-        for (int r = 0; r < totalRows; r++)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(
-              children: [
-                for (int c = 0; c < 7; c++)
-                  Expanded(
-                    child: Builder(
-                      builder: (ctx) {
-                        final dayNumber = r * 7 + c - startingOffset + 1;
-                        if (dayNumber < 1 || dayNumber > daysInMonth) {
-                          return const SizedBox(height: 48);
-                        }
-
-                        final date = DateTime(
-                          _displayedMonth.year,
-                          _displayedMonth.month,
-                          dayNumber,
-                        );
-                        final key =
-                            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-                        final hasData = _dayData.containsKey(key);
-                        final dayInfo = _dayData[key];
-
-                        Color cellColor = Colors.transparent;
-                        if (hasData && dayInfo?['typeId'] != null) {
-                          final type = _shiftTypes.firstWhere(
-                            (t) => t['id'] == dayInfo!['typeId'],
-                            orElse: () => {'color': 0xFF2C69D1},
-                          );
-                          cellColor = Color(type['color'] as int)
-                              .withValues(alpha: 0.35);
-                        }
-
-                        return InkWell(
-                          onTap: () => _openDayEditDialog(date, key, isDark),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            height: 48,
-                            margin: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: cellColor,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isDark
-                                    ? const Color(0xFF30363D)
-                                    : const Color(0xFFD0D7DE),
-                                width: 0.8,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '$dayNumber',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: textPrimary,
-                                  ),
-                                ),
-                                if (hasData &&
-                                    (dayInfo?['hours']?.toString() ?? '')
-                                        .isNotEmpty)
-                                  Text(
-                                    '${dayInfo!['hours']}ч',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      color: textSecondary,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  void _openDayEditDialog(DateTime date, String key, bool isDark) {
-    final existing = _dayData[key] ?? {};
-    String selectedTypeId = existing['typeId'] ?? _shiftTypes.first['id'];
-    final hoursCtrl = TextEditingController(
-      text: existing['hours']?.toString() ?? '',
-    );
-    final rateCtrl = TextEditingController(
-      text: existing['rate']?.toString() ?? '',
-    );
-    final noteCtrl = TextEditingController(
-      text: existing['note']?.toString() ?? '',
-    );
-
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-          title: Text('День: ${date.day}.${date.month}.${date.year}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: selectedTypeId,
-                  decoration: const InputDecoration(
-                    labelText: 'Тип отметки',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _shiftTypes
-                      .map(
-                        (t) => DropdownMenuItem(
-                          value: t['id'] as String,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(t['color'] as int),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(t['name'] as String),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (val) => setDlg(() => selectedTypeId = val!),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: hoursCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Количество часов',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: rateCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Сумма / Значение (₽)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Заметка пользователя',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            if (_dayData.containsKey(key))
-              TextButton(
-                onPressed: () {
-                  setState(() => _dayData.remove(key));
-                  _saveCurrentScheduleData();
-                  Navigator.pop(ctx);
-                },
-                child: const Text(
-                  'Удалить',
-                  style: TextStyle(color: Colors.redAccent),
-                ),
-              ),
-            FilledButton(
-              onPressed: () {
-                setState(() {
-                  _dayData[key] = {
-                    'typeId': selectedTypeId,
-                    'hours': hoursCtrl.text.trim(),
-                    'rate': rateCtrl.text.trim(),
-                    'note': noteCtrl.text.trim(),
-                  };
-                });
-                _saveCurrentScheduleData();
-                Navigator.pop(ctx);
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openSettingsDialog(bool isDark) {
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-          title: const Text('Настройки графика'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  title: const Text('Показывать номер недели'),
-                  value: _showWeekNumber,
-                  onChanged: (v) {
-                    setDlg(() => _showWeekNumber = v);
-                    setState(() => _showWeekNumber = v);
-                    _saveCurrentScheduleData();
-                  },
-                ),
-                ListTile(
-                  title: const Text('Настройка типов меток'),
-                  subtitle: const Text('Изменение названий и палитры'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _openShiftTypesSettings();
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Закрыть'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openShiftTypesSettings() {
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-          title: const Text('Пресеты меток'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _shiftTypes.length,
-              itemBuilder: (c, i) {
-                final item = _shiftTypes[i];
-                return ListTile(
-                  leading: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(item['color'] as int),
-                    ),
-                  ),
-                  title: Text(item['name']),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.edit, size: 16),
-                    onPressed: () {
-                      final nameCtrl = TextEditingController(
-                        text: item['name'],
-                      );
-                      showDialog(
-                        context: context,
-                        builder: (editCtx) => AlertDialog(
-                          title: const Text('Редактировать пресет'),
-                          content: TextField(
-                            controller: nameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Название',
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(editCtx),
-                              child: const Text('Отмена'),
-                            ),
-                            FilledButton(
-                              onPressed: () {
-                                setDlg(
-                                  () => item['name'] = nameCtrl.text.trim(),
-                                );
-                                setState(() {});
-                                _saveCurrentScheduleData();
-                                Navigator.pop(editCtx);
-                              },
-                              child: const Text('Сохранить'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Готово'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _monthName(int month) {
-    const names = [
-      'Январь',
-      'Февраль',
-      'Март',
-      'Апрель',
-      'Май',
-      'Июнь',
-      'Июль',
-      'Август',
-      'Сентябрь',
-      'Октябрь',
-      'Ноябрь',
-      'Декабрь',
-    ];
-    return names[month - 1];
-  }
+  String _monthName(int m) => const [
+    'Январь',
+    'Февраль',
+    'Март',
+    'Апрель',
+    'Май',
+    'Июнь',
+    'Июль',
+    'Август',
+    'Сентябрь',
+    'Октябрь',
+    'Ноябрь',
+    'Декабрь',
+  ][m - 1];
 }

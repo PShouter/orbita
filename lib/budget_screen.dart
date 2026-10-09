@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class BudgetScreen extends StatefulWidget {
   final bool isDarkMode;
@@ -79,7 +76,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
 
   // Настройки
   bool _remindAt21 = true;
-  int _startPeriodDay = 1;
+  final int _startPeriodDay = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +255,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: const Color(0xFF38BDF8).withOpacity(0.12),
+                  backgroundColor: const Color(0xFF38BDF8)
+                      .withValues(alpha: 0.12),
                   child: Icon(
                     acc['icon'] as IconData,
                     color: const Color(0xFF38BDF8),
@@ -349,8 +347,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
               children: [
                 CircleAvatar(
                   backgroundColor: isExpense
-                      ? Colors.redAccent.withOpacity(0.12)
-                      : Colors.greenAccent.withOpacity(0.12),
+                      ? Colors.redAccent.withValues(alpha: 0.12)
+                      : Colors.greenAccent.withValues(alpha: 0.12),
                   child: Icon(
                     isExpense ? Icons.arrow_downward : Icons.arrow_upward,
                     color: isExpense ? Colors.redAccent : Colors.green,
@@ -591,7 +589,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
             child: LinearProgressIndicator(
               value: percent,
               minHeight: 6,
-              backgroundColor: Colors.grey.withOpacity(0.2),
+              backgroundColor: Colors.grey.withValues(alpha: 0.2),
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),

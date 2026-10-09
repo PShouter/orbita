@@ -1,13 +1,17 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// Подключение экранов и модулей
+// Сервисы
+import 'notification_service.dart';
+import 'services/sync_service.dart';
+
+// Экраны приложения
 import 'auth_screen.dart';
 import 'profile_screen.dart';
 import 'budget_screen.dart';
@@ -30,12 +34,29 @@ const String kSupabaseAnonKey =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Инициализация сервиса локальных уведомлений
+  try {
+    await NotificationService().init();
+  } catch (e) {
+    debugPrint('Notification init notice: $e');
+  }
+
+  // Инициализация фоновой синхронизации
+  try {
+    SyncService.instance.initListener();
+  } catch (e) {
+    debugPrint('SyncService init notice: $e');
+  }
+
+  // Инициализация Supabase
   try {
     await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
   } catch (e) {
     debugPrint('Supabase init notice: $e');
   }
-  runApp(const OrbitaApp());
+
+  runApp(const ProviderScope(child: OrbitaApp()));
 }
 
 final supabase = Supabase.instance.client;
@@ -171,15 +192,7 @@ class _MainShellState extends State<MainShell> {
   int _daysWithOrbita = 1;
   String? _savedVaultPin;
 
-  final List<Map<String, dynamic>> _tasks = [];
-  bool _isLoadingTasks = false;
-
-  final List<Map<String, dynamic>> _notes = [];
-  bool _isLoadingNotes = false;
-
   final List<Map<String, dynamic>> _taskTemplates = [];
-  final List<Map<String, dynamic>> _habits = [];
-  final List<Map<String, dynamic>> _calendarEvents = [];
   final List<Map<String, dynamic>> _documents = [];
 
   @override
@@ -197,74 +210,31 @@ class _MainShellState extends State<MainShell> {
       _userAvatarPath = prefs.getString('user_avatar_path');
       _savedVaultPin = prefs.getString('vault_pin');
 
-      final regTimestamp = prefs.getInt('registration_timestamp');
+      int? regTimestamp = prefs.getInt('registration_timestamp');
+
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser?.createdAt != null) {
+        final parsedCreated = DateTime.tryParse(currentUser!.createdAt);
+        if (parsedCreated != null) {
+          regTimestamp = parsedCreated.millisecondsSinceEpoch;
+          prefs.setInt('registration_timestamp', regTimestamp);
+        }
+      }
+
+      final now = DateTime.now();
+      final cleanNow = DateTime(now.year, now.month, now.day);
+
       if (regTimestamp == null) {
-        final nowMs = DateTime.now().millisecondsSinceEpoch;
-        prefs.setInt('registration_timestamp', nowMs);
+        prefs.setInt('registration_timestamp', now.millisecondsSinceEpoch);
         _daysWithOrbita = 1;
       } else {
         final regDate = DateTime.fromMillisecondsSinceEpoch(regTimestamp);
-        _daysWithOrbita = DateTime.now().difference(regDate).inDays + 1;
-      }
+        final cleanReg = DateTime(regDate.year, regDate.month, regDate.day);
 
-      final rawTasks = prefs.getString('cached_tasks');
-      if (rawTasks != null) {
-        final List decoded = jsonDecode(rawTasks);
-        _tasks.clear();
-        _tasks.addAll(
-          decoded.map((e) {
-            final m = Map<String, dynamic>.from(e);
-            m['date'] = DateTime.parse(m['date']);
-            return m;
-          }),
-        );
-      }
-
-      final rawNotes = prefs.getString('cached_notes');
-      if (rawNotes != null) {
-        final List decoded = jsonDecode(rawNotes);
-        _notes.clear();
-        _notes.addAll(decoded.map((e) => Map<String, dynamic>.from(e)));
-      }
-
-      final rawHabits = prefs.getString('cached_habits');
-      if (rawHabits != null) {
-        final List decoded = jsonDecode(rawHabits);
-        _habits.clear();
-        _habits.addAll(
-          decoded.map((e) {
-            final m = Map<String, dynamic>.from(e);
-            if (m['color'] is int) m['color'] = Color(m['color']);
-            return m;
-          }),
-        );
+        final diff = cleanNow.difference(cleanReg).inDays;
+        _daysWithOrbita = (diff >= 0 ? diff : 0) + 1;
       }
     });
-  }
-
-  Future<void> _saveTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final toSave = _tasks.map((t) {
-      final m = Map<String, dynamic>.from(t);
-      m['date'] = (t['date'] as DateTime).toIso8601String();
-      return m;
-    }).toList();
-    await prefs.setString('cached_tasks', jsonEncode(toSave));
-  }
-
-  Future<void> _saveNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('cached_notes', jsonEncode(_notes));
-  }
-
-  Future<void> _saveHabits() async {
-    final prefs = await SharedPreferences.getInstance();
-    final toSave = _habits.map((h) {
-      final m = Map<String, dynamic>.from(h);
-      if (h['color'] is Color) m['color'] = (h['color'] as Color).value;
-      return m;
-    }).toList();
-    await prefs.setString('cached_habits', jsonEncode(toSave));
   }
 
   void _openProfileScreen() {
@@ -278,6 +248,7 @@ class _MainShellState extends State<MainShell> {
           userAvatarPath: _userAvatarPath,
           daysWithOrbita: _daysWithOrbita,
           onLogout: widget.onLogout,
+          onDeleteAccount: widget.onLogout,
           onProfileUpdated: (newName, newUsername, newAvatarPath) {
             setState(() {
               _userName = newName;
@@ -446,130 +417,25 @@ class _MainShellState extends State<MainShell> {
           isDarkMode: widget.isDarkMode,
           userName: _userName,
           daysWithOrbita: _daysWithOrbita,
-          tasks: _tasks,
-          isLoadingTasks: _isLoadingTasks,
-          calendarEvents: _calendarEvents,
-          habits: _habits,
-          onToggleTask: (t, v) {
-            setState(() => t['done'] = v);
-            _saveTasks();
-          },
-          onToggleHabit: (h) {
-            setState(() => h['done'] = !(h['done'] ?? false));
-            _saveHabits();
-          },
           onOpenCreateTask: () => setState(() => _navIndex = 2),
           onOpenCreateEvent: () => setState(() => _navIndex = 1),
           onOpenCreateHabit: () => setState(() => _navIndex = 3),
           onOpenBudget: () => setState(() => _isBudgetModeActive = true),
         );
       case 1:
-        return CalendarScreen(
-          isDarkMode: widget.isDarkMode,
-          tasks: _tasks,
-          calendarEvents: _calendarEvents,
-          onToggleTask: (t, v) {
-            setState(() => t['done'] = v);
-            _saveTasks();
-          },
-          onAddCalendarEvent: (ev) {
-            setState(() => _calendarEvents.add(ev));
-          },
-        );
+        return CalendarScreen(isDarkMode: widget.isDarkMode);
       case 2:
         return TasksScreen(
           isDarkMode: widget.isDarkMode,
-          tasks: _tasks,
-          isLoadingTasks: _isLoadingTasks,
           taskTemplates: _taskTemplates,
-          onToggleTask: (t, v) {
-            setState(() => t['done'] = v);
-            _saveTasks();
-          },
-          onDeleteTask: (t) {
-            setState(() => _tasks.remove(t));
-            _saveTasks();
-          },
-          onSaveTask:
-              ({
-                existingTask,
-                required title,
-                required desc,
-                required date,
-                required isAllDay,
-                required time,
-                required location,
-                required reminder,
-                required repeat,
-                required priority,
-                required subtasks,
-              }) {
-                if (existingTask == null) {
-                  setState(() {
-                    _tasks.insert(0, {
-                      'title': title,
-                      'desc': desc,
-                      'date': date,
-                      'isAllDay': isAllDay,
-                      'time': time,
-                      'priority': priority,
-                      'subtasks': subtasks,
-                      'done': false,
-                    });
-                  });
-                } else {
-                  setState(() {
-                    existingTask['title'] = title;
-                    existingTask['desc'] = desc;
-                    existingTask['date'] = date;
-                    existingTask['isAllDay'] = isAllDay;
-                    existingTask['time'] = time;
-                    existingTask['priority'] = priority;
-                    existingTask['subtasks'] = subtasks;
-                  });
-                }
-                _saveTasks();
-              },
           onSaveTemplate: (tpl) {
             setState(() => _taskTemplates.add(tpl));
           },
         );
       case 3:
-        return HabitsScreen(
-          isDarkMode: widget.isDarkMode,
-          habits: _habits,
-          onSaveHabits: _saveHabits,
-        );
+        return HabitsScreen(isDarkMode: widget.isDarkMode);
       case 4:
-        return NotesScreen(
-          isDarkMode: widget.isDarkMode,
-          notes: _notes,
-          isLoadingNotes: _isLoadingNotes,
-          onSaveNote:
-              ({existingNote, required title, required body, required image}) {
-                if (existingNote == null) {
-                  setState(() {
-                    _notes.insert(0, {
-                      'title': title,
-                      'body': body,
-                      'image': image,
-                      'date': 'Сегодня',
-                    });
-                  });
-                } else {
-                  setState(() {
-                    existingNote['title'] = title;
-                    existingNote['body'] = body;
-                    existingNote['image'] = image;
-                  });
-                }
-                _saveNotes();
-              },
-          onDeleteNote: (n) {
-            setState(() => _notes.remove(n));
-            _saveNotes();
-          },
-        );
+        return NotesScreen(isDarkMode: widget.isDarkMode);
       case 5:
         return DiaryScreen(isDarkMode: widget.isDarkMode);
       default:

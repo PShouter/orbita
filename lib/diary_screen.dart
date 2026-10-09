@@ -120,8 +120,9 @@ class _DiaryScreenState extends State<DiaryScreen> {
                         label: Text('${m['emoji']} ${m['label']}'),
                         selected: isSelected,
                         onSelected: (val) {
-                          if (val)
+                          if (val) {
                             setSheetState(() => selectedMood = m['emoji']!);
+                          }
                         },
                       );
                     }).toList(),
@@ -149,8 +150,9 @@ class _DiaryScreenState extends State<DiaryScreen> {
                     child: FilledButton(
                       onPressed: () {
                         if (titleController.text.trim().isEmpty &&
-                            bodyController.text.trim().isEmpty)
+                            bodyController.text.trim().isEmpty) {
                           return;
+                        }
 
                         final now = DateTime.now();
                         final dateStr =
@@ -369,7 +371,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                         entry['date'] ?? '',
                         style: TextStyle(
                           fontSize: 11,
-                          color: textSecondary.withOpacity(0.7),
+                          color: textSecondary.withValues(alpha: 0.7),
                         ),
                       ),
                     ],

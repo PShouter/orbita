@@ -2,18 +2,17 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-class HomeScreen extends StatefulWidget {
+import '../providers/calendar_provider.dart';
+import '../providers/habits_provider.dart';
+import '../providers/tasks_provider.dart';
+
+class HomeScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
   final String userName;
   final int daysWithOrbita;
-  final List<Map<String, dynamic>> tasks;
-  final bool isLoadingTasks;
-  final List<Map<String, dynamic>> calendarEvents;
-  final List<Map<String, dynamic>> habits;
-  final Function(Map<String, dynamic>, bool) onToggleTask;
-  final Function(Map<String, dynamic>) onToggleHabit;
   final VoidCallback onOpenCreateTask;
   final VoidCallback onOpenCreateEvent;
   final VoidCallback onOpenCreateHabit;
@@ -24,12 +23,6 @@ class HomeScreen extends StatefulWidget {
     required this.isDarkMode,
     required this.userName,
     required this.daysWithOrbita,
-    required this.tasks,
-    required this.isLoadingTasks,
-    required this.calendarEvents,
-    required this.habits,
-    required this.onToggleTask,
-    required this.onToggleHabit,
     required this.onOpenCreateTask,
     required this.onOpenCreateEvent,
     required this.onOpenCreateHabit,
@@ -37,10 +30,10 @@ class HomeScreen extends StatefulWidget {
   });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   late String _randomQuote;
 
   static const List<String> _quotes = [
@@ -74,18 +67,29 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final today = DateTime.now();
 
-    final todayTasks = widget.tasks.where((t) {
-      final d = t['date'] as DateTime;
-      return d.year == today.year &&
-          d.month == today.month &&
-          d.day == today.day;
+    final allTasks = ref.watch(tasksProvider);
+    final allEvents = ref.watch(calendarProvider);
+    final habits = ref.watch(habitsProvider);
+
+    final todayTasks = allTasks.where((t) {
+      if (t['isNoDate'] == true || t['date'] == null) return false;
+      final d = t['date'];
+      if (d is DateTime) {
+        return d.year == today.year &&
+            d.month == today.month &&
+            d.day == today.day;
+      }
+      return false;
     }).toList();
 
-    final todayEvents = widget.calendarEvents.where((e) {
-      final d = e['date'] as DateTime;
-      return d.year == today.year &&
-          d.month == today.month &&
-          d.day == today.day;
+    final todayEvents = allEvents.where((e) {
+      final d = e['date'];
+      if (d is DateTime) {
+        return d.year == today.year &&
+            d.month == today.month &&
+            d.day == today.day;
+      }
+      return false;
     }).toList();
 
     final Color textPrimary = widget.isDarkMode
@@ -122,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 14),
 
-        // 2. Блок рандомной цитаты
+        // 2. Рандомная цитата
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -153,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 3. Блок "Календарь (Слева) и Задачи (Справа)"
+        // 3. Календарь (Слева) и Задачи (Справа)
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -165,7 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Левая половина: Календарь
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,8 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      if (todayEvents.isEmpty &&
-                          !todayTasks.any((t) => t['isAllDay'] == false))
+                      if (todayEvents.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
@@ -208,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         )
-                      else ...[
+                      else
                         ...todayEvents.map(
                           (ev) => Padding(
                             padding: const EdgeInsets.only(bottom: 6),
@@ -226,7 +228,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(
-                                  ev['startTime'] ?? 'Весь день',
+                                  ev['isAllDay'] == true
+                                      ? 'Весь день'
+                                      : '${ev['startTime'] ?? '00:00'} - ${ev['endTime'] ?? ''}',
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: textSecondary,
@@ -236,48 +240,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-                        ...todayTasks
-                            .where((t) => t['isAllDay'] == false)
-                            .map(
-                              (t) => Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '⏱ ${t['title']}',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF38BDF8),
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      t['time'] ?? '12:00',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                      ],
                     ],
                   ),
                 ),
-
-                // Вертикальный разделитель
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10),
                   width: 1,
                   color: borderColor,
                 ),
-
-                // Правая половина: Задачи
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,14 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      if (widget.isLoadingTasks)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      else if (todayTasks.isEmpty)
+                      if (todayTasks.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
@@ -327,41 +290,69 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         )
                       else
-                        ...todayTasks.map(
-                          (t) => Padding(
+                        ...todayTasks.map((t) {
+                          final isDone = t['done'] == true;
+                          final isAllDay = t['isAllDay'] == true;
+                          final time = t['time'];
+
+                          return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 3),
                             child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: Checkbox(
-                                    value: t['done'] ?? false,
-                                    onChanged: (v) =>
-                                        widget.onToggleTask(t, v ?? false),
+                                    value: isDone,
+                                    onChanged: (v) {
+                                      ref
+                                          .read(tasksProvider.notifier)
+                                          .toggleTask(
+                                            t['id'].toString(),
+                                            v ?? false,
+                                          );
+                                    },
                                   ),
                                 ),
                                 const SizedBox(width: 6),
                                 Expanded(
-                                  child: Text(
-                                    t['title'] ?? '',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: (t['done'] == true)
-                                          ? textSecondary
-                                          : textPrimary,
-                                      decoration: (t['done'] == true)
-                                          ? TextDecoration.lineThrough
-                                          : null,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        t['title'] ?? '',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDone
+                                              ? textSecondary
+                                              : textPrimary,
+                                          decoration: isDone
+                                              ? TextDecoration.lineThrough
+                                              : null,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (!isAllDay && time != null)
+                                        Text(
+                                          '⏱ $time',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDone
+                                                ? textSecondary
+                                                : const Color(0xFF38BDF8),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                     ],
                   ),
                 ),
@@ -371,7 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 4. Блок "Привычки"
+        // 4. Привычки (из SQLite / habitsProvider)
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -408,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              if (widget.habits.isEmpty)
+              if (habits.isEmpty)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
@@ -420,7 +411,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               else
                 Row(
-                  children: widget.habits.take(3).map((h) {
+                  children: habits.take(3).map((h) {
                     final itemColor =
                         (h['color'] as Color? ?? const Color(0xFF2C69D1));
                     final isDone = h['done'] == true;
@@ -429,7 +420,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: GestureDetector(
                         onTap: () {
                           HapticFeedback.mediumImpact();
-                          widget.onToggleHabit(h);
+                          ref
+                              .read(habitsProvider.notifier)
+                              .toggleHabit(h['id'].toString());
                         },
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -438,7 +431,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             horizontal: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: itemColor.withOpacity(isDone ? 0.25 : 0.08),
+                            color: itemColor.withValues(
+                              alpha: isDone ? 0.25 : 0.08,
+                            ),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isDone ? itemColor : borderColor,
@@ -485,7 +480,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 5. Блок "Финансы"
+        // 5. Финансы
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

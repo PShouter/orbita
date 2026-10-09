@@ -78,12 +78,12 @@ class AppInfoScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Версия: Demo 0.2.9',
+                  'Версия: Global Demo 0.3.0',
                   style: TextStyle(fontSize: 13, color: textSecondary),
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Разработчик: Pavel Krikun',
+                  'Разработчик: Pavel Krikun (Shouter)',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
