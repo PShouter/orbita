@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Сервисы
 import 'notification_service.dart';
 import 'services/sync_service.dart';
+import 'providers/profile_provider.dart';
 
 // Экраны приложения
 import 'auth_screen.dart';
@@ -27,7 +27,6 @@ import 'diary_screen.dart';
 import 'vault_screen.dart';
 import 'settings_screen.dart';
 
-// Конфигурация Supabase
 const String kSupabaseUrl = 'https://zttfujvamtcfkraotxif.supabase.co';
 const String kSupabaseAnonKey =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0dGZ1anZhbXRjZmtyYW90eGlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MDk0ODksImV4cCI6MjEwNjE4NTQ4OX0.xLzvSDMuyuYCGmzyV7EKZhpjKhOc3Sb2JCYnZvMkeVs';
@@ -35,21 +34,18 @@ const String kSupabaseAnonKey =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Инициализация сервиса локальных уведомлений
   try {
     await NotificationService().init();
   } catch (e) {
     debugPrint('Notification init notice: $e');
   }
 
-  // Инициализация фоновой синхронизации
   try {
     SyncService.instance.initListener();
   } catch (e) {
     debugPrint('SyncService init notice: $e');
   }
 
-  // Инициализация Supabase
   try {
     await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
   } catch (e) {
@@ -59,60 +55,14 @@ Future<void> main() async {
   runApp(const ProviderScope(child: OrbitaApp()));
 }
 
-final supabase = Supabase.instance.client;
-
-class OrbitaApp extends StatefulWidget {
+class OrbitaApp extends ConsumerWidget {
   const OrbitaApp({super.key});
 
   @override
-  State<OrbitaApp> createState() => _OrbitaAppState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(profileProvider);
 
-class _OrbitaAppState extends State<OrbitaApp> {
-  bool _isDarkMode = false;
-  bool _isAuthenticated = false;
-  bool _isCheckingAuth = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _initApp();
-  }
-
-  Future<void> _initApp() async {
-    final prefs = await SharedPreferences.getInstance();
-    final isDark = prefs.getBool('is_dark_mode') ?? false;
-
-    final session = supabase.auth.currentSession;
-    final isGuest = prefs.getBool('is_guest_mode') ?? false;
-
-    setState(() {
-      _isDarkMode = isDark;
-      _isAuthenticated = session != null || isGuest;
-      _isCheckingAuth = false;
-    });
-  }
-
-  Future<void> _toggleTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _isDarkMode = !_isDarkMode;
-    });
-    await prefs.setBool('is_dark_mode', _isDarkMode);
-  }
-
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await supabase.auth.signOut();
-    await prefs.setBool('is_guest_mode', false);
-    setState(() {
-      _isAuthenticated = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isCheckingAuth) {
+    if (profile.isCheckingAuth) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -122,7 +72,7 @@ class _OrbitaAppState extends State<OrbitaApp> {
     return MaterialApp(
       title: 'Орбита',
       debugShowCheckedModeBanner: false,
-      themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+      themeMode: profile.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       locale: const Locale('ru', 'RU'),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -151,110 +101,51 @@ class _OrbitaAppState extends State<OrbitaApp> {
           surface: const Color(0xFF161B22),
         ),
       ),
-      home: _isAuthenticated
-          ? MainShell(
-              isDarkMode: _isDarkMode,
-              onToggleTheme: _toggleTheme,
-              onLogout: _logout,
-            )
+      home: profile.isAuthenticated
+          ? const MainShell()
           : AuthScreen(
-              isDarkMode: _isDarkMode,
-              onAuthenticated: () => setState(() => _isAuthenticated = true),
+              isDarkMode: profile.isDarkMode,
+              onAuthenticated: () =>
+                  ref.read(profileProvider.notifier).markAuthenticated(),
             ),
     );
   }
 }
 
-class MainShell extends StatefulWidget {
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
-  final VoidCallback onLogout;
-
-  const MainShell({
-    super.key,
-    required this.isDarkMode,
-    required this.onToggleTheme,
-    required this.onLogout,
-  });
+class MainShell extends ConsumerStatefulWidget {
+  const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends ConsumerState<MainShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _navIndex = 0;
   bool _isBudgetModeActive = false;
 
-  String _userName = 'Пользователь';
-  String _customUsername = 'orbita_user';
-  String? _userAvatarPath;
-  int _daysWithOrbita = 1;
-  String? _savedVaultPin;
-
   final List<Map<String, dynamic>> _taskTemplates = [];
-  final List<Map<String, dynamic>> _documents = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _loadCache();
-  }
-
-  Future<void> _loadCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userName = prefs.getString('user_full_name') ?? 'Пользователь';
-      _customUsername =
-          prefs.getString('user_custom_username') ?? 'orbita_user';
-      _userAvatarPath = prefs.getString('user_avatar_path');
-      _savedVaultPin = prefs.getString('vault_pin');
-
-      int? regTimestamp = prefs.getInt('registration_timestamp');
-
-      final currentUser = supabase.auth.currentUser;
-      if (currentUser?.createdAt != null) {
-        final parsedCreated = DateTime.tryParse(currentUser!.createdAt);
-        if (parsedCreated != null) {
-          regTimestamp = parsedCreated.millisecondsSinceEpoch;
-          prefs.setInt('registration_timestamp', regTimestamp);
-        }
-      }
-
-      final now = DateTime.now();
-      final cleanNow = DateTime(now.year, now.month, now.day);
-
-      if (regTimestamp == null) {
-        prefs.setInt('registration_timestamp', now.millisecondsSinceEpoch);
-        _daysWithOrbita = 1;
-      } else {
-        final regDate = DateTime.fromMillisecondsSinceEpoch(regTimestamp);
-        final cleanReg = DateTime(regDate.year, regDate.month, regDate.day);
-
-        final diff = cleanNow.difference(cleanReg).inDays;
-        _daysWithOrbita = (diff >= 0 ? diff : 0) + 1;
-      }
-    });
-  }
-
-  void _openProfileScreen() {
+  void _openProfileScreen(ProfileState profile) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ProfileScreen(
-          isDarkMode: widget.isDarkMode,
-          userName: _userName,
-          customUsername: _customUsername,
-          userAvatarPath: _userAvatarPath,
-          daysWithOrbita: _daysWithOrbita,
-          onLogout: widget.onLogout,
-          onDeleteAccount: widget.onLogout,
+          isDarkMode: profile.isDarkMode,
+          userName: profile.userName,
+          customUsername: profile.customUsername,
+          userAvatarPath: profile.avatarPath,
+          daysWithOrbita: profile.daysWithOrbita,
+          onLogout: () => ref.read(profileProvider.notifier).logout(),
+          onDeleteAccount: () => ref.read(profileProvider.notifier).logout(),
           onProfileUpdated: (newName, newUsername, newAvatarPath) {
-            setState(() {
-              _userName = newName;
-              _customUsername = newUsername;
-              _userAvatarPath = newAvatarPath;
-            });
+            ref
+                .read(profileProvider.notifier)
+                .updateProfile(
+                  newName: newName,
+                  newUsername: newUsername,
+                  newAvatarPath: newAvatarPath,
+                );
           },
         ),
       ),
@@ -274,21 +165,24 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final profile = ref.watch(profileProvider);
+    final profileNotifier = ref.read(profileProvider.notifier);
+
     if (_isBudgetModeActive) {
       return BudgetScreen(
-        isDarkMode: widget.isDarkMode,
+        isDarkMode: profile.isDarkMode,
         onExitBudget: () => setState(() => _isBudgetModeActive = false),
       );
     }
 
-    final isDark = widget.isDarkMode;
+    final isDark = profile.isDarkMode;
     final textPrimary = isDark
         ? const Color(0xFFF0F6FC)
         : const Color(0xFF24292F);
 
     return Scaffold(
       key: _scaffoldKey,
-      drawer: _buildDrawer(isDark, textPrimary),
+      drawer: _buildDrawer(profile, profileNotifier, isDark, textPrimary),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 16,
@@ -318,23 +212,23 @@ class _MainShellState extends State<MainShell> {
                 color: textPrimary,
               ),
             ),
-            onPressed: widget.onToggleTheme,
+            onPressed: () => profileNotifier.toggleTheme(),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 16, left: 4),
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: _openProfileScreen,
+              onTap: () => _openProfileScreen(profile),
               child: SizedBox(
                 width: 32,
                 height: 32,
                 child:
-                    _userAvatarPath != null &&
-                        File(_userAvatarPath!).existsSync()
+                    profile.avatarPath != null &&
+                        File(profile.avatarPath!).existsSync()
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: Image.file(
-                          File(_userAvatarPath!),
+                          File(profile.avatarPath!),
                           fit: BoxFit.cover,
                         ),
                       )
@@ -361,7 +255,7 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: _buildCurrentBody(),
+      body: _buildCurrentBody(profile.isDarkMode),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _navIndex,
         onTap: (i) {
@@ -410,40 +304,41 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildCurrentBody() {
+  Widget _buildCurrentBody(bool isDark) {
     switch (_navIndex) {
       case 0:
         return HomeScreen(
-          isDarkMode: widget.isDarkMode,
-          userName: _userName,
-          daysWithOrbita: _daysWithOrbita,
+          isDarkMode: isDark,
           onOpenCreateTask: () => setState(() => _navIndex = 2),
           onOpenCreateEvent: () => setState(() => _navIndex = 1),
           onOpenCreateHabit: () => setState(() => _navIndex = 3),
           onOpenBudget: () => setState(() => _isBudgetModeActive = true),
         );
       case 1:
-        return CalendarScreen(isDarkMode: widget.isDarkMode);
+        return CalendarScreen(isDarkMode: isDark);
       case 2:
         return TasksScreen(
-          isDarkMode: widget.isDarkMode,
+          isDarkMode: isDark,
           taskTemplates: _taskTemplates,
-          onSaveTemplate: (tpl) {
-            setState(() => _taskTemplates.add(tpl));
-          },
+          onSaveTemplate: (tpl) => setState(() => _taskTemplates.add(tpl)),
         );
       case 3:
-        return HabitsScreen(isDarkMode: widget.isDarkMode);
+        return HabitsScreen(isDarkMode: isDark);
       case 4:
-        return NotesScreen(isDarkMode: widget.isDarkMode);
+        return NotesScreen(isDarkMode: isDark);
       case 5:
-        return DiaryScreen(isDarkMode: widget.isDarkMode);
+        return DiaryScreen(isDarkMode: isDark);
       default:
         return const SizedBox.shrink();
     }
   }
 
-  Widget _buildDrawer(bool isDark, Color textPrimary) {
+  Widget _buildDrawer(
+    ProfileState profile,
+    ProfileNotifier notifier,
+    bool isDark,
+    Color textPrimary,
+  ) {
     final Color textSecondary = isDark
         ? const Color(0xFF8B949E)
         : const Color(0xFF57606A);
@@ -473,7 +368,7 @@ class _MainShellState extends State<MainShell> {
             InkWell(
               onTap: () {
                 Navigator.pop(context);
-                _openProfileScreen();
+                _openProfileScreen(profile);
               },
               child: Container(
                 width: double.infinity,
@@ -491,12 +386,12 @@ class _MainShellState extends State<MainShell> {
                       width: 52,
                       height: 52,
                       child:
-                          _userAvatarPath != null &&
-                              File(_userAvatarPath!).existsSync()
+                          profile.avatarPath != null &&
+                              File(profile.avatarPath!).existsSync()
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(26),
                               child: Image.file(
-                                File(_userAvatarPath!),
+                                File(profile.avatarPath!),
                                 fit: BoxFit.cover,
                               ),
                             )
@@ -525,7 +420,7 @@ class _MainShellState extends State<MainShell> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _userName,
+                            profile.userName,
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
@@ -536,7 +431,7 @@ class _MainShellState extends State<MainShell> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '@$_customUsername',
+                            '@${profile.customUsername}',
                             style: const TextStyle(
                               fontSize: 13,
                               color: Color(0xFF38BDF8),
@@ -572,7 +467,7 @@ class _MainShellState extends State<MainShell> {
                     ),
                     onTap: () {
                       Navigator.pop(context);
-                      _openProfileScreen();
+                      _openProfileScreen(profile);
                     },
                   ),
                   ListTile(
@@ -593,8 +488,8 @@ class _MainShellState extends State<MainShell> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => FriendsScreen(
-                            isDarkMode: widget.isDarkMode,
-                            currentUsername: _customUsername,
+                            isDarkMode: isDark,
+                            currentUsername: profile.customUsername,
                           ),
                         ),
                       );
@@ -617,9 +512,8 @@ class _MainShellState extends State<MainShell> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => ShiftScheduleScreen(
-                            isDarkMode: widget.isDarkMode,
-                          ),
+                          builder: (_) =>
+                              ShiftScheduleScreen(isDarkMode: isDark),
                         ),
                       );
                     },
@@ -641,14 +535,7 @@ class _MainShellState extends State<MainShell> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => VaultScreen(
-                            isDarkMode: widget.isDarkMode,
-                            savedVaultPin: _savedVaultPin,
-                            documents: _documents,
-                            onPinCreated: (p) =>
-                                setState(() => _savedVaultPin = p),
-                            onSaveDocuments: () {},
-                          ),
+                          builder: (_) => VaultScreen(isDarkMode: isDark),
                         ),
                       );
                     },
@@ -688,15 +575,15 @@ class _MainShellState extends State<MainShell> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => SettingsScreen(
-                            isDarkMode: widget.isDarkMode,
-                            onToggleTheme: widget.onToggleTheme,
-                            userName: _userName,
-                            customUsername: _customUsername,
+                            isDarkMode: isDark,
+                            onToggleTheme: () => notifier.toggleTheme(),
+                            userName: profile.userName,
+                            customUsername: profile.customUsername,
                             onProfileUpdated: (newName, newUsername) {
-                              setState(() {
-                                _userName = newName;
-                                _customUsername = newUsername;
-                              });
+                              notifier.updateProfile(
+                                newName: newName,
+                                newUsername: newUsername,
+                              );
                             },
                           ),
                         ),
@@ -720,8 +607,7 @@ class _MainShellState extends State<MainShell> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              AppInfoScreen(isDarkMode: widget.isDarkMode),
+                          builder: (_) => AppInfoScreen(isDarkMode: isDark),
                         ),
                       );
                     },
@@ -742,7 +628,7 @@ class _MainShellState extends State<MainShell> {
                     ),
                     onTap: () {
                       Navigator.pop(context);
-                      widget.onLogout();
+                      notifier.logout();
                     },
                   ),
                 ],
@@ -751,17 +637,17 @@ class _MainShellState extends State<MainShell> {
             Divider(color: borderColor, height: 1),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Версия: Global Demo 0.3.0',
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   Text(
                     'Pavel Krikun',
                     style: TextStyle(
-                      color: Theme.of(context).primaryColor,
+                      color: Color(0xFF38BDF8),
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),

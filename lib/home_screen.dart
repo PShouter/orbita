@@ -5,14 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../providers/calendar_provider.dart';
-import '../providers/habits_provider.dart';
-import '../providers/tasks_provider.dart';
+import 'providers/budget_provider.dart';
+import 'providers/calendar_provider.dart';
+import 'providers/habits_provider.dart';
+import 'providers/profile_provider.dart';
+import 'providers/tasks_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
-  final String userName;
-  final int daysWithOrbita;
   final VoidCallback onOpenCreateTask;
   final VoidCallback onOpenCreateEvent;
   final VoidCallback onOpenCreateHabit;
@@ -21,8 +21,6 @@ class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({
     super.key,
     required this.isDarkMode,
-    required this.userName,
-    required this.daysWithOrbita,
     required this.onOpenCreateTask,
     required this.onOpenCreateEvent,
     required this.onOpenCreateHabit,
@@ -67,9 +65,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final today = DateTime.now();
 
+    final profile = ref.watch(profileProvider);
     final allTasks = ref.watch(tasksProvider);
     final allEvents = ref.watch(calendarProvider);
     final habits = ref.watch(habitsProvider);
+    final budgetState = ref.watch(budgetProvider);
 
     final todayTasks = allTasks.where((t) {
       if (t['isNoDate'] == true || t['date'] == null) return false;
@@ -110,7 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Привет, ${widget.userName}',
+              'Привет, ${profile.userName}',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -119,14 +119,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Дней с Орбитой: ${widget.daysWithOrbita}',
+              'Дней с Орбитой: ${profile.daysWithOrbita}',
               style: TextStyle(fontSize: 13, color: textSecondary),
             ),
           ],
         ),
         const SizedBox(height: 14),
 
-        // 2. Рандомная цитата
+        // 2. Блок цитаты
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
@@ -157,7 +157,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 3. Календарь (Слева) и Задачи (Справа)
+        // 3. Блок "Календарь и Задачи"
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -169,6 +169,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Левая колонка: Календарь
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,11 +244,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                 ),
+
+                // Разделитель
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10),
                   width: 1,
                   color: borderColor,
                 ),
+
+                // Правая колонка: Задачи
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,7 +367,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 4. Привычки (из SQLite / habitsProvider)
+        // 4. Блок "Привычки"
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -480,7 +485,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 5. Финансы
+        // 5. Блок "Финансы"
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -528,17 +533,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Свободный бюджет: 0 ₽',
+                'Свободный баланс: ${budgetState.balance.toStringAsFixed(0)} ₽',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: textPrimary,
+                  color: budgetState.balance >= 0
+                      ? const Color(0xFF38BDF8)
+                      : Colors.redAccent,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Раздел находится в разработке',
-                style: TextStyle(fontSize: 11, color: textSecondary),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Text(
+                    'Доходы: +${budgetState.totalIncome.toStringAsFixed(0)} ₽',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.green,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Расходы: -${budgetState.totalExpense.toStringAsFixed(0)} ₽',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
