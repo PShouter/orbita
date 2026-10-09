@@ -40,16 +40,18 @@ Future<void> main() async {
     debugPrint('Notification init notice: $e');
   }
 
-  try {
-    SyncService.instance.initListener();
-  } catch (e) {
-    debugPrint('SyncService init notice: $e');
-  }
-
+  // 1. СНАЧАЛА инициализируем Supabase
   try {
     await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
   } catch (e) {
     debugPrint('Supabase init notice: $e');
+  }
+
+  // 2. И ТОЛЬКО ПОТОМ запускаем слушатель синхронизации
+  try {
+    SyncService.instance.initListener();
+  } catch (e) {
+    debugPrint('SyncService init notice: $e');
   }
 
   runApp(const ProviderScope(child: OrbitaApp()));

@@ -1,11 +1,13 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../providers/calendar_provider.dart';
-import '../providers/tasks_provider.dart';
+import 'providers/calendar_provider.dart';
+import 'providers/tasks_provider.dart';
+import 'screens/create_event_screen.dart';
+import 'screens/manage_calendars_screen.dart';
+
+enum CalendarViewType { month, day }
 
 class CalendarScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -17,78 +19,73 @@ class CalendarScreen extends ConsumerStatefulWidget {
 }
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
-  DateTime _selectedDate = DateTime.now();
-  DateTime _focusedMonth = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    1,
-  );
-  final String _viewMode = 'Месяц'; // 'Месяц', 'Неделя', 'День'
+  late final ScrollController _scrollController;
+  CalendarViewType _currentView = CalendarViewType.month;
+  bool _showWeekNumbers = false;
 
-  List<Map<String, dynamic>> _userCalendars = [];
+  static const int _initialWeekOffset = 520; // 10 лет назад от текущей недели
+  late final DateTime _baseMonday;
+  DateTime _visibleDate = DateTime.now();
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _loadUserCalendars();
-  }
-
-  Future<void> _loadUserCalendars() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('saved_user_calendars');
-    if (raw != null) {
-      try {
-        final List decoded = jsonDecode(raw);
-        setState(() {
-          _userCalendars = decoded
-              .map((c) => Map<String, dynamic>.from(c))
-              .toList();
-        });
-      } catch (_) {}
-    }
-
-    if (_userCalendars.isEmpty) {
-      _userCalendars = [
-        {
-          'id': 'main',
-          'name': 'Основной',
-          'color': const Color(0xFF2C69D1).toARGB32(),
-          'enabled': true,
-        },
-        {
-          'id': 'work',
-          'name': 'Работа',
-          'color': const Color(0xFFFF5252).toARGB32(),
-          'enabled': true,
-        },
-        {
-          'id': 'personal',
-          'name': 'Личное',
-          'color': const Color(0xFF66BB6A).toARGB32(),
-          'enabled': true,
-        },
-      ];
-    }
-  }
-
-  bool _isCalendarEnabled(String? calName) {
-    if (calName == null) return true;
-    final found = _userCalendars.firstWhere(
-      (c) => c['name'] == calName,
-      orElse: () => {'enabled': true},
+    final now = DateTime.now();
+    _baseMonday = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: now.weekday - 1));
+    _scrollController = ScrollController(
+      initialScrollOffset: _initialWeekOffset * 68.0,
     );
-    return found['enabled'] != false;
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToToday() {
+    setState(() {
+      _selectedDate = DateTime.now();
+      _visibleDate = DateTime.now();
+    });
+    _scrollController.animateTo(
+      _initialWeekOffset * 68.0,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  int _getWeekNumber(DateTime date) {
+    final firstDayOfYear = DateTime(date.year, 1, 1);
+    final days = date.difference(firstDayOfYear).inDays;
+    return ((days + firstDayOfYear.weekday - 1) / 7).ceil();
   }
 
   @override
   Widget build(BuildContext context) {
+    final calendars = ref.watch(userCalendarsProvider);
     final allEvents = ref.watch(calendarProvider);
     final allTasks = ref.watch(tasksProvider);
 
     // Фильтруем события по включенным календарям
-    final visibleEvents = allEvents
-        .where((e) => _isCalendarEnabled(e['calendar']))
+    final visibleCalendarTitles = calendars
+        .where((c) => c.isVisible)
+        .map((c) => c.title)
+        .toSet();
+    final events = allEvents
+        .where((e) => visibleCalendarTitles.contains(e['calendar']))
         .toList();
+
+    // Задачи с заданной датой
+    final datedTasks = allTasks.where((t) {
+      if (t['isNoDate'] == true || t['date'] == null) return false;
+      return t['date'] is DateTime;
+    }).toList();
 
     final isDark = widget.isDarkMode;
     final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
@@ -103,274 +100,59 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         ? const Color(0xFF30363D)
         : const Color(0xFFD0D7DE);
 
-    // События и задачи на выбранный день
-    final dayEvents = visibleEvents.where((e) {
-      final d = e['date'] as DateTime?;
-      return d != null &&
-          d.year == _selectedDate.year &&
-          d.month == _selectedDate.month &&
-          d.day == _selectedDate.day;
-    }).toList();
-
-    final dayTasks = allTasks.where((t) {
-      if (t['isNoDate'] == true || t['date'] == null) return false;
-      final d = t['date'] as DateTime?;
-      return d != null &&
-          d.year == _selectedDate.year &&
-          d.month == _selectedDate.month &&
-          d.day == _selectedDate.day;
-    }).toList();
-
     return Scaffold(
       backgroundColor: bg,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF38BDF8),
-        onPressed: () => _openCreateEventDialog(),
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
-      ),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // Шапка: Месяц/Год и переключатели режимов
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
-                children: [
-                  Text(
-                    '${_monthName(_focusedMonth.month)} ${_focusedMonth.year}',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: textPrimary,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left, size: 22),
-                    onPressed: () => setState(() {
-                      _focusedMonth = DateTime(
-                        _focusedMonth.year,
-                        _focusedMonth.month - 1,
-                        1,
-                      );
-                    }),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right, size: 22),
-                    onPressed: () => setState(() {
-                      _focusedMonth = DateTime(
-                        _focusedMonth.year,
-                        _focusedMonth.month + 1,
-                        1,
-                      );
-                    }),
-                  ),
-                  IconButton(
-                    tooltip: 'Фильтр календарей',
-                    icon: const Icon(Icons.tune, size: 20),
-                    onPressed: _openCalendarsFilterDialog,
-                  ),
+            Column(
+              children: [
+                _buildHeader(textPrimary, textSecondary),
+
+                // Строка дней недели отображается только в виде месяца
+                if (_currentView == CalendarViewType.month) ...[
+                  _buildWeekHeader(textSecondary),
+                  Divider(height: 1, color: borderColor),
                 ],
-              ),
+
+                Expanded(
+                  child: _currentView == CalendarViewType.month
+                      ? _buildContinuousWeekList(
+                          events,
+                          datedTasks,
+                          cardBg,
+                          borderColor,
+                          textPrimary,
+                          textSecondary,
+                        )
+                      : _buildDayView(
+                          events,
+                          datedTasks,
+                          cardBg,
+                          borderColor,
+                          textPrimary,
+                          textSecondary,
+                        ),
+                ),
+
+                _buildBottomCalendarBar(
+                  calendars,
+                  cardBg,
+                  borderColor,
+                  textPrimary,
+                ),
+              ],
             ),
 
-            // Сетка месяца
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildMonthGrid(
-                cardBg,
-                borderColor,
-                textPrimary,
-                textSecondary,
-                visibleEvents,
+            Positioned(
+              right: 16,
+              bottom: 60,
+              child: FloatingActionButton(
+                backgroundColor: const Color(0xFF38BDF8),
+                elevation: 4,
+                onPressed: _openAddMenu,
+                child: const Icon(Icons.add, color: Colors.white, size: 28),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // Заголовок выбранного дня
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Text(
-                    'Планы на ${_selectedDate.day} ${_monthNameGenitive(_selectedDate.month)}:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: textPrimary,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${dayEvents.length} событий • ${dayTasks.length} задач',
-                    style: TextStyle(fontSize: 11, color: textSecondary),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // Список событий и задач на день
-            Expanded(
-              child: (dayEvents.isEmpty && dayTasks.isEmpty)
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.event_available,
-                            size: 40,
-                            color: Colors.grey.withValues(alpha: 0.4),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'На этот день планов нет',
-                            style: TextStyle(
-                              color: textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                      children: [
-                        // События
-                        ...dayEvents.map((ev) {
-                          final color = ev['color'] is Color
-                              ? ev['color'] as Color
-                              : const Color(0xFF2C69D1);
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 4,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        ev['title'] ?? 'Событие',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: textPrimary,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        ev['isAllDay'] == true
-                                            ? 'Весь день • ${ev['calendar'] ?? 'Основной'}'
-                                            : '${ev['startTime'] ?? ''} - ${ev['endTime'] ?? ''} • ${ev['calendar'] ?? 'Основной'}',
-                                        style: TextStyle(
-                                          color: textSecondary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                    color: Colors.redAccent,
-                                  ),
-                                  onPressed: () {
-                                    ref
-                                        .read(calendarProvider.notifier)
-                                        .deleteEvent(ev['id'].toString());
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-
-                        // Задачи
-                        ...dayTasks.map((t) {
-                          final isDone = t['done'] == true;
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: Checkbox(
-                                    value: isDone,
-                                    onChanged: (v) {
-                                      ref
-                                          .read(tasksProvider.notifier)
-                                          .toggleTask(
-                                            t['id'].toString(),
-                                            v ?? false,
-                                          );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        t['title'] ?? '',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDone
-                                              ? textSecondary
-                                              : textPrimary,
-                                          decoration: isDone
-                                              ? TextDecoration.lineThrough
-                                              : null,
-                                        ),
-                                      ),
-                                      if (t['time'] != null)
-                                        Text(
-                                          '⏱ ${t['time']}',
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF38BDF8),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
             ),
           ],
         ),
@@ -378,406 +160,1008 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildMonthGrid(
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
-    List<Map<String, dynamic>> events,
-  ) {
-    final firstDay = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
-    final daysInMonth = DateTime(
-      _focusedMonth.year,
-      _focusedMonth.month + 1,
-      0,
-    ).day;
-    final int offset = (firstDay.weekday - 1);
-    final totalCells = ((offset + daysInMonth + 6) ~/ 7) * 7;
-    final weeksCount = totalCells ~/ 7;
-
-    const weekDays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
-
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
+  Widget _buildHeader(Color textPrimary, Color textSecondary) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Text(
+            '${_monthName(_visibleDate.month)} ${_visibleDate.year}',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: textPrimary,
+            ),
+          ),
           Row(
-            children: weekDays
-                .map(
-                  (wd) => Expanded(
-                    child: Center(
-                      child: Text(
-                        wd,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: textSecondary,
+            children: [
+              IconButton(
+                tooltip: 'Сегодня',
+                icon: const Icon(
+                  Icons.today,
+                  color: Color(0xFF38BDF8),
+                  size: 22,
+                ),
+                onPressed: _scrollToToday,
+              ),
+              IconButton(
+                tooltip: 'Вид календаря',
+                icon: Icon(
+                  _currentView == CalendarViewType.month
+                      ? Icons.calendar_view_day
+                      : Icons.calendar_view_month,
+                  color: textPrimary,
+                  size: 22,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _currentView = _currentView == CalendarViewType.month
+                        ? CalendarViewType.day
+                        : CalendarViewType.month;
+                  });
+                },
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert, color: textPrimary, size: 22),
+                onSelected: (val) {
+                  if (val == 'slider') {
+                    setState(() => _showWeekNumbers = !_showWeekNumbers);
+                  } else if (val == 'invites') {
+                    _showInvitesDialog();
+                  } else if (val == 'calendars') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ManageCalendarsScreen(
+                          isDarkMode: widget.isDarkMode,
                         ),
                       ),
+                    );
+                  } else if (val == 'settings') {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Дополнительные настройки календаря'),
+                      ),
+                    );
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'slider',
+                    child: Row(
+                      children: [
+                        Icon(
+                          _showWeekNumbers
+                              ? Icons.check_box
+                              : Icons.check_box_outline_blank,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Номера недель'),
+                      ],
                     ),
                   ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 6),
-          const Divider(height: 1),
-
-          for (int w = 0; w < weeksCount; w++)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                children: [
-                  for (int d = 0; d < 7; d++)
-                    Expanded(
-                      child: Builder(
-                        builder: (ctx) {
-                          final cellIdx = (w * 7) + d;
-                          final dayNum = cellIdx - offset + 1;
-                          if (dayNum < 1 || dayNum > daysInMonth) {
-                            return const SizedBox(height: 38);
-                          }
-
-                          final date = DateTime(
-                            _focusedMonth.year,
-                            _focusedMonth.month,
-                            dayNum,
-                          );
-                          final isSel =
-                              date.year == _selectedDate.year &&
-                              date.month == _selectedDate.month &&
-                              date.day == _selectedDate.day;
-                          final isToday =
-                              date.year == DateTime.now().year &&
-                              date.month == DateTime.now().month &&
-                              date.day == DateTime.now().day;
-
-                          final dateEvents = events.where((e) {
-                            final ed = e['date'] as DateTime?;
-                            return ed != null &&
-                                ed.year == date.year &&
-                                ed.month == date.month &&
-                                ed.day == date.day;
-                          }).toList();
-
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedDate = date),
-                            child: Container(
-                              height: 38,
-                              margin: const EdgeInsets.all(1.5),
-                              decoration: BoxDecoration(
-                                color: isSel
-                                    ? const Color(0xFF38BDF8)
-                                          .withValues(alpha: 0.2)
-                                    : (isToday
-                                          ? Colors.blueGrey.withValues(
-                                              alpha: 0.1,
-                                            )
-                                          : Colors.transparent),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: isSel
-                                      ? const Color(0xFF38BDF8)
-                                      : (isToday
-                                            ? Colors.blueAccent
-                                            : Colors.transparent),
-                                  width: isSel || isToday ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    '$dayNum',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: isSel || isToday
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      color: isSel
-                                          ? const Color(0xFF38BDF8)
-                                          : textPrimary,
-                                    ),
-                                  ),
-                                  if (dateEvents.isNotEmpty)
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: dateEvents.take(3).map((ev) {
-                                        final col = ev['color'] is Color
-                                            ? ev['color'] as Color
-                                            : const Color(0xFF2C69D1);
-                                        return Container(
-                                          margin: const EdgeInsets.symmetric(
-                                            horizontal: 1,
-                                          ),
-                                          width: 4,
-                                          height: 4,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: col,
-                                          ),
-                                        );
-                                      }).toList(),
-                                    )
-                                  else
-                                    const SizedBox(height: 4),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                  const PopupMenuItem(
+                    value: 'invites',
+                    child: Row(
+                      children: [
+                        Icon(Icons.mail_outline, size: 18),
+                        SizedBox(width: 8),
+                        Text('Приглашения'),
+                      ],
                     ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'calendars',
+                    child: Row(
+                      children: [
+                        Icon(Icons.tune, size: 18),
+                        SizedBox(width: 8),
+                        Text('Календари'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'settings',
+                    child: Row(
+                      children: [
+                        Icon(Icons.settings_outlined, size: 18),
+                        SizedBox(width: 8),
+                        Text('Другие настройки'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  void _openCreateEventDialog() {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final locationCtrl = TextEditingController();
-    DateTime eventDate = _selectedDate;
-    TimeOfDay startTime = const TimeOfDay(hour: 10, minute: 0);
-    TimeOfDay endTime = const TimeOfDay(hour: 11, minute: 0);
-    bool isAllDay = false;
-    String selectedCal = _userCalendars.isNotEmpty
-        ? _userCalendars.first['name']
-        : 'Основной';
+  Widget _buildWeekHeader(Color textSecondary) {
+    const weekDays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: [
+          if (_showWeekNumbers)
+            const SizedBox(
+              width: 24,
+              child: Center(
+                child: Text(
+                  '#',
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+              ),
+            ),
+          ...weekDays.map(
+            (wd) => Expanded(
+              child: Center(
+                child: Text(
+                  wd,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: (wd == 'СБ' || wd == 'ВС')
+                        ? Colors.redAccent.withValues(alpha: 0.8)
+                        : textSecondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  // Непрерывная вертикальная лента недель
+  Widget _buildContinuousWeekList(
+    List<Map<String, dynamic>> events,
+    List<Map<String, dynamic>> tasks,
+    Color cardBg,
+    Color borderColor,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollInfo) {
+        final currentWeekIdx = (_scrollController.offset / 68.0).round();
+        final offsetWeeks = currentWeekIdx - _initialWeekOffset;
+        final midWeekDay = _baseMonday.add(Duration(days: offsetWeeks * 7 + 3));
+        if (midWeekDay.month != _visibleDate.month ||
+            midWeekDay.year != _visibleDate.year) {
+          setState(() {
+            _visibleDate = midWeekDay;
+          });
+        }
+        return false;
+      },
+      child: ListView.builder(
+        controller: _scrollController,
+        itemCount: 1040, // 20 лет недель
+        itemExtent: 68.0,
+        itemBuilder: (ctx, index) {
+          final offsetWeeks = index - _initialWeekOffset;
+          final startOfWeek = _baseMonday.add(Duration(days: offsetWeeks * 7));
+          final weekNum = _getWeekNumber(startOfWeek);
+
+          return Row(
+            children: [
+              if (_showWeekNumbers)
+                SizedBox(
+                  width: 24,
+                  child: Center(
+                    child: Text(
+                      '$weekNum',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: textSecondary.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: Row(
+                  children: List.generate(7, (d) {
+                    final date = startOfWeek.add(Duration(days: d));
+                    return Expanded(
+                      child: _buildDayCell(
+                        date,
+                        events,
+                        tasks,
+                        borderColor,
+                        textPrimary,
+                        textSecondary,
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDayCell(
+    DateTime date,
+    List<Map<String, dynamic>> events,
+    List<Map<String, dynamic>> tasks,
+    Color borderColor,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final now = DateTime.now();
+    final isToday =
+        date.year == now.year && date.month == now.month && date.day == now.day;
+    final isSel =
+        date.year == _selectedDate.year &&
+        date.month == _selectedDate.month &&
+        date.day == _selectedDate.day;
+    final isCurrentMonth = date.month == _visibleDate.month;
+
+    // События этого дня
+    final dayEvents = events.where((e) {
+      final ed = e['date'] as DateTime;
+      return ed.year == date.year &&
+          ed.month == date.month &&
+          ed.day == date.day;
+    }).toList();
+
+    // Задачи этого дня
+    final dayTasks = tasks.where((t) {
+      final td = t['date'] as DateTime;
+      return td.year == date.year &&
+          td.month == date.month &&
+          td.day == date.day;
+    }).toList();
+
+    // Объединяем элементы для отображения в ячейке
+    final List<Widget> cellItems = [];
+
+    // Плашки событий
+    for (final ev in dayEvents) {
+      final c = ev['color'] as Color? ?? const Color(0xFF2C69D1);
+      cellItems.add(
+        Container(
+          margin: const EdgeInsets.only(top: 1, left: 1, right: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+          decoration: BoxDecoration(
+            color: c.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: Text(
+            ev['title'] ?? '',
+            style: const TextStyle(
+              fontSize: 8,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+
+    // Плашки задач (с префиксом чекбокса)
+    for (final t in dayTasks) {
+      final isDone = t['done'] == true;
+      cellItems.add(
+        Container(
+          margin: const EdgeInsets.only(top: 1, left: 1, right: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+          decoration: BoxDecoration(
+            color: isDone
+                ? Colors.grey.withValues(alpha: 0.3)
+                : const Color(0xFF0284C7).withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(2),
+            border: Border.all(
+              color: isDone ? Colors.grey : const Color(0xFF38BDF8),
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            children: [
+              Text(
+                isDone ? '✓ ' : '□ ',
+                style: TextStyle(
+                  fontSize: 7,
+                  color: isDone ? Colors.grey : const Color(0xFF38BDF8),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  t['title'] ?? '',
+                  style: TextStyle(
+                    fontSize: 8,
+                    color: isDone ? textSecondary : textPrimary,
+                    decoration: isDone ? TextDecoration.lineThrough : null,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final totalCount = dayEvents.length + dayTasks.length;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedDate = date);
+        _showDayPopup(date, dayEvents, dayTasks);
+      },
+      onDoubleTap: () {
+        setState(() {
+          _selectedDate = date;
+          _currentView = CalendarViewType.day;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.all(0.5),
+        decoration: BoxDecoration(
+          color: isSel
+              ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
+              : (isToday
+                    ? Colors.blue.withValues(alpha: 0.05)
+                    : Colors.transparent),
+          border: Border.all(
+            color: isSel
+                ? const Color(0xFF38BDF8)
+                : (isToday
+                      ? Colors.blueAccent
+                      : borderColor.withValues(alpha: 0.2)),
+            width: isSel || isToday ? 1.5 : 0.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 1, right: 3),
+              child: Text(
+                '${date.day}',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isToday || isSel
+                      ? FontWeight.bold
+                      : FontWeight.normal,
+                  color: isToday
+                      ? const Color(0xFF38BDF8)
+                      : (isCurrentMonth
+                            ? textPrimary
+                            : textSecondary.withValues(alpha: 0.5)),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                physics: const NeverScrollableScrollPhysics(),
+                children: cellItems.take(2).toList(),
+              ),
+            ),
+            if (totalCount > 2)
+              Text(
+                '+${totalCount - 2}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 7,
+                  color: textSecondary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDayPopup(
+    DateTime date,
+    List<Map<String, dynamic>> dayEvents,
+    List<Map<String, dynamic>> dayTasks,
+  ) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       backgroundColor: widget.isDarkMode
           ? const Color(0xFF161B22)
           : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => Consumer(
+        builder: (ctx, ref, _) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: ListView(
+              shrinkWrap: true,
               children: [
-                const Text(
-                  'Новое событие',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: titleCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Название события',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedCal,
-                  decoration: const InputDecoration(
-                    labelText: 'Календарь',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: _userCalendars
-                      .map(
-                        (c) => DropdownMenuItem(
-                          value: c['name'].toString(),
-                          child: Text(c['name']),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) =>
-                      setDState(() => selectedCal = v ?? selectedCal),
-                ),
-                const SizedBox(height: 10),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Весь день',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                  value: isAllDay,
-                  onChanged: (v) => setDState(() => isAllDay = v),
-                ),
-                if (!isAllDay) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Начало',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          trailing: Text(
-                            startTime.format(context),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          onTap: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: startTime,
-                            );
-                            if (t != null) setDState(() => startTime = t);
-                          },
-                        ),
-                      ),
-                      Expanded(
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text(
-                            'Конец',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          trailing: Text(
-                            endTime.format(context),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          onTap: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: endTime,
-                            );
-                            if (t != null) setDState(() => endTime = t);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                TextField(
-                  controller: locationCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Местоположение',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: descCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Описание',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                ),
-                const SizedBox(height: 16),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Отмена'),
+                    Text(
+                      '${date.day} ${_monthNameGenitive(date.month)} ${date.year}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF38BDF8),
-                      ),
+                    TextButton(
                       onPressed: () {
-                        final title = titleCtrl.text.trim();
-                        if (title.isEmpty) return;
-
-                        final calMeta = _userCalendars.firstWhere(
-                          (c) => c['name'] == selectedCal,
-                          orElse: () => {},
-                        );
-                        final calColor = calMeta['color'] != null
-                            ? Color(calMeta['color'] as int)
-                            : const Color(0xFF2C69D1);
-
-                        ref.read(calendarProvider.notifier).addEvent({
-                          'id':
-                              'event_${DateTime.now().millisecondsSinceEpoch}',
-                          'title': title,
-                          'date': eventDate,
-                          'endDate': eventDate,
-                          'startTime': isAllDay
-                              ? null
-                              : '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
-                          'endTime': isAllDay
-                              ? null
-                              : '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
-                          'isAllDay': isAllDay,
-                          'calendar': selectedCal,
-                          'color': calColor,
-                          'location': locationCtrl.text.trim(),
-                          'desc': descCtrl.text.trim(),
-                        });
-
                         Navigator.pop(ctx);
+                        setState(() => _currentView = CalendarViewType.day);
                       },
-                      child: const Text(
-                        'Создать',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      child: const Text('Открыть день'),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+
+                if (dayEvents.isEmpty && dayTasks.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'Событий и задач нет',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+
+                // Список событий
+                if (dayEvents.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 4),
+                    child: Text(
+                      'События:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  ...dayEvents.map(
+                    (ev) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        radius: 6,
+                        backgroundColor: ev['color'] as Color? ?? Colors.blue,
+                      ),
+                      title: Text(
+                        ev['title'] ?? '',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      subtitle: Text(
+                        ev['isAllDay'] == true
+                            ? 'Весь день'
+                            : '${ev['startTime'] ?? ''} - ${ev['endTime'] ?? ''}',
+                      ),
+                    ),
+                  ),
+                ],
+
+                // Список задач
+                if (dayTasks.isNotEmpty) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 4),
+                    child: Text(
+                      'Задачи:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  ...dayTasks.map((t) {
+                    final isDone = t['done'] == true;
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Checkbox(
+                        value: isDone,
+                        onChanged: (v) {
+                          ref
+                              .read(tasksProvider.notifier)
+                              .toggleTask(t['id'].toString(), v ?? false);
+                          Navigator.pop(ctx);
+                        },
+                      ),
+                      title: Text(
+                        t['title'] ?? '',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          decoration: isDone
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      subtitle: t['time'] != null
+                          ? Text(
+                              'Время: ${t['time']}',
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                    );
+                  }),
+                ],
               ],
             ),
-          ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _openAddMenu() {
+    final templates = ref.read(eventTemplatesProvider);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: widget.isDarkMode
+          ? const Color(0xFF161B22)
+          : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.add_circle_outline,
+                color: Color(0xFF38BDF8),
+              ),
+              title: const Text(
+                'Создать событие',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateEventScreen(
+                      isDarkMode: widget.isDarkMode,
+                      initialDate: _selectedDate,
+                    ),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.bookmark_outline,
+                color: Colors.orangeAccent,
+              ),
+              title: const Text(
+                'Загрузить из шаблона',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                if (templates.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Сохраненных шаблонов пока нет'),
+                    ),
+                  );
+                } else {
+                  _showSelectTemplateDialog(templates);
+                }
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 
-  void _openCalendarsFilterDialog() {
+  void _showSelectTemplateDialog(List<Map<String, dynamic>> templates) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: widget.isDarkMode
+          ? const Color(0xFF161B22)
+          : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => ListView.builder(
+        shrinkWrap: true,
+        itemCount: templates.length,
+        itemBuilder: (ctx, i) {
+          final tpl = templates[i];
+          return ListTile(
+            leading: const Icon(Icons.bookmark, color: Color(0xFF38BDF8)),
+            title: Text(
+              tpl['title'] ?? '',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(tpl['calendar'] ?? 'Основной'),
+            onTap: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateEventScreen(
+                    isDarkMode: widget.isDarkMode,
+                    initialDate: _selectedDate,
+                    templateData: tpl,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  void _showInvitesDialog() {
+    final invites = ref.watch(eventInvitesProvider);
+    final notifier = ref.read(eventInvitesProvider.notifier);
+
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDState) => AlertDialog(
-          title: const Text('Мои календари'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: _userCalendars.map((c) {
-              final col = Color(c['color'] as int);
-              final isEn = c['enabled'] != false;
-              return CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                secondary: CircleAvatar(radius: 6, backgroundColor: col),
-                title: Text(c['name']),
-                value: isEn,
-                activeColor: col,
-                onChanged: (v) async {
-                  setDState(() => c['enabled'] = v ?? true);
-                  setState(() {});
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString(
-                    'saved_user_calendars',
-                    jsonEncode(_userCalendars),
-                  );
-                },
-              );
-            }).toList(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Закрыть'),
-            ),
-          ],
+      builder: (ctx) => AlertDialog(
+        backgroundColor: widget.isDarkMode
+            ? const Color(0xFF161B22)
+            : Colors.white,
+        title: const Text('Приглашения'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: invites.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    'Приглашений пока нет',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: invites.length,
+                  itemBuilder: (ctx, i) {
+                    final item = invites[i];
+                    return ListTile(
+                      title: Text(item['title'] ?? ''),
+                      subtitle: Text('От: ${item['sender'] ?? 'Друг'}'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.check, color: Colors.green),
+                            onPressed: () {
+                              notifier.acceptInvite(item['id'].toString());
+                              Navigator.pop(ctx);
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.close,
+                              color: Colors.redAccent,
+                            ),
+                            onPressed: () {
+                              notifier.declineInvite(item['id'].toString());
+                              Navigator.pop(ctx);
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayView(
+    List<Map<String, dynamic>> events,
+    List<Map<String, dynamic>> tasks,
+    Color cardBg,
+    Color borderColor,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final dayEvents = events.where((e) {
+      final ed = e['date'] as DateTime;
+      return ed.year == _selectedDate.year &&
+          ed.month == _selectedDate.month &&
+          ed.day == _selectedDate.day;
+    }).toList();
+
+    final dayTasks = tasks.where((t) {
+      final td = t['date'] as DateTime;
+      return td.year == _selectedDate.year &&
+          td.month == _selectedDate.month &&
+          td.day == _selectedDate.day;
+    }).toList();
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: cardBg,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_selectedDate.day} ${_monthNameGenitive(_selectedDate.month)} ${_selectedDate.year}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                ),
+              ),
+              Text(
+                '${dayEvents.length} соб. • ${dayTasks.length} зад.',
+                style: TextStyle(color: textSecondary, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: (dayEvents.isEmpty && dayTasks.isEmpty)
+              ? Center(
+                  child: Text(
+                    'На этот день ничего не запланировано',
+                    style: TextStyle(color: textSecondary),
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    // События
+                    if (dayEvents.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'События',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: textSecondary,
+                          ),
+                        ),
+                      ),
+                      ...dayEvents.map((ev) {
+                        final c =
+                            ev['color'] as Color? ?? const Color(0xFF2C69D1);
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 4,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: c,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      ev['title'] ?? '',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      ev['isAllDay'] == true
+                                          ? 'Весь день'
+                                          : '${ev['startTime'] ?? ''} - ${ev['endTime'] ?? ''}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () => ref
+                                    .read(calendarProvider.notifier)
+                                    .deleteEvent(ev['id'].toString()),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+
+                    // Задачи
+                    if (dayTasks.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 8),
+                        child: Text(
+                          'Задачи',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: textSecondary,
+                          ),
+                        ),
+                      ),
+                      ...dayTasks.map((t) {
+                        final isDone = t['done'] == true;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: isDone,
+                                onChanged: (v) {
+                                  ref
+                                      .read(tasksProvider.notifier)
+                                      .toggleTask(
+                                        t['id'].toString(),
+                                        v ?? false,
+                                      );
+                                },
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      t['title'] ?? '',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: isDone
+                                            ? textSecondary
+                                            : textPrimary,
+                                        decoration: isDone
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                      ),
+                                    ),
+                                    if (t['time'] != null)
+                                      Text(
+                                        '⏱ ${t['time']}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isDone
+                                              ? textSecondary
+                                              : const Color(0xFF38BDF8),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomCalendarBar(
+    List<UserCalendar> calendars,
+    Color cardBg,
+    Color borderColor,
+    Color textPrimary,
+  ) {
+    final notifier = ref.read(userCalendarsProvider.notifier);
+
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: cardBg,
+        border: Border(top: BorderSide(color: borderColor)),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: calendars.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (ctx, i) {
+          final cal = calendars[i];
+          return Center(
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                notifier.toggleVisibility(cal.id);
+              },
+              onLongPress: () {
+                HapticFeedback.heavyImpact();
+                notifier.isolateCalendar(cal.id);
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: cal.isVisible
+                      ? cal.color.withValues(alpha: 0.2)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: cal.isVisible
+                        ? cal.color
+                        : Colors.grey.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 4,
+                      backgroundColor: cal.isVisible ? cal.color : Colors.grey,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      cal.title,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: cal.isVisible ? textPrimary : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
