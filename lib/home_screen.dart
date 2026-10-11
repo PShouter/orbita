@@ -415,70 +415,77 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 )
               else
-                Row(
-                  children: habits.take(3).map((h) {
-                    final itemColor =
-                        (h['color'] as Color? ?? const Color(0xFF2C69D1));
-                    final isDone = h['done'] == true;
+                Builder(
+                  builder: (context) {
+                    final now = DateTime.now();
+                    final todayStr =
+                        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.mediumImpact();
-                          ref
-                              .read(habitsProvider.notifier)
-                              .toggleHabit(h['id'].toString());
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 10,
-                            horizontal: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: itemColor.withValues(
-                              alpha: isDone ? 0.25 : 0.08,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isDone ? itemColor : borderColor,
-                              width: isDone ? 1.5 : 1,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(
-                                isDone
-                                    ? Icons.check_circle
-                                    : Icons.circle_outlined,
-                                size: 20,
-                                color: itemColor,
+                    return Row(
+                      children: habits.take(3).map((h) {
+                        final itemColor = h.color;
+                        final isDone = h.isCompletedOn(todayStr);
+
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              ref
+                                  .read(habitsProvider.notifier)
+                                  .toggleHabit(h.id);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 6,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                h['title'] ?? '',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: textPrimary,
+                              decoration: BoxDecoration(
+                                color: itemColor.withValues(
+                                  alpha: isDone ? 0.25 : 0.08,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${h['streak'] ?? 0} дн.',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: textSecondary,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDone ? itemColor : borderColor,
+                                  width: isDone ? 1.5 : 1,
                                 ),
                               ),
-                            ],
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    isDone
+                                        ? Icons.check_circle
+                                        : Icons.circle_outlined,
+                                    size: 20,
+                                    color: itemColor,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    h.title,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${h.streak} дн.',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  },
                 ),
             ],
           ),

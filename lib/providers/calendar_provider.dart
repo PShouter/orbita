@@ -67,7 +67,7 @@ class UserCalendarsNotifier extends Notifier<List<UserCalendar>> {
         await db.insert('user_calendars', {
           'id': c.id,
           'title': c.title,
-          'color': c.color.value,
+          'color': c.color.toARGB32(),
           'is_visible': 1,
           'account_type': 'local',
           'is_synced': 0,
@@ -134,7 +134,7 @@ class UserCalendarsNotifier extends Notifier<List<UserCalendar>> {
     await db.insert('user_calendars', {
       'id': id,
       'title': title,
-      'color': color.value,
+      'color': color.toARGB32(),
       'is_visible': 1,
       'account_type': 'local',
       'is_synced': 0,
@@ -154,7 +154,7 @@ class UserCalendarsNotifier extends Notifier<List<UserCalendar>> {
 
     await db.update(
       'user_calendars',
-      {'title': title, 'color': color.value, 'updated_at': nowIso},
+      {'title': title, 'color': color.toARGB32(), 'updated_at': nowIso},
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -280,7 +280,7 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
       'end_time': endTime,
       'is_all_day': isAllDay ? 1 : 0,
       'calendar': calendar,
-      'color': color.value,
+      'color': color.toARGB32(),
       'description': description,
       'location': location,
       'is_synced': 0,

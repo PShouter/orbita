@@ -1110,7 +1110,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: calendars.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
         itemBuilder: (ctx, i) {
           final cal = calendars[i];
           return Center(

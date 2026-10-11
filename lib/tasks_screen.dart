@@ -266,11 +266,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         final isNoDate = t['isNoDate'] as bool? ?? false;
         if (isNoDate || d == null) return false;
 
-        if (_filterDueDate == 'overdue' && !d.isBefore(todayStart))
+        if (_filterDueDate == 'overdue' && !d.isBefore(todayStart)) {
           return false;
+        }
         if (_filterDueDate == 'today' &&
-            (d.isBefore(todayStart) || d.isAfter(todayEnd)))
+            (d.isBefore(todayStart) || d.isAfter(todayEnd))) {
           return false;
+        }
         if (_filterDueDate == 'upcoming' && !d.isAfter(todayEnd)) return false;
       }
 

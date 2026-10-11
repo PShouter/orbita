@@ -36,6 +36,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false # если пока только Android
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+  # Настройки адаптивной иконки (Android 8.0+):
+  adaptive_icon_background: "#0D1117" # Цвет фона (например, под твою темную тему)
+  adaptive_icon_foreground: "assets/icons/app_icon.png" # Картинка переднего плана
 
 flutter:
   uses-material-design: true

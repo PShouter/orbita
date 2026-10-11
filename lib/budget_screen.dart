@@ -166,7 +166,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                       borderRadius: BorderRadius.circular(22),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF2563EB).withOpacity(0.25),
+                          color: const Color(0xFF2563EB)
+                              .withValues(alpha: 0.25),
                           blurRadius: 16,
                           offset: const Offset(0, 8),
                         ),
@@ -193,7 +194,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -224,7 +225,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.15),
+                                  color: Colors.black.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
@@ -273,7 +274,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.15),
+                                  color: Colors.black.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
@@ -397,7 +398,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
             Icon(
               Icons.receipt_long_outlined,
               size: 48,
-              color: Colors.grey.withOpacity(0.4),
+              color: Colors.grey.withValues(alpha: 0.4),
             ),
             const SizedBox(height: 10),
             Text(
@@ -447,7 +448,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -544,7 +545,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.12),
+                      color: color.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(icon, color: color, size: 18),
@@ -580,7 +581,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: pct,
-                  backgroundColor: borderColor.withOpacity(0.3),
+                  backgroundColor: borderColor.withValues(alpha: 0.3),
                   color: color,
                   minHeight: 6,
                 ),
@@ -654,13 +655,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: type == 'expense'
-                                ? Colors.redAccent.withOpacity(0.2)
+                                ? Colors.redAccent.withValues(alpha: 0.2)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: type == 'expense'
                                   ? Colors.redAccent
-                                  : Colors.grey.withOpacity(0.3),
+                                  : Colors.grey.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Center(
@@ -688,13 +689,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: type == 'income'
-                                ? Colors.green.withOpacity(0.2)
+                                ? Colors.green.withValues(alpha: 0.2)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: type == 'income'
                                   ? Colors.green
-                                  : Colors.grey.withOpacity(0.3),
+                                  : Colors.grey.withValues(alpha: 0.3),
                             ),
                           ),
                           child: Center(
@@ -743,7 +744,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen>
                 const SizedBox(height: 10),
 
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   decoration: const InputDecoration(
                     labelText: 'Категория',
                     border: OutlineInputBorder(),

@@ -471,25 +471,25 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                           'name': 'Дневная',
                           'type': 'work',
                           'time': '08:00 - 20:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Дневная',
                           'type': 'work',
                           'time': '08:00 - 20:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                       ];
                     } else if (preset == 'сутки/трое') {
@@ -498,25 +498,25 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                           'name': 'Сутки',
                           'type': 'work',
                           'time': '09:00 - 09:00',
-                          'color': const Color(0xFFFF9800).value,
+                          'color': const Color(0xFFFF9800).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                       ];
                     } else if (preset == 'день/ночь/48') {
@@ -525,25 +525,25 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                           'name': 'День',
                           'type': 'work',
                           'time': '08:00 - 20:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Ночь',
                           'type': 'work',
                           'time': '20:00 - 08:00',
-                          'color': const Color(0xFF9C27B0).value,
+                          'color': const Color(0xFF9C27B0).toARGB32(),
                         },
                         {
                           'name': 'Отсыпной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF80CBC4).value,
+                          'color': const Color(0xFF80CBC4).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                       ];
                     } else {
@@ -552,43 +552,43 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                           'name': 'Работа',
                           'type': 'work',
                           'time': '09:00 - 18:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Работа',
                           'type': 'work',
                           'time': '09:00 - 18:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Работа',
                           'type': 'work',
                           'time': '09:00 - 18:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Работа',
                           'type': 'work',
                           'time': '09:00 - 18:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Работа',
                           'type': 'work',
                           'time': '09:00 - 18:00',
-                          'color': const Color(0xFF2C69D1).value,
+                          'color': const Color(0xFF2C69D1).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                         {
                           'name': 'Выходной',
                           'type': 'rest',
                           'time': null,
-                          'color': const Color(0xFF66BB6A).value,
+                          'color': const Color(0xFF66BB6A).toARGB32(),
                         },
                       ];
                     }
@@ -651,7 +651,7 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                 notifier.setOverride(date, {
                   'name': 'Отпуск',
                   'type': 'rest',
-                  'color': const Color(0xFF4CAF50).value,
+                  'color': const Color(0xFF4CAF50).toARGB32(),
                 });
                 Navigator.pop(ctx);
               },
@@ -666,7 +666,7 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                 notifier.setOverride(date, {
                   'name': 'Больничный',
                   'type': 'rest',
-                  'color': const Color(0xFFFF9800).value,
+                  'color': const Color(0xFFFF9800).toARGB32(),
                 });
                 Navigator.pop(ctx);
               },
@@ -679,7 +679,7 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                   'name': 'Подмена',
                   'type': 'work',
                   'time': '08:00 - 20:00',
-                  'color': const Color(0xFFE91E63).value,
+                  'color': const Color(0xFFE91E63).toARGB32(),
                 });
                 Navigator.pop(ctx);
               },

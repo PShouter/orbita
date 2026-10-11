@@ -323,10 +323,10 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _availableColors.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (ctx, i) {
                 final c = _availableColors[i];
-                final isSelected = c.value == _selectedColor.value;
+                final isSelected = c.toARGB32() == _selectedColor.toARGB32();
                 return GestureDetector(
                   onTap: () => setState(() => _selectedColor = c),
                   child: Container(

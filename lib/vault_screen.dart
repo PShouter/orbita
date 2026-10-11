@@ -16,7 +16,7 @@ class VaultScreen extends ConsumerStatefulWidget {
 class _VaultScreenState extends ConsumerState<VaultScreen> {
   final TextEditingController _pinController = TextEditingController();
   final TextEditingController _confirmPinController = TextEditingController();
-  bool _isCreatingPin = false;
+  final bool _isCreatingPin = false;
 
   @override
   void dispose() {
