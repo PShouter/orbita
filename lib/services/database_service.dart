@@ -19,13 +19,32 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
+    // 0. Категории задач (Task Categories)
+    await db.execute('''
+      CREATE TABLE task_categories (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        name TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // Дефолтная категория
+    await db.insert('task_categories', {
+      'id': 'cat_personal',
+      'name': 'Личное',
+      'is_synced': 0,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+
     // 1. Задачи (Tasks)
     await db.execute('''
       CREATE TABLE tasks (
@@ -37,8 +56,14 @@ class DatabaseService {
         time TEXT,
         is_no_date INTEGER DEFAULT 0,
         is_all_day INTEGER DEFAULT 0,
-        priority TEXT DEFAULT 'none',
+        priority TEXT DEFAULT 'normal',
+        status TEXT DEFAULT 'todo',
         done INTEGER DEFAULT 0,
+        category TEXT DEFAULT 'Личное',
+        color INTEGER DEFAULT 4281373137,
+        reminder_minutes INTEGER DEFAULT -1,
+        recurrence TEXT DEFAULT 'none',
+        attachments TEXT,
         subtasks TEXT,
         tags TEXT,
         is_synced INTEGER DEFAULT 0,
@@ -172,7 +197,7 @@ class DatabaseService {
       )
     ''');
 
-    // 10. Очередь удаления для оффлайн-синхронизации (Delete Queue)
+    // 10. Очередь удаления (Delete Queue)
     await db.execute('''
       CREATE TABLE delete_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,6 +209,29 @@ class DatabaseService {
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    // 0. Категории задач
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS task_categories (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        name TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    final catCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM task_categories'),
+    );
+    if (catCount == 0) {
+      await db.insert('task_categories', {
+        'id': 'cat_personal',
+        'name': 'Личное',
+        'is_synced': 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    }
+
     // 1. Задачи
     await db.execute('''
       CREATE TABLE IF NOT EXISTS tasks (
@@ -195,14 +243,53 @@ class DatabaseService {
         time TEXT,
         is_no_date INTEGER DEFAULT 0,
         is_all_day INTEGER DEFAULT 0,
-        priority TEXT DEFAULT 'none',
+        priority TEXT DEFAULT 'normal',
+        status TEXT DEFAULT 'todo',
         done INTEGER DEFAULT 0,
+        category TEXT DEFAULT 'Личное',
+        color INTEGER DEFAULT 4281373137,
+        reminder_minutes INTEGER DEFAULT -1,
+        recurrence TEXT DEFAULT 'none',
+        attachments TEXT,
         subtasks TEXT,
         tags TEXT,
         is_synced INTEGER DEFAULT 0,
         updated_at TEXT NOT NULL
       )
     ''');
+
+    // Добавляем новые колонки в tasks при необходимости
+    final taskColumns = await db.rawQuery('PRAGMA table_info(tasks)');
+    final colNames = taskColumns.map((c) => c['name'] as String).toSet();
+
+    if (!colNames.contains('status')) {
+      await db.execute(
+        "ALTER TABLE tasks ADD COLUMN status TEXT DEFAULT 'todo'",
+      );
+    }
+    if (!colNames.contains('category')) {
+      await db.execute(
+        "ALTER TABLE tasks ADD COLUMN category TEXT DEFAULT 'Личное'",
+      );
+    }
+    if (!colNames.contains('color')) {
+      await db.execute(
+        "ALTER TABLE tasks ADD COLUMN color INTEGER DEFAULT 4281373137",
+      );
+    }
+    if (!colNames.contains('reminder_minutes')) {
+      await db.execute(
+        "ALTER TABLE tasks ADD COLUMN reminder_minutes INTEGER DEFAULT -1",
+      );
+    }
+    if (!colNames.contains('recurrence')) {
+      await db.execute(
+        "ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT 'none'",
+      );
+    }
+    if (!colNames.contains('attachments')) {
+      await db.execute("ALTER TABLE tasks ADD COLUMN attachments TEXT");
+    }
 
     // 2. События
     await db.execute('''
@@ -341,10 +428,10 @@ class DatabaseService {
     ''');
   }
 
-  /// Полная очистка пользовательских данных при выходе (Logout)
   Future<void> clearAllData() async {
     final db = await database;
     await db.transaction((txn) async {
+      await txn.delete('task_categories');
       await txn.delete('tasks');
       await txn.delete('calendar_events');
       await txn.delete('habits');

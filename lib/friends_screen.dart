@@ -22,6 +22,7 @@ class _FriendsScreenState extends State<FriendsScreen>
   late TabController _tabController;
 
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
 
@@ -30,24 +31,26 @@ class _FriendsScreenState extends State<FriendsScreen>
   List<Map<String, dynamic>> _outgoingRequests = [];
   bool _isLoading = true;
 
+  String? _myInviteCode;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadFriendships();
+    _loadMyProfileAndFriends();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
   String? get _currentUserId => _supabase.auth.currentUser?.id;
 
-  // Загрузка всех связей пользователя
-  Future<void> _loadFriendships() async {
+  Future<void> _loadMyProfileAndFriends() async {
     final uid = _currentUserId;
     if (uid == null) {
       setState(() => _isLoading = false);
@@ -57,11 +60,20 @@ class _FriendsScreenState extends State<FriendsScreen>
     setState(() => _isLoading = true);
 
     try {
-      // 1. Загружаем все дружбы, где текущий пользователь либо отправитель, либо получатель
+      final myProf = await _supabase
+          .from('profiles')
+          .select('invite_code')
+          .eq('id', uid)
+          .maybeSingle();
+
+      if (myProf != null && myProf['invite_code'] != null) {
+        _myInviteCode = myProf['invite_code'];
+      }
+
       final data = await _supabase
           .from('friendships')
-          .select('id, sender_id, receiver_id, status, created_at')
-          .or('sender_id.eq.$uid,receiver_id.eq.$uid');
+          .select('id, user_id, friend_id, status, created_at')
+          .or('user_id.eq.$uid,friend_id.eq.$uid');
 
       final List accepted = [];
       final List incoming = [];
@@ -70,30 +82,29 @@ class _FriendsScreenState extends State<FriendsScreen>
       final Set<String> profileIdsToFetch = {};
 
       for (final item in (data as List)) {
-        final senderId = item['sender_id'];
-        final receiverId = item['receiver_id'];
+        final userId = item['user_id'];
+        final friendId = item['friend_id'];
         final status = item['status'];
 
         if (status == 'accepted') {
           accepted.add(item);
-          profileIdsToFetch.add(senderId == uid ? receiverId : senderId);
+          profileIdsToFetch.add(userId == uid ? friendId : userId);
         } else if (status == 'pending') {
-          if (receiverId == uid) {
+          if (friendId == uid) {
             incoming.add(item);
-            profileIdsToFetch.add(senderId);
+            profileIdsToFetch.add(userId);
           } else {
             outgoing.add(item);
-            profileIdsToFetch.add(receiverId);
+            profileIdsToFetch.add(friendId);
           }
         }
       }
 
-      // 2. Подгружаем профили этих людей
       Map<String, Map<String, dynamic>> profilesMap = {};
       if (profileIdsToFetch.isNotEmpty) {
         final profilesData = await _supabase
             .from('profiles')
-            .select('id, full_name, username, avatar_url')
+            .select('id, display_name, username')
             .filter('id', 'in', profileIdsToFetch.toList());
 
         for (final p in (profilesData as List)) {
@@ -101,38 +112,37 @@ class _FriendsScreenState extends State<FriendsScreen>
         }
       }
 
-      // 3. Собираем итоговые списки
       _acceptedFriends = accepted.map((item) {
-        final otherId = item['sender_id'] == uid
-            ? item['receiver_id']
-            : item['sender_id'];
+        final otherId = item['user_id'] == uid
+            ? item['friend_id']
+            : item['user_id'];
         final prof = profilesMap[otherId] ?? {};
         return {
           'friendshipId': item['id'],
           'userId': otherId,
-          'name': prof['full_name'] ?? 'Пользователь',
+          'name': prof['display_name'] ?? 'Пользователь',
           'username': prof['username'] ?? 'user',
         };
       }).toList();
 
       _incomingRequests = incoming.map((item) {
-        final otherId = item['sender_id'];
+        final otherId = item['user_id'];
         final prof = profilesMap[otherId] ?? {};
         return {
           'friendshipId': item['id'],
           'userId': otherId,
-          'name': prof['full_name'] ?? 'Пользователь',
+          'name': prof['display_name'] ?? 'Пользователь',
           'username': prof['username'] ?? 'user',
         };
       }).toList();
 
       _outgoingRequests = outgoing.map((item) {
-        final otherId = item['receiver_id'];
+        final otherId = item['friend_id'];
         final prof = profilesMap[otherId] ?? {};
         return {
           'friendshipId': item['id'],
           'userId': otherId,
-          'name': prof['full_name'] ?? 'Пользователь',
+          'name': prof['display_name'] ?? 'Пользователь',
           'username': prof['username'] ?? 'user',
         };
       }).toList();
@@ -143,7 +153,6 @@ class _FriendsScreenState extends State<FriendsScreen>
     }
   }
 
-  // Поиск пользователей в Supabase
   Future<void> _searchUsers(String query) async {
     final clean = query.trim().replaceAll('@', '');
     if (clean.isEmpty) {
@@ -157,84 +166,115 @@ class _FriendsScreenState extends State<FriendsScreen>
       final uid = _currentUserId;
       final res = await _supabase
           .from('profiles')
-          .select('id, full_name, username')
+          .select('id, display_name, username')
           .ilike('username', '%$clean%')
           .neq('id', uid ?? '')
           .limit(10);
 
-      setState(() {
-        _searchResults = List<Map<String, dynamic>>.from(res);
-      });
+      if (mounted) {
+        setState(() {
+          _searchResults = List<Map<String, dynamic>>.from(res);
+        });
+      }
     } catch (e) {
       debugPrint('Ошибка поиска пользователей: $e');
     } finally {
-      setState(() => _isSearching = false);
+      if (mounted) setState(() => _isSearching = false);
     }
   }
 
-  // Отправка заявки в друзья
+  Future<void> _addFriendByCode() async {
+    final code = _codeController.text.trim().toUpperCase();
+    final uid = _currentUserId;
+    if (code.isEmpty || uid == null) return;
+
+    try {
+      final target = await _supabase
+          .from('profiles')
+          .select('id, display_name, username')
+          .eq('invite_code', code)
+          .maybeSingle();
+
+      if (target == null || target['id'] == uid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Неверный код или вы ввели свой собственный код'),
+            ),
+          );
+        }
+        return;
+      }
+
+      await _sendFriendRequest(target['id']);
+      _codeController.clear();
+    } catch (e) {
+      debugPrint('Ошибка добавления по коду: $e');
+    }
+  }
+
   Future<void> _sendFriendRequest(String targetUserId) async {
     final uid = _currentUserId;
     if (uid == null) return;
 
     try {
       await _supabase.from('friendships').insert({
-        'sender_id': uid,
-        'receiver_id': targetUserId,
-        'status': 'pending',
+        'user_id': uid,
+        'friend_id': targetUserId,
+        'status': 'accepted',
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Заявка в друзья отправлена')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Друг успешно добавлен!')));
       }
-      _loadFriendships();
+      _loadMyProfileAndFriends();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Заявка уже отправлена или существует')),
+          const SnackBar(
+            content: Text(
+              'Запрос уже отправлен или пользователь уже в друзьях',
+            ),
+          ),
         );
       }
     }
   }
 
-  // Принятие заявки
   Future<void> _acceptFriendRequest(String friendshipId) async {
     try {
       await _supabase
           .from('friendships')
-          .update({
-            'status': 'accepted',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
+          .update({'status': 'accepted'})
           .eq('id', friendshipId);
 
-      _loadFriendships();
+      _loadMyProfileAndFriends();
     } catch (e) {
       debugPrint('Ошибка принятия заявки: $e');
     }
   }
 
-  // Отклонение / Удаление дружбы
   Future<void> _removeFriendship(String friendshipId) async {
     try {
       await _supabase.from('friendships').delete().eq('id', friendshipId);
-      _loadFriendships();
+      _loadMyProfileAndFriends();
     } catch (e) {
       debugPrint('Ошибка удаления: $e');
     }
   }
 
-  // Копирование персональной ссылки-приглашения
   void _copyInviteLink() {
-    final link = 'https://orbita.app/invite?user=${widget.currentUsername}';
-    Clipboard.setData(ClipboardData(text: link));
+    final code = _myInviteCode ?? 'ORB-USER';
+    final shareText =
+        'Привет! Добавляйся ко мне в приложении Орбита. Мой код: $code\nСсылка: orbita://invite?code=$code';
+    Clipboard.setData(ClipboardData(text: shareText));
     HapticFeedback.mediumImpact();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Ссылка-приглашение скопирована:\n$link'),
+        content: Text('Инвайт-код и ссылка скопированы в буфер:\n$code'),
         backgroundColor: const Color(0xFF2C69D1),
         duration: const Duration(seconds: 3),
       ),
@@ -271,14 +311,14 @@ class _FriendsScreenState extends State<FriendsScreen>
         ),
         actions: [
           IconButton(
-            tooltip: 'Пригласить по ссылке',
+            tooltip: 'Скопировать мой код',
             icon: const Icon(Icons.share_outlined, color: Color(0xFF38BDF8)),
             onPressed: _copyInviteLink,
           ),
           IconButton(
             tooltip: 'Обновить',
             icon: const Icon(Icons.refresh),
-            onPressed: _loadFriendships,
+            onPressed: _loadMyProfileAndFriends,
           ),
         ],
         bottom: TabBar(
@@ -322,32 +362,131 @@ class _FriendsScreenState extends State<FriendsScreen>
       ),
       body: Column(
         children: [
-          // Поле глобального поиска по @username
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: InkWell(
+              onTap: _copyInviteLink,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.qr_code,
+                      color: Color(0xFF38BDF8),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _myInviteCode != null
+                                ? 'Мой код: $_myInviteCode'
+                                : 'Загрузка кода...',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF38BDF8),
+                            ),
+                          ),
+                          const Text(
+                            'Нажмите, чтобы скопировать приглашение',
+                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.copy, size: 18, color: Color(0xFF38BDF8)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: TextField(
+                      controller: _codeController,
+                      textCapitalization: TextCapitalization.characters,
+                      style: TextStyle(color: textPrimary, fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Ввести код друга (например, ORB-...)',
+                        hintStyle: TextStyle(
+                          color: textSecondary,
+                          fontSize: 12,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF38BDF8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: _addFriendByCode,
+                  child: const Text(
+                    'Добавить',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             child: Container(
-              height: 44,
+              height: 42,
               decoration: BoxDecoration(
                 color: cardBg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: borderColor),
               ),
               child: TextField(
                 controller: _searchController,
-                style: TextStyle(color: textPrimary, fontSize: 14),
+                style: TextStyle(color: textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  hintText: 'Поиск человека по @username...',
-                  hintStyle: TextStyle(color: textSecondary, fontSize: 13),
+                  hintText: 'Поиск по @username...',
+                  hintStyle: TextStyle(color: textSecondary, fontSize: 12),
                   prefixIcon: const Icon(
                     Icons.search,
-                    size: 20,
+                    size: 18,
                     color: Colors.grey,
                   ),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(
                             Icons.close,
-                            size: 18,
+                            size: 16,
                             color: Colors.grey,
                           ),
                           onPressed: () {
@@ -366,8 +505,6 @@ class _FriendsScreenState extends State<FriendsScreen>
               ),
             ),
           ),
-
-          // Результаты поиска
           if (_searchResults.isNotEmpty)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -394,9 +531,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                   final isAlreadyFriend = _acceptedFriends.any(
                     (f) => f['userId'] == user['id'],
                   );
-                  final isOutgoing = _outgoingRequests.any(
-                    (f) => f['userId'] == user['id'],
-                  );
 
                   return ListTile(
                     dense: true,
@@ -406,7 +540,7 @@ class _FriendsScreenState extends State<FriendsScreen>
                       child: Icon(Icons.person, color: Colors.white, size: 18),
                     ),
                     title: Text(
-                      user['full_name'] ?? 'Пользователь',
+                      user['display_name'] ?? 'Пользователь',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: textPrimary,
@@ -420,14 +554,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                         ? const Text(
                             'В друзьях',
                             style: TextStyle(color: Colors.green, fontSize: 12),
-                          )
-                        : isOutgoing
-                        ? const Text(
-                            'Запрос отправлен',
-                            style: TextStyle(
-                              color: Colors.orangeAccent,
-                              fontSize: 12,
-                            ),
                           )
                         : FilledButton.tonal(
                             onPressed: () {
@@ -444,63 +570,12 @@ class _FriendsScreenState extends State<FriendsScreen>
                 },
               ),
             ),
-
-          // Баннер быстрой инвайт-ссылки
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: InkWell(
-              onTap: _copyInviteLink,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
-                  ),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.link, color: Color(0xFF38BDF8), size: 20),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Пригласить друга по ссылке',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: Color(0xFF38BDF8),
-                            ),
-                          ),
-                          Text(
-                            'Нажмите, чтобы скопировать персональную ссылку',
-                            style: TextStyle(fontSize: 11, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.copy, size: 18, color: Color(0xFF38BDF8)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Вкладки: Друзья и Заявки
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : TabBarView(
                     controller: _tabController,
                     children: [
-                      // Вкладка 1: Список принятых друзей
                       _acceptedFriends.isEmpty
                           ? Center(
                               child: Column(
@@ -521,7 +596,7 @@ class _FriendsScreenState extends State<FriendsScreen>
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Найдите их по @username или отправьте ссылку',
+                                    'Найдите их по @username или добавьте по коду выше',
                                     style: TextStyle(
                                       color: textSecondary,
                                       fontSize: 12,
@@ -594,8 +669,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                                 );
                               },
                             ),
-
-                      // Вкладка 2: Входящие и исходящие заявки
                       ListView(
                         padding: const EdgeInsets.all(16),
                         children: [
@@ -678,90 +751,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                                       ),
                                       onPressed: () => _removeFriendship(
                                         req['friendshipId'],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
-
-                          const SizedBox(height: 16),
-                          Text(
-                            'Отправленные запросы (${_outgoingRequests.length})',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: textPrimary,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (_outgoingRequests.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Text(
-                                'Нет ожидающих запросов',
-                                style: TextStyle(
-                                  color: textSecondary,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            )
-                          else
-                            ..._outgoingRequests.map((req) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: cardBg,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: borderColor),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const CircleAvatar(
-                                      backgroundColor: Colors.grey,
-                                      child: Icon(
-                                        Icons.hourglass_top,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            req['name'],
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: textPrimary,
-                                            ),
-                                          ),
-                                          Text(
-                                            '@${req['username']}',
-                                            style: TextStyle(
-                                              color: textSecondary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () => _removeFriendship(
-                                        req['friendshipId'],
-                                      ),
-                                      child: const Text(
-                                        'Отменить',
-                                        style: TextStyle(
-                                          color: Colors.redAccent,
-                                          fontSize: 12,
-                                        ),
                                       ),
                                     ),
                                   ],

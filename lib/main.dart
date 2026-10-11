@@ -319,11 +319,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       case 1:
         return CalendarScreen(isDarkMode: isDark);
       case 2:
-        return TasksScreen(
-          isDarkMode: isDark,
-          taskTemplates: _taskTemplates,
-          onSaveTemplate: (tpl) => setState(() => _taskTemplates.add(tpl)),
-        );
+        return TasksScreen(isDarkMode: isDark);
       case 3:
         return HabitsScreen(isDarkMode: isDark);
       case 4:
