@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import 'providers/tasks_provider.dart';
@@ -35,6 +35,38 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
   final List<Map<String, dynamic>> _subtasks = [];
   final List<String> _attachments = [];
 
+  static const List<int> _allowedReminderMinutes = [
+    -1,
+    0,
+    5,
+    10,
+    15,
+    30,
+    60,
+    1440,
+  ];
+
+  static const List<String> _allowedRecurrences = [
+    'none',
+    'hourly',
+    'daily',
+    'weekdays',
+    'weekly',
+    'biweekly',
+    'monthly',
+    'yearly',
+    'custom',
+  ];
+
+  static const List<String> _allowedPriorities = ['low', 'normal', 'high'];
+
+  static const List<String> _allowedStatuses = [
+    'todo',
+    'in_progress',
+    'done',
+    'canceled',
+  ];
+
   final List<Color> _availableColors = const [
     Color(0xFF38BDF8),
     Color(0xFF3B82F6),
@@ -64,18 +96,51 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
       }
       _isNoDate = t['isNoDate'] ?? false;
       _isAllDay = t['isAllDay'] ?? false;
-      _reminderMinutes = t['reminderMinutes'] ?? -1;
-      _recurrence = t['recurrence'] ?? 'none';
-      _priority = t['priority'] ?? 'normal';
-      _status = t['status'] ?? 'todo';
-      _selectedColor = t['color'] ?? const Color(0xFF38BDF8);
 
-      if (t['subtasks'] != null) {
+      // Безопасное чтение reminderMinutes с fallback
+      final rawReminder = t['reminderMinutes'];
+      final parsedReminder = rawReminder is int
+          ? rawReminder
+          : int.tryParse(rawReminder?.toString() ?? '-1') ?? -1;
+      _reminderMinutes = _allowedReminderMinutes.contains(parsedReminder)
+          ? parsedReminder
+          : -1;
+
+      // Безопасное чтение recurrence с fallback
+      final rawRecurrence = (t['recurrence'] ?? 'none')
+          .toString()
+          .toLowerCase();
+      _recurrence = _allowedRecurrences.contains(rawRecurrence)
+          ? rawRecurrence
+          : 'none';
+
+      // Безопасное чтение priority с fallback
+      final rawPriority = (t['priority'] ?? 'normal').toString().toLowerCase();
+      _priority = _allowedPriorities.contains(rawPriority)
+          ? rawPriority
+          : 'normal';
+
+      // Безопасное чтение status с fallback
+      final rawStatus = (t['status'] ?? 'todo').toString().toLowerCase();
+      _status = _allowedStatuses.contains(rawStatus) ? rawStatus : 'todo';
+
+      // Безопасное чтение color
+      if (t['color'] is Color) {
+        _selectedColor = t['color'];
+      } else if (t['color'] is int) {
+        _selectedColor = Color(t['color']);
+      } else {
+        _selectedColor = const Color(0xFF38BDF8);
+      }
+
+      if (t['subtasks'] != null && t['subtasks'] is Iterable) {
         for (final item in t['subtasks']) {
-          _subtasks.add(Map<String, dynamic>.from(item));
+          if (item is Map) {
+            _subtasks.add(Map<String, dynamic>.from(item));
+          }
         }
       }
-      if (t['attachments'] != null) {
+      if (t['attachments'] != null && t['attachments'] is Iterable) {
         _attachments.addAll(List<String>.from(t['attachments']));
       }
     } else {
@@ -239,9 +304,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
     final borderColor = isDark
         ? const Color(0xFF30363D)
         : const Color(0xFFD0D7DE);
@@ -282,7 +344,7 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
                   child: DropdownButton<String>(
                     value: categories.contains(_selectedCategory)
                         ? _selectedCategory
-                        : null,
+                        : (categories.isNotEmpty ? categories.first : null),
                     isExpanded: true,
                     hint: const Text('Выберите категорию'),
                     items: [
@@ -480,7 +542,9 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             leading: const Icon(Icons.notifications_none, size: 20),
             title: const Text('Напоминание'),
             trailing: DropdownButton<int>(
-              value: _reminderMinutes,
+              value: _allowedReminderMinutes.contains(_reminderMinutes)
+                  ? _reminderMinutes
+                  : -1,
               underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: -1, child: Text('Без напоминания')),
@@ -505,7 +569,9 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             leading: const Icon(Icons.repeat, size: 20),
             title: const Text('Повтор'),
             trailing: DropdownButton<String>(
-              value: _recurrence,
+              value: _allowedRecurrences.contains(_recurrence)
+                  ? _recurrence
+                  : 'none',
               underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 'none', child: Text('Не повторять')),
@@ -540,7 +606,9 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             leading: const Icon(Icons.flag_outlined, size: 20),
             title: const Text('Приоритет'),
             trailing: DropdownButton<String>(
-              value: _priority,
+              value: _allowedPriorities.contains(_priority)
+                  ? _priority
+                  : 'normal',
               underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 'low', child: Text('Низкий')),
@@ -560,7 +628,7 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             leading: const Icon(Icons.fact_check_outlined, size: 20),
             title: const Text('Статус'),
             trailing: DropdownButton<String>(
-              value: _status,
+              value: _allowedStatuses.contains(_status) ? _status : 'todo',
               underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 'todo', child: Text('К выполнению')),

@@ -19,7 +19,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 10,
+      version: 11, // Подняли до 11 для обновления таблицы заметок
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -146,9 +146,12 @@ class DatabaseService {
         title TEXT NOT NULL,
         body TEXT,
         image_path TEXT,
+        attachments TEXT,
+        tags TEXT,
         category TEXT DEFAULT 'Общее',
         is_pinned INTEGER DEFAULT 0,
         is_synced INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
     ''');
@@ -407,6 +410,38 @@ class DatabaseService {
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(habit_id, date);
     ''');
+
+    // 4. Миграция таблицы заметок (Notes)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        title TEXT NOT NULL,
+        body TEXT,
+        image_path TEXT,
+        category TEXT DEFAULT 'Общее',
+        is_pinned INTEGER DEFAULT 0,
+        is_synced INTEGER DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    final noteColumns = await db.rawQuery('PRAGMA table_info(notes)');
+    final nCols = noteColumns.map((c) => c['name'] as String).toSet();
+
+    if (!nCols.contains('created_at')) {
+      await db.execute("ALTER TABLE notes ADD COLUMN created_at TEXT");
+      // Заполняем датой обновления для старых записей
+      await db.execute(
+        "UPDATE notes SET created_at = updated_at WHERE created_at IS NULL",
+      );
+    }
+    if (!nCols.contains('tags')) {
+      await db.execute("ALTER TABLE notes ADD COLUMN tags TEXT");
+    }
+    if (!nCols.contains('attachments')) {
+      await db.execute("ALTER TABLE notes ADD COLUMN attachments TEXT");
+    }
 
     // 11. Настройки приложения
     await db.execute('''
