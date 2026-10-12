@@ -1,83 +1,296 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 import '../services/database_service.dart';
 import '../services/sync_service.dart';
 
-class DiaryNotifier extends Notifier<List<Map<String, dynamic>>> {
-  @override
-  List<Map<String, dynamic>> build() {
-    loadEntries();
-    return [];
-  }
+class DiaryMood {
+  final String id;
+  final String emoji;
+  final String label;
 
-  Future<void> loadEntries() async {
-    final db = await DatabaseService.instance.database;
-    final res = await db.query('diary_entries', orderBy: 'date DESC');
+  const DiaryMood({required this.id, required this.emoji, required this.label});
+}
 
-    state = res.map((row) {
-      final m = Map<String, dynamic>.from(row);
-      m['date'] = DateTime.parse(m['date']);
-      if (m['tags'] != null && m['tags'] is String) {
-        try {
-          m['tags'] = List<String>.from(jsonDecode(m['tags']));
-        } catch (_) {
-          m['tags'] = <String>[];
-        }
-      } else {
-        m['tags'] = <String>[];
-      }
-      return m;
-    }).toList();
-  }
+const List<DiaryMood> defaultMoods = [
+  DiaryMood(id: 'great', emoji: '😄', label: 'Отлично'),
+  DiaryMood(id: 'good', emoji: '😊', label: 'Хорошо'),
+  DiaryMood(id: 'neutral', emoji: '😐', label: 'Нормально'),
+  DiaryMood(id: 'tired', emoji: '🥱', label: 'Устал'),
+  DiaryMood(id: 'sad', emoji: '😔', label: 'Грустно'),
+  DiaryMood(id: 'angry', emoji: '😡', label: 'Злость'),
+  DiaryMood(id: 'love', emoji: '🥰', label: 'Влюблен'),
+  DiaryMood(id: 'anxious', emoji: '😰', label: 'Тревожно'),
+];
 
-  Future<void> saveEntry({
-    String? existingId,
-    required DateTime date,
-    required String mood,
-    required String content,
-    List<String> tags = const [],
-  }) async {
-    final db = await DatabaseService.instance.database;
-    final nowIso = DateTime.now().toIso8601String();
-    final id = existingId ?? 'diary_${DateTime.now().millisecondsSinceEpoch}';
+class DiaryItem {
+  final String id;
+  final String title;
+  final String content;
+  final DateTime date;
+  final String mood;
+  final List<String> images;
+  final bool isDraft;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
-    final row = {
-      'id': id,
-      'date': date.toIso8601String(),
-      'mood': mood,
-      'content': content,
-      'tags': jsonEncode(tags),
-      'is_synced': 0,
-      'updated_at': nowIso,
-    };
+  DiaryItem({
+    required this.id,
+    required this.title,
+    required this.content,
+    required this.date,
+    required this.mood,
+    this.images = const [],
+    this.isDraft = false,
+    required this.createdAt,
+    required this.updatedAt,
+  });
 
-    await db.insert(
-      'diary_entries',
-      row,
-      conflictAlgorithm: ConflictAlgorithm.replace,
+  DiaryMood get moodObject {
+    return defaultMoods.firstWhere(
+      (m) => m.id == mood,
+      orElse: () =>
+          const DiaryMood(id: 'neutral', emoji: '😐', label: 'Нормально'),
     );
-    await loadEntries();
-    SyncService.instance.syncAll();
   }
 
-  Future<void> deleteEntry(String entryId) async {
-    final db = await DatabaseService.instance.database;
-    await db.delete('diary_entries', where: 'id = ?', whereArgs: [entryId]);
-    await db.insert('delete_queue', {
-      'table_name': 'diary_entries',
-      'record_id': entryId,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-
-    state = state.where((e) => e['id'].toString() != entryId).toList();
-    SyncService.instance.syncAll();
+  DiaryItem copyWith({
+    String? id,
+    String? title,
+    String? content,
+    DateTime? date,
+    String? mood,
+    List<String>? images,
+    bool? isDraft,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return DiaryItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      date: date ?? this.date,
+      mood: mood ?? this.mood,
+      images: images ?? this.images,
+      isDraft: isDraft ?? this.isDraft,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 
-final diaryProvider =
-    NotifierProvider<DiaryNotifier, List<Map<String, dynamic>>>(
-      DiaryNotifier.new,
+class DiarySearchQueryNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+  void setQuery(String q) => state = q;
+}
+
+final diarySearchQueryProvider =
+    NotifierProvider<DiarySearchQueryNotifier, String>(
+      DiarySearchQueryNotifier.new,
     );
+
+class DiaryNotifier extends Notifier<List<DiaryItem>> {
+  static const _uuid = Uuid();
+
+  @override
+  List<DiaryItem> build() {
+    loadDiaries();
+    cleanExpiredDrafts();
+    return [];
+  }
+
+  Future<void> cleanExpiredDrafts() async {
+    try {
+      final db = await DatabaseService.instance.database;
+      final threshold = DateTime.now()
+          .subtract(const Duration(hours: 48))
+          .toIso8601String();
+      await db.delete(
+        'diaries',
+        where: 'is_draft = 1 AND created_at < ?',
+        whereArgs: [threshold],
+      );
+    } catch (e) {
+      debugPrint('Ошибка автоудаления черновиков: $e');
+    }
+  }
+
+  Future<void> loadDiaries() async {
+    try {
+      final db = await DatabaseService.instance.database;
+
+      // Защитная проверка: создаем таблицу diaries, если при обновлении версии она не создалась
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS diaries (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          title TEXT,
+          content TEXT,
+          date TEXT NOT NULL,
+          mood TEXT DEFAULT 'good',
+          images TEXT,
+          is_draft INTEGER DEFAULT 0,
+          is_synced INTEGER DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+
+      final rows = await db.query(
+        'diaries',
+        orderBy: 'date DESC, created_at DESC',
+      );
+
+      state = rows.map((r) {
+        List<String> imgs = [];
+        if (r['images'] != null && (r['images'] as String).isNotEmpty) {
+          try {
+            imgs = List<String>.from(jsonDecode(r['images'] as String));
+          } catch (_) {}
+        }
+
+        return DiaryItem(
+          id: r['id'] as String,
+          title: r['title'] as String? ?? '',
+          content: r['content'] as String? ?? '',
+          date: DateTime.tryParse(r['date'] as String? ?? '') ?? DateTime.now(),
+          mood: r['mood'] as String? ?? 'good',
+          images: imgs,
+          isDraft: (r['is_draft'] as int? ?? 0) == 1,
+          createdAt:
+              DateTime.tryParse(r['created_at'] as String? ?? '') ??
+              DateTime.now(),
+          updatedAt:
+              DateTime.tryParse(r['updated_at'] as String? ?? '') ??
+              DateTime.now(),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Ошибка загрузки дневников: $e');
+    }
+  }
+
+  Future<String> saveDiary({
+    String? id,
+    required String title,
+    required String content,
+    required DateTime date,
+    required String mood,
+    List<String> images = const [],
+    required bool isDraft,
+  }) async {
+    final db = await DatabaseService.instance.database;
+    final now = DateTime.now();
+    final nowIso = now.toIso8601String();
+    final diaryId = id ?? _uuid.v4();
+
+    DateTime createdAt = now;
+    if (id != null) {
+      final existing = state.where((d) => d.id == id).firstOrNull;
+      if (existing != null) {
+        createdAt = existing.createdAt;
+      }
+    }
+
+    final row = {
+      'id': diaryId,
+      'title': title,
+      'content': content,
+      'date': date.toIso8601String(),
+      'mood': mood,
+      'images': jsonEncode(images),
+      'is_draft': isDraft ? 1 : 0,
+      'is_synced': 0,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': nowIso,
+    };
+
+    // 1. Сохраняем локально в SQLite
+    await db.insert(
+      'diaries',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    // 2. Сразу обновляем стейт в памяти, чтобы интерфейс мгновенно среагировал
+    final newItem = DiaryItem(
+      id: diaryId,
+      title: title,
+      content: content,
+      date: date,
+      mood: mood,
+      images: images,
+      isDraft: isDraft,
+      createdAt: createdAt,
+      updatedAt: now,
+    );
+
+    final existingIndex = state.indexWhere((d) => d.id == diaryId);
+    if (existingIndex >= 0) {
+      final updatedList = List<DiaryItem>.from(state);
+      updatedList[existingIndex] = newItem;
+      state = updatedList;
+    } else {
+      state = [newItem, ...state];
+    }
+
+    // 3. Синхронизацию вызываем асинхронно в фоне, не блокируя UI и не роняя метод
+    try {
+      SyncService.instance.syncAll();
+    } catch (e) {
+      debugPrint('Синхронизация дневника отложена: $e');
+    }
+
+    return diaryId;
+  }
+
+  Future<void> deleteDiary(String id) async {
+    try {
+      final db = await DatabaseService.instance.database;
+      await db.delete('diaries', where: 'id = ?', whereArgs: [id]);
+
+      await db.insert('delete_queue', {
+        'table_name': 'diaries',
+        'record_id': id,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      state = state.where((d) => d.id != id).toList();
+      SyncService.instance.syncAll();
+    } catch (e) {
+      debugPrint('Ошибка удаления дневника: $e');
+    }
+  }
+}
+
+final diaryProvider = NotifierProvider<DiaryNotifier, List<DiaryItem>>(
+  DiaryNotifier.new,
+);
+
+final filteredDiariesProvider = Provider<List<DiaryItem>>((ref) {
+  final diaries = ref.watch(diaryProvider);
+  final query = ref.watch(diarySearchQueryProvider).trim().toLowerCase();
+
+  if (query.isEmpty) return diaries;
+
+  final dateFormat = DateFormat('dd.MM.yyyy', 'ru');
+  final dateFullFormat = DateFormat('d MMMM yyyy', 'ru');
+
+  return diaries.where((item) {
+    final dateStr = dateFormat.format(item.date).toLowerCase();
+    final dateFullStr = dateFullFormat.format(item.date).toLowerCase();
+    final titleStr = item.title.toLowerCase();
+    final contentStr = item.content.toLowerCase();
+
+    return titleStr.contains(query) ||
+        contentStr.contains(query) ||
+        dateStr.contains(query) ||
+        dateFullStr.contains(query);
+  }).toList();
+});

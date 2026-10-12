@@ -107,7 +107,7 @@ class NotesScreen extends ConsumerWidget {
               decoration: InputDecoration(
                 hintText: 'Поиск по заголовку и содержанию...',
                 hintStyle: TextStyle(
-                  color: textSecondary.withOpacity(0.6),
+                  color: textSecondary.withValues(alpha: 0.6),
                   fontSize: 14,
                 ),
                 prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
@@ -281,7 +281,7 @@ class NotesScreen extends ConsumerWidget {
                 Text(
                   DateFormat('dd.MM.yyyy').format(note.updatedAt),
                   style: TextStyle(
-                    color: textSecondary.withOpacity(0.6),
+                    color: textSecondary.withValues(alpha: 0.6),
                     fontSize: 10,
                   ),
                 ),
@@ -346,7 +346,7 @@ class NotesScreen extends ConsumerWidget {
                 Text(
                   DateFormat('dd.MM.yyyy HH:mm').format(note.updatedAt),
                   style: TextStyle(
-                    color: textSecondary.withOpacity(0.5),
+                    color: textSecondary.withValues(alpha: 0.5),
                     fontSize: 10,
                   ),
                 ),

@@ -1,38 +1,37 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import 'diary_detail_screen.dart';
+import 'diary_settings_screen.dart';
 import 'providers/diary_provider.dart';
 
 class DiaryScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
 
-  const DiaryScreen({super.key, required this.isDarkMode});
+  const DiaryScreen({super.key, this.isDarkMode = true});
 
   @override
   ConsumerState<DiaryScreen> createState() => _DiaryScreenState();
 }
 
 class _DiaryScreenState extends ConsumerState<DiaryScreen> {
-  String _searchQuery = '';
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
 
-  static const Map<String, Map<String, dynamic>> _moodMeta = {
-    'great': {'emoji': '🤩', 'label': 'Отлично', 'color': Colors.amber},
-    'good': {'emoji': '😊', 'label': 'Хорошо', 'color': Colors.green},
-    'neutral': {'emoji': '😐', 'label': 'Нейтрально', 'color': Colors.blueGrey},
-    'tired': {
-      'emoji': '🥱',
-      'label': 'Усталость',
-      'color': Colors.deepOrangeAccent,
-    },
-    'sad': {'emoji': '😔', 'label': 'Грустно', 'color': Colors.blueAccent},
-  };
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final entries = ref.watch(diaryProvider);
-    final notifier = ref.read(diaryProvider.notifier);
-
+    final diaries = ref.watch(filteredDiariesProvider);
     final isDark = widget.isDarkMode;
+
     final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
     final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
     final textPrimary = isDark
@@ -43,497 +42,262 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
         : const Color(0xFF57606A);
     final borderColor = isDark
         ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
-
-    final filtered = entries.where((e) {
-      final text = (e['content'] ?? '').toString().toLowerCase();
-      final q = _searchQuery.toLowerCase();
-      return text.contains(q);
-    }).toList();
+        : const Color(0xFFE1E4E8);
 
     return Scaffold(
       backgroundColor: bg,
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF38BDF8),
-        icon: const Icon(Icons.edit, color: Colors.white),
-        label: const Text(
-          'Запись дня',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        onPressed: () => _openEntryDialog(),
+      appBar: AppBar(
+        backgroundColor: bg,
+        elevation: 0,
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: TextStyle(color: textPrimary, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'Поиск по заголовку, дате, тексту...',
+                  hintStyle: TextStyle(color: textSecondary.withOpacity(0.6)),
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) {
+                  ref.read(diarySearchQueryProvider.notifier).setQuery(val);
+                },
+              )
+            : const Text(
+                'Дневник',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isSearching ? Icons.close : Icons.search,
+              color: textPrimary,
+            ),
+            tooltip: _isSearching ? 'Закрыть поиск' : 'Поиск',
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  _searchController.clear();
+                  ref.read(diarySearchQueryProvider.notifier).setQuery('');
+                  _isSearching = false;
+                } else {
+                  _isSearching = true;
+                }
+              });
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.more_vert, color: textPrimary),
+            tooltip: 'Настройки',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DiarySettingsScreen()),
+              );
+            },
+          ),
+        ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(
+      body: diaries.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Личный дневник',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: textPrimary,
-                    ),
+                  Icon(
+                    Icons.auto_stories_outlined,
+                    size: 64,
+                    color: textSecondary.withOpacity(0.4),
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${entries.length} записей',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF38BDF8),
-                      ),
-                    ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _isSearching ? 'Ничего не найдено' : 'В дневнике пока нет записей\nНажмите +, чтобы добавить первую',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: textSecondary, fontSize: 15),
                   ),
                 ],
               ),
-            ),
-
-            // Поиск
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: borderColor),
-                ),
-                child: TextField(
-                  style: TextStyle(color: textPrimary, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Поиск по дневнику...',
-                    hintStyle: TextStyle(color: textSecondary, fontSize: 12),
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      size: 18,
-                      color: Colors.grey,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                  onChanged: (v) => setState(() => _searchQuery = v.trim()),
-                ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: 84,
               ),
-            ),
-            const SizedBox(height: 8),
+              itemCount: diaries.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item = diaries[index];
+                final dateFormat = DateFormat('d MMMM yyyy, EEEE', 'ru');
+                final timeFormat = DateFormat('HH:mm');
 
-            // Список записей
-            Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.auto_stories_outlined,
-                            size: 48,
-                            color: Colors.grey.withValues(alpha: 0.4),
+                return Material(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DiaryDetailScreen(
+                            diaryId: item.id,
+                            isInitialViewMode: true,
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Дневник пуст',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Запишите мысли, итоги или события сегодняшнего дня',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: textSecondary,
-                            ),
-                          ),
-                        ],
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: item.isDraft
+                              ? Colors.amber.withOpacity(0.5)
+                              : borderColor,
+                        ),
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                      itemCount: filtered.length,
-                      itemBuilder: (ctx, i) {
-                        final entry = filtered[i];
-                        final d = entry['date'] as DateTime;
-                        final moodKey = entry['mood'] ?? 'neutral';
-                        final meta =
-                            _moodMeta[moodKey] ?? _moodMeta['neutral']!;
-                        final List tags = (entry['tags'] as List?) ?? [];
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: cardBg,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: borderColor),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () => _openEntryDialog(existingEntry: entry),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                item.moodObject.emoji,
+                                style: const TextStyle(fontSize: 22),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      dateFormat.format(item.date),
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      timeFormat.format(item.createdAt),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (item.isDraft)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withOpacity(0.18),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.amber.withOpacity(0.6),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      Icon(
+                                        Icons.edit_note,
+                                        size: 14,
+                                        color: Colors.amber,
+                                      ),
+                                      SizedBox(width: 4),
                                       Text(
-                                        meta['emoji'] as String,
-                                        style: const TextStyle(fontSize: 22),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${d.day} ${_monthNameGenitive(d.month)} ${d.year}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                              color: textPrimary,
-                                            ),
-                                          ),
-                                          Text(
-                                            meta['label'] as String,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: meta['color'] as Color,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const Spacer(),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.delete_outline,
-                                          size: 18,
-                                          color: Colors.redAccent,
-                                        ),
-                                        onPressed: () => notifier.deleteEntry(
-                                          entry['id'].toString(),
+                                        'Черновик',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.amber,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    entry['content'] ?? '',
-                                    style: TextStyle(
-                                      fontSize: 13.5,
-                                      height: 1.45,
-                                      color: textPrimary,
-                                    ),
-                                  ),
-                                  if (tags.isNotEmpty) ...[
-                                    const SizedBox(height: 10),
-                                    Wrap(
-                                      spacing: 6,
-                                      children: tags.map((t) {
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF38BDF8)
-                                                .withValues(alpha: 0.12),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            '#$t',
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              color: Color(0xFF38BDF8),
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ],
-                                ],
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          if (item.title.isNotEmpty) ...[
+                            Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: textPrimary,
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _openEntryDialog({Map<String, dynamic>? existingEntry}) {
-    final contentCtrl = TextEditingController(
-      text: existingEntry?['content'] ?? '',
-    );
-    final tagCtrl = TextEditingController();
-    String selectedMood = existingEntry?['mood'] ?? 'good';
-    DateTime selectedDate =
-        existingEntry?['date'] as DateTime? ?? DateTime.now();
-    List<String> currentTags = existingEntry?['tags'] != null
-        ? List<String>.from(existingEntry!['tags'])
-        : <String>[];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: widget.isDarkMode
-          ? const Color(0xFF161B22)
-          : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDState) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      existingEntry == null
-                          ? 'Новая запись'
-                          : 'Редактировать запись',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton.icon(
-                      icon: const Icon(Icons.calendar_today, size: 16),
-                      label: Text(
-                        '${selectedDate.day}.${selectedDate.month}.${selectedDate.year}',
-                      ),
-                      onPressed: () async {
-                        final p = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2035),
-                        );
-                        if (p != null) setDState(() => selectedDate = p);
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Выбор настроения
-                const Text(
-                  'Как прошел день?',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: _moodMeta.entries.map((entry) {
-                    final key = entry.key;
-                    final val = entry.value;
-                    final isSel = selectedMood == key;
-
-                    return GestureDetector(
-                      onTap: () => setDState(() => selectedMood = key),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSel
-                              ? (val['color'] as Color).withValues(alpha: 0.25)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSel
-                                ? val['color'] as Color
-                                : Colors.grey.withValues(alpha: 0.2),
-                            width: isSel ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Column(
-                          children: [
+                            const SizedBox(height: 6),
+                          ],
+                          if (item.content.isNotEmpty)
                             Text(
-                              val['emoji'] as String,
-                              style: const TextStyle(fontSize: 24),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              val['label'] as String,
+                              item.content,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: isSel
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isSel
-                                    ? val['color'] as Color
-                                    : Colors.grey,
+                                fontSize: 14,
+                                height: 1.4,
+                                color: textSecondary,
+                              ),
+                            ),
+                          if (item.images.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 60,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: item.images.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (ctx, i) {
+                                  final file = File(item.images[i]);
+                                  if (!file.existsSync())
+                                    return const SizedBox.shrink();
+                                  return ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      file,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           ],
-                        ),
+                        ],
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-
-                // Поле ввода текста
-                TextField(
-                  controller: contentCtrl,
-                  maxLines: 6,
-                  autofocus: existingEntry == null,
-                  decoration: const InputDecoration(
-                    hintText: 'Опишите ваши мысли, события или инсайты...',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                // Теги
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: tagCtrl,
-                        decoration: const InputDecoration(
-                          hintText: 'Добавить тег (#спорт, #работа)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        onSubmitted: (val) {
-                          final clean = val.trim().replaceAll('#', '');
-                          if (clean.isNotEmpty &&
-                              !currentTags.contains(clean)) {
-                            setDState(() {
-                              currentTags.add(clean);
-                              tagCtrl.clear();
-                            });
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.add_circle,
-                        color: Color(0xFF38BDF8),
-                      ),
-                      onPressed: () {
-                        final clean = tagCtrl.text.trim().replaceAll('#', '');
-                        if (clean.isNotEmpty && !currentTags.contains(clean)) {
-                          setDState(() {
-                            currentTags.add(clean);
-                            tagCtrl.clear();
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-                if (currentTags.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    children: currentTags.map((t) {
-                      return Chip(
-                        label: Text(
-                          '#$t',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        deleteIcon: const Icon(Icons.close, size: 14),
-                        onDeleted: () => setDState(() => currentTags.remove(t)),
-                      );
-                    }).toList(),
-                  ),
-                ],
-                const SizedBox(height: 20),
-
-                // Кнопки Сохранить / Отмена
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Отмена'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF38BDF8),
-                      ),
-                      onPressed: () {
-                        final text = contentCtrl.text.trim();
-                        if (text.isEmpty) return;
-
-                        ref
-                            .read(diaryProvider.notifier)
-                            .saveEntry(
-                              existingId: existingEntry?['id']?.toString(),
-                              date: selectedDate,
-                              mood: selectedMood,
-                              content: text,
-                              tags: currentTags,
-                            );
-
-                        Navigator.pop(ctx);
-                      },
-                      child: const Text(
-                        'Сохранить',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
+                );
+              },
             ),
-          ),
-        ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF38BDF8),
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add, size: 28),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const DiaryDetailScreen(
+                diaryId: null,
+                isInitialViewMode: false,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
-
-  String _monthNameGenitive(int m) => const [
-    'января',
-    'февраля',
-    'марта',
-    'апреля',
-    'мая',
-    'июня',
-    'июля',
-    'августа',
-    'сентября',
-    'октября',
-    'ноября',
-    'декабря',
-  ][m - 1];
 }

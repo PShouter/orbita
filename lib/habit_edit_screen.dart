@@ -280,7 +280,7 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
           spacing: 10,
           runSpacing: 10,
           children: _palette.map((color) {
-            final isSelected = _selectedColor.value == color.value;
+            final isSelected = _selectedColor.toARGB32() == color.toARGB32();
             return GestureDetector(
               onTap: () => setState(() => _selectedColor = color),
               child: Container(
@@ -329,7 +329,7 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
             children: [
               // Выпадающий список вариантов
               DropdownButtonFormField<String>(
-                value: _frequencyType,
+                initialValue: _frequencyType,
                 dropdownColor: const Color(0xFF1E293B),
                 style: const TextStyle(color: Colors.white, fontSize: 15),
                 decoration: InputDecoration(

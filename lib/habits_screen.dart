@@ -192,7 +192,11 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.repeat, size: 64, color: textSecondary.withOpacity(0.3)),
+          Icon(
+            Icons.repeat,
+            size: 64,
+            color: textSecondary.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: 16),
           Text(
             'Нет привычек',
@@ -202,7 +206,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
           Text(
             'Нажмите "+", чтобы создать первую привычку',
             style: TextStyle(
-              color: textSecondary.withOpacity(0.7),
+              color: textSecondary.withValues(alpha: 0.7),
               fontSize: 13,
             ),
           ),
@@ -251,7 +255,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF38BDF8).withOpacity(0.2),
+                          color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(
@@ -537,7 +541,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   Text(
                     'Цель: ${habit.targetValue} ${habit.unit ?? ""}',
                     style: TextStyle(
-                      color: textPrimary.withOpacity(0.6),
+                      color: textPrimary.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   ),
@@ -569,7 +573,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                           decoration: InputDecoration(
                             suffixText: habit.unit,
                             suffixStyle: TextStyle(
-                              color: textPrimary.withOpacity(0.5),
+                              color: textPrimary.withValues(alpha: 0.5),
                               fontSize: 12,
                             ),
                             border: const UnderlineInputBorder(),
@@ -771,7 +775,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF38BDF8).withOpacity(0.15),
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -804,7 +808,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.15),
+                      color: Colors.amber.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.speed, color: Colors.amber),

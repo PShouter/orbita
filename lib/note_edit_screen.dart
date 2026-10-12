@@ -776,10 +776,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    'Создано: ${dateFormat.format(_createdAt)}' +
-                        (_updatedAt != null
-                            ? '   |   Изменено: ${dateFormat.format(_updatedAt!)}'
-                            : ''),
+                    'Создано: ${dateFormat.format(_createdAt)}${_updatedAt != null ? '   |   Изменено: ${dateFormat.format(_updatedAt!)}' : ''}',
                     style: TextStyle(color: textSecondary, fontSize: 11),
                   ),
                 ),
