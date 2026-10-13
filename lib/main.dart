@@ -126,8 +126,6 @@ class _MainShellState extends ConsumerState<MainShell> {
   int _navIndex = 0;
   bool _isBudgetModeActive = false;
 
-  final List<Map<String, dynamic>> _taskTemplates = [];
-
   void _openProfileScreen(ProfileState profile) {
     Navigator.push(
       context,

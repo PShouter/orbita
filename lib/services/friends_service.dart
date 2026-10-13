@@ -29,7 +29,6 @@ class FriendsService {
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  /// Профиль текущего пользователя (чтобы узнать свой инвайт-код)
   Future<FriendProfile?> getMyProfile() async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
@@ -44,18 +43,32 @@ class FriendsService {
     return FriendProfile.fromMap(data);
   }
 
-  /// Поиск пользователей по @username (исключая самого себя)
+  /// Универсальный поиск: по коду инвайта ИЛИ по username
   Future<List<FriendProfile>> searchUsers(String query) async {
     final user = _client.auth.currentUser;
     if (user == null || query.trim().isEmpty) return [];
 
-    final cleanQuery = query.replaceAll('@', '').trim().toLowerCase();
+    final cleanQuery = query.replaceAll('@', '').trim();
+    final isCode = cleanQuery.toUpperCase().startsWith('ORB-');
+
+    if (isCode) {
+      final codeRes = await _client
+          .from('profiles')
+          .select()
+          .neq('id', user.id)
+          .eq('invite_code', cleanQuery.toUpperCase())
+          .limit(5);
+
+      if ((codeRes as List).isNotEmpty) {
+        return codeRes.map((m) => FriendProfile.fromMap(m)).toList();
+      }
+    }
 
     final List<dynamic> response = await _client
         .from('profiles')
         .select()
         .neq('id', user.id)
-        .ilike('username', '%$cleanQuery%')
+        .ilike('username', '%${cleanQuery.toLowerCase()}%')
         .limit(10);
 
     return response
@@ -63,64 +76,15 @@ class FriendsService {
         .toList();
   }
 
-  /// Получение списка подтвержденных друзей
-  Future<List<FriendProfile>> getFriends() async {
-    final user = _client.auth.currentUser;
-    if (user == null) return [];
-
-    final List<dynamic> response = await _client
-        .from('friendships')
-        .select('friend_id, profiles!friendships_friend_id_fkey(*)')
-        .eq('user_id', user.id);
-
-    final List<FriendProfile> friends = [];
-    for (final row in response) {
-      if (row['profiles'] != null) {
-        friends.add(
-          FriendProfile.fromMap(row['profiles'] as Map<String, dynamic>),
-        );
-      }
-    }
-    return friends;
-  }
-
-  /// Добавление в друзья по инвайт-коду (например, "ORB-A1B2C3")
-  Future<bool> addFriendByCode(String code) async {
-    final user = _client.auth.currentUser;
-    if (user == null) return false;
-
-    final cleanCode = code.trim().toUpperCase();
-
-    // Находим владельца кода
-    final target = await _client
-        .from('profiles')
-        .select()
-        .eq('invite_code', cleanCode)
-        .maybeSingle();
-
-    if (target == null || target['id'] == user.id) {
-      return false;
-    }
-
-    final targetId = target['id'] as String;
-
-    // Создаем взаимную дружбу
-    await _client.from('friendships').upsert([
-      {'user_id': user.id, 'friend_id': targetId, 'status': 'accepted'},
-      {'user_id': targetId, 'friend_id': user.id, 'status': 'accepted'},
-    ]);
-
-    return true;
-  }
-
-  /// Добавление в друзья по ID профиля (при клике из результатов поиска)
-  Future<void> addFriendById(String targetId) async {
+  /// Отправка заявки в друзья (в статусе 'pending')
+  Future<void> sendFriendRequest(String targetId) async {
     final user = _client.auth.currentUser;
     if (user == null || user.id == targetId) return;
 
-    await _client.from('friendships').upsert([
-      {'user_id': user.id, 'friend_id': targetId, 'status': 'accepted'},
-      {'user_id': targetId, 'friend_id': user.id, 'status': 'accepted'},
-    ]);
+    await _client.from('friendships').insert({
+      'user_id': user.id,
+      'friend_id': targetId,
+      'status': 'pending',
+    });
   }
 }
