@@ -112,8 +112,6 @@ class _FriendsScreenState extends State<FriendsScreen>
           'userId': otherId,
           'name': prof['display_name'] ?? 'Пользователь',
           'username': prof['username'] ?? 'user',
-          'streakDays':
-              42 + (otherId.hashCode % 50).abs(), // Демо-стрик для визуала
         };
       }).toList();
 
@@ -226,6 +224,17 @@ class _FriendsScreenState extends State<FriendsScreen>
           friendUsername: friend['username'],
           onFriendRemoved: _loadMyProfileAndFriends,
         ),
+      ),
+    );
+  }
+
+  void _showChatPlaceholder(String friendName) {
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Чат с $friendName откроется в следующем обновлении 🚀'),
+        backgroundColor: const Color(0xFF7C3AED),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -345,7 +354,6 @@ class _FriendsScreenState extends State<FriendsScreen>
       ),
       body: Column(
         children: [
-          // ЕДИНАЯ СТРОКА ПОИСКА (по коду ИЛИ по username)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Container(
@@ -389,8 +397,6 @@ class _FriendsScreenState extends State<FriendsScreen>
               ),
             ),
           ),
-
-          // Результаты глобального поиска
           if (_searchResults.isNotEmpty)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -485,8 +491,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                 },
               ),
             ),
-
-          // Вкладки: Мои друзья / Заявки
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -495,7 +499,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                 : TabBarView(
                     controller: _tabController,
                     children: [
-                      // Вкладка 1: Мои друзья
                       _acceptedFriends.isEmpty
                           ? Center(
                               child: Column(
@@ -544,157 +547,94 @@ class _FriendsScreenState extends State<FriendsScreen>
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: borderColor),
                                     ),
-                                    child: Column(
+                                    child: Row(
                                       children: [
-                                        Row(
-                                          children: [
-                                            // Аватарка со статусом
-                                            Stack(
-                                              alignment: Alignment.bottomRight,
-                                              children: [
-                                                CircleAvatar(
-                                                  radius: 22,
-                                                  backgroundColor: const Color(
-                                                    0xFF1E293B,
-                                                  ),
-                                                  child: Text(
-                                                    f['name'].isNotEmpty
-                                                        ? f['name'][0]
-                                                              .toUpperCase()
-                                                        : '?',
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 16,
-                                                    ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                  width: 10,
-                                                  height: 10,
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(
-                                                      0xFF10B981,
-                                                    ),
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(
-                                                      color: cardBg,
-                                                      width: 2,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                        CircleAvatar(
+                                          radius: 22,
+                                          backgroundColor: const Color(
+                                            0xFF1E293B,
+                                          ),
+                                          child: Text(
+                                            f['name'].isNotEmpty
+                                                ? f['name'][0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    f['name'],
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                      color: textPrimary,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    '@${f['username']}',
-                                                    style: TextStyle(
-                                                      color: textSecondary,
-                                                      fontSize: 11,
-                                                      fontFamily: 'monospace',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            // Бейдж стрика
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF59E0B)
-                                                    .withValues(alpha: 0.12),
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                                border: Border.all(
-                                                  color: const Color(0xFFF59E0B)
-                                                      .withValues(alpha: 0.25),
-                                                ),
-                                              ),
-                                              child: Text(
-                                                '🔥 ${f['streakDays']} дн.',
-                                                style: const TextStyle(
-                                                  color: Color(0xFFF59E0B),
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
+                                          ),
                                         ),
-                                        const SizedBox(height: 10),
-                                        // Кнопки действий прямо в карточке
-                                        Row(
-                                          children: [
-                                            Expanded(
-                                              child: ElevatedButton.icon(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: const Color(
-                                                    0xFF7C3AED,
-                                                  ).withValues(alpha: 0.2),
-                                                  foregroundColor: const Color(
-                                                    0xFFC4B5FD,
-                                                  ),
-                                                  elevation: 0,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        vertical: 8,
-                                                      ),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12,
-                                                        ),
-                                                  ),
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                f['name'],
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                  color: textPrimary,
                                                 ),
-                                                icon: const Icon(
-                                                  Icons.chat_bubble_outline,
-                                                  size: 14,
-                                                ),
-                                                label: const Text(
-                                                  'Чат',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                onPressed: () =>
-                                                    _openFriendProfile(f),
                                               ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            IconButton(
-                                              tooltip: 'Удалить из друзей',
-                                              icon: const Icon(
-                                                Icons.person_remove_outlined,
-                                                color: Colors.redAccent,
-                                                size: 18,
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '@${f['username']}',
+                                                style: TextStyle(
+                                                  color: textSecondary,
+                                                  fontSize: 12,
+                                                  fontFamily: 'monospace',
+                                                ),
                                               ),
-                                              onPressed: () =>
-                                                  _removeFriendship(
-                                                    f['friendshipId'],
-                                                  ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Кнопка «Чат» прямо в карточке
+                                        ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFF7C3AED,
+                                            ).withValues(alpha: 0.18),
+                                            foregroundColor: const Color(
+                                              0xFFC4B5FD,
                                             ),
-                                          ],
+                                            elevation: 0,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                          icon: const Icon(
+                                            Icons.chat_bubble_outline,
+                                            size: 14,
+                                          ),
+                                          label: const Text(
+                                            'Чат',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          onPressed: () =>
+                                              _showChatPlaceholder(f['name']),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        IconButton(
+                                          tooltip: 'Удалить из друзей',
+                                          icon: const Icon(
+                                            Icons.person_remove_outlined,
+                                            color: Colors.redAccent,
+                                            size: 18,
+                                          ),
+                                          onPressed: () => _removeFriendship(
+                                            f['friendshipId'],
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -702,8 +642,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                                 );
                               },
                             ),
-
-                      // Вкладка 2: Входящие заявки
                       ListView(
                         padding: const EdgeInsets.all(16),
                         children: [

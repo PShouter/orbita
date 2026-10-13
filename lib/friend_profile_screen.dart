@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FriendProfileScreen extends StatefulWidget {
@@ -26,51 +28,63 @@ class FriendProfileScreen extends StatefulWidget {
 
 class _FriendProfileScreenState extends State<FriendProfileScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
-  int _cheersCount = 12;
-  bool _isCloseCircle = true;
+  int _cheersCount = 0;
+  bool _canCheerToday = true;
 
-  // Демо-привычки для синергии (синхронизируются с общим стилем)
-  final List<Map<String, dynamic>> _habits = [
-    {
-      'title': 'Figma UI Daily',
-      'subtitle': 'Совместный спринт по будням',
-      'icon': '🎨',
-      'streak': 84,
-      'isDone': true,
-    },
-    {
-      'title': 'Утренняя пробежка 5 км',
-      'subtitle': 'Синхронизация привычки',
-      'icon': '🏃',
-      'streak': 29,
-      'isDone': false,
-    },
-    {
-      'title': 'Чтение книг 30 мин',
-      'subtitle': 'Глава каждый вечер',
-      'icon': '📚',
-      'streak': 41,
-      'isDone': true,
-    },
-  ];
-
-  void _cheerFriend() {
-    HapticFeedback.heavyImpact();
-    setState(() => _cheersCount++);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Вы поддержали стрик ${widget.friendName}! 🔥'),
-        backgroundColor: const Color(0xFFF59E0B),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadCheerState();
   }
 
-  void _toggleHabit(int index) {
-    HapticFeedback.selectionClick();
+  Future<void> _loadCheerState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final lastCheerDate = prefs.getString('last_cheer_${widget.friendUserId}');
+    final count = prefs.getInt('cheers_count_${widget.friendUserId}') ?? 0;
+
     setState(() {
-      _habits[index]['isDone'] = !_habits[index]['isDone'];
+      _cheersCount = count;
+      _canCheerToday = lastCheerDate != today;
     });
+  }
+
+  Future<void> _cheerFriend() async {
+    if (!_canCheerToday) {
+      HapticFeedback.lightImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Вы уже поддержали этого друга сегодня! Приходите завтра 🙌',
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    HapticFeedback.heavyImpact();
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    final newCount = _cheersCount + 1;
+    await prefs.setString('last_cheer_${widget.friendUserId}', today);
+    await prefs.setInt('cheers_count_${widget.friendUserId}', newCount);
+
+    setState(() {
+      _cheersCount = newCount;
+      _canCheerToday = false;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Вы поддержали ${widget.friendName}! 🔥'),
+          backgroundColor: const Color(0xFFF59E0B),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _confirmRemoveFriend() async {
@@ -143,48 +157,18 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       appBar: AppBar(
         backgroundColor: bg,
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new, size: 18, color: textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        centerTitle: true,
-        title: Column(
-          children: [
-            const Text(
-              'ПРОФИЛЬ ДРУГА',
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 1.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8B5CF6),
-              ),
-            ),
-            Container(
-              margin: const EdgeInsets.only(top: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
-                ),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('⭐ ', style: TextStyle(fontSize: 10)),
-                  Text(
-                    'Взаимная орбита',
-                    style: TextStyle(
-                      color: Color(0xFFFCD34D),
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        title: Text(
+          'Профиль друга',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: textPrimary,
+          ),
         ),
         actions: [
           PopupMenuButton<String>(
@@ -236,265 +220,77 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. Переключатель режима видимости
+          // Карточка друга: аватарка слева, имя и ID в центре, Чат справа
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Режим видимости:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      InkWell(
-                        onTap: () => setState(() => _isCloseCircle = true),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _isCloseCircle
-                                ? const Color(0xFF7C3AED)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Близкий круг',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: _isCloseCircle
-                                  ? Colors.white
-                                  : textSecondary,
-                            ),
-                          ),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => setState(() => _isCloseCircle = false),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: !_isCloseCircle
-                                ? const Color(0xFF7C3AED)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Знакомый',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: !_isCloseCircle
-                                  ? Colors.white
-                                  : textSecondary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 2. Карточка Героя (Аватар, Имя, Статус, 3 счётчика)
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: borderColor),
             ),
-            child: Column(
+            child: Row(
               children: [
-                // Аватарка со статусом
-                Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
-                        ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 44,
-                        backgroundColor: const Color(0xFF1E293B),
-                        child: Text(
-                          widget.friendName.isNotEmpty
-                              ? widget.friendName[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0B0E17),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF8B5CF6)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.circle, color: Color(0xFF8B5CF6), size: 6),
-                          SizedBox(width: 4),
-                          Text(
-                            'Фокус',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF8B5CF6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  widget.friendName,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '@${widget.friendUsername} • На Орбите',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    color: textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Статус / цитата
+                // Аватарка слева
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
                     ),
                   ),
-                  child: Row(
+                  child: CircleAvatar(
+                    radius: 30,
+                    backgroundColor: const Color(0xFF1E293B),
+                    child: Text(
+                      widget.friendName.isNotEmpty
+                          ? widget.friendName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Имя и ID в центре
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('⏳ ', style: TextStyle(fontSize: 14)),
-                      Expanded(
-                        child: Text(
-                          _isCloseCircle
-                              ? '«Глубокий спринт над задачами Орбиты до 16:30»'
-                              : '«Занят до 16:30 (Глубокий фокус)»',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFFDDD6FE),
-                            fontWeight: FontWeight.w500,
-                          ),
+                      Text(
+                        widget.friendName,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: textPrimary,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '@${widget.friendUsername}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'monospace',
+                          color: const Color(0xFF8B5CF6),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
 
-                // 3 Счетчика (Дней, Стрик, Слоты)
-                Row(
-                  children: [
-                    _buildCounterTile(
-                      '142',
-                      'Дней в синергии',
-                      const Color(0xFF06B6D4),
-                      innerBg,
-                      textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildCounterTile(
-                      '🔥 38',
-                      'Общий стрик',
-                      const Color(0xFFF59E0B),
-                      innerBg,
-                      textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildCounterTile(
-                      '19',
-                      'Совместных слотов',
-                      const Color(0xFF10B981),
-                      innerBg,
-                      textSecondary,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 3. Быстрые действия (Написать, Слот, Поддержать)
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: const Text(
-                    'Чат',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: () {
+                // Иконка чата справа
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
@@ -503,66 +299,91 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                       ),
                     );
                   },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF06B6D4),
-                    side: const BorderSide(color: Color(0xFF06B6D4)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                  label: const Text(
-                    'Слот',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Свободное окно для встречи с ${widget.friendName}: 17:00 - 18:30 ☕',
-                        ),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.4),
                       ),
-                    );
-                  },
+                    ),
+                    child: const Icon(
+                      Icons.chat_bubble_outline,
+                      color: Color(0xFFC4B5FD),
+                      size: 20,
+                    ),
+                  ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 3 Блока счетчиков
+          Row(
+            children: [
+              _buildCounterTile(
+                '0',
+                'Дней в орбите',
+                const Color(0xFF06B6D4),
+                cardBg,
+                textSecondary,
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B)
-                        .withValues(alpha: 0.2),
-                    foregroundColor: const Color(0xFFF59E0B),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  icon: const Text('🙌', style: TextStyle(fontSize: 16)),
-                  label: Text(
-                    '+$_cheersCount',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onPressed: _cheerFriend,
-                ),
+              _buildCounterTile(
+                '0',
+                'Общий стрик',
+                const Color(0xFFF59E0B),
+                cardBg,
+                textSecondary,
+              ),
+              const SizedBox(width: 8),
+              _buildCounterTile(
+                '0',
+                'Совместных событий',
+                const Color(0xFF10B981),
+                cardBg,
+                textSecondary,
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // 4. Синергия привычек
+          // Кнопка «Поддержать» с суточным лимитом
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _canCheerToday
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                foregroundColor: _canCheerToday ? Colors.black : Colors.white70,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: const Text('🙌', style: TextStyle(fontSize: 18)),
+              label: Text(
+                _canCheerToday
+                    ? 'Поддержать ($_cheersCount)'
+                    : 'Поддержано сегодня ($_cheersCount)',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              onPressed: _cheerFriend,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Блок «Общая синергия привычек» (в разработке)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(24),
@@ -580,9 +401,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                         Text(
                           'Общая синергия привычек',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                            letterSpacing: 0.3,
                             color: textPrimary,
                           ),
                         ),
@@ -591,16 +412,16 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 2,
+                        vertical: 3,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF06B6D4).withValues(alpha: 0.15),
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(
-                        '3 цели',
+                        'Скоро',
                         style: TextStyle(
-                          color: Color(0xFF06B6D4),
+                          color: Color(0xFFC4B5FD),
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -608,82 +429,42 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                ..._habits.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final h = entry.value;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: innerBg,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(h['icon'], style: const TextStyle(fontSize: 22)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                h['title'],
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                  color: textPrimary,
-                                ),
-                              ),
-                              Text(
-                                h['subtitle'],
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: innerBg,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.auto_awesome,
+                        color: Color(0xFF8B5CF6),
+                        size: 28,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'В разработке 🚀',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: textPrimary,
                         ),
-                        Text(
-                          '🔥 ${h['streak']} дн',
-                          style: const TextStyle(
-                            color: Color(0xFFF59E0B),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: () => _toggleHabit(idx),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: h['isDone']
-                                  ? const Color(0xFF10B981)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: h['isDone']
-                                    ? const Color(0xFF10B981)
-                                    : textSecondary.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: h['isDone']
-                                ? const Icon(
-                                    Icons.check,
-                                    size: 16,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Здесь будут отображаться общие цели и взаимные привычки',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, color: textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -701,10 +482,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
   ) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
           children: [
@@ -712,12 +493,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               val,
               style: TextStyle(
                 color: color,
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.w900,
                 fontFamily: 'monospace',
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
               textAlign: TextAlign.center,
