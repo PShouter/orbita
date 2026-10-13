@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../services/database_service.dart';
@@ -11,6 +12,7 @@ class VaultState {
   final String? activePin;
   final List<Map<String, dynamic>> documents;
   final String? errorMessage;
+  final bool canCheckBiometrics;
 
   VaultState({
     required this.hasPin,
@@ -18,6 +20,7 @@ class VaultState {
     this.activePin,
     required this.documents,
     this.errorMessage,
+    this.canCheckBiometrics = false,
   });
 
   VaultState copyWith({
@@ -26,6 +29,7 @@ class VaultState {
     String? activePin,
     List<Map<String, dynamic>>? documents,
     String? errorMessage,
+    bool? canCheckBiometrics,
   }) {
     return VaultState(
       hasPin: hasPin ?? this.hasPin,
@@ -33,12 +37,14 @@ class VaultState {
       activePin: activePin ?? this.activePin,
       documents: documents ?? this.documents,
       errorMessage: errorMessage,
+      canCheckBiometrics: canCheckBiometrics ?? this.canCheckBiometrics,
     );
   }
 }
 
 class VaultNotifier extends Notifier<VaultState> {
   final _service = VaultService.instance;
+  final LocalAuthentication _auth = LocalAuthentication();
 
   @override
   VaultState build() {
@@ -48,10 +54,16 @@ class VaultNotifier extends Notifier<VaultState> {
 
   Future<void> _initStatus() async {
     final hasPin = await _service.hasPin();
-    state = state.copyWith(hasPin: hasPin);
+    bool canBio = false;
+    try {
+      final canAuth = await _auth.canCheckBiometrics;
+      final isDeviceSupported = await _auth.isDeviceSupported();
+      canBio = canAuth || isDeviceSupported;
+    } catch (_) {}
+
+    state = state.copyWith(hasPin: hasPin, canCheckBiometrics: canBio);
   }
 
-  /// Установка первого PIN-кода
   Future<void> setupPin(String pin) async {
     await _service.setPin(pin);
     state = state.copyWith(
@@ -62,7 +74,6 @@ class VaultNotifier extends Notifier<VaultState> {
     );
   }
 
-  /// Разблокировка сейфа
   Future<bool> unlock(String pin) async {
     final isValid = await _service.verifyPin(pin);
     if (isValid) {
@@ -79,17 +90,44 @@ class VaultNotifier extends Notifier<VaultState> {
     }
   }
 
-  /// Блокировка сейфа (сброс расшифрованных данных из памяти)
+  Future<bool> unlockWithBiometrics() async {
+    try {
+      final authenticated = await _auth.authenticate(
+        localizedReason: 'Подтвердите личность для входа в Сейф',
+      );
+
+      if (authenticated) {
+        final realPin = await _service.getSavedPinForBiometrics();
+        if (realPin != null) {
+          state = state.copyWith(
+            isUnlocked: true,
+            activePin: realPin,
+            errorMessage: null,
+          );
+          await loadDocuments();
+          return true;
+        } else {
+          state = state.copyWith(
+            errorMessage: 'Для первого входа введите PIN вручную',
+          );
+        }
+      }
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Ошибка биометрии: $e');
+    }
+    return false;
+  }
+
   void lock() {
     state = VaultState(
       hasPin: state.hasPin,
       isUnlocked: false,
       activePin: null,
       documents: [],
+      canCheckBiometrics: state.canCheckBiometrics,
     );
   }
 
-  /// Загрузка и расшифровка документов из базы
   Future<void> loadDocuments() async {
     if (!state.isUnlocked || state.activePin == null) return;
 
@@ -117,7 +155,6 @@ class VaultNotifier extends Notifier<VaultState> {
     state = state.copyWith(documents: decryptedDocs);
   }
 
-  /// Добавление нового защищенного документа
   Future<void> addDocument({
     required String title,
     required String category,
@@ -129,7 +166,6 @@ class VaultNotifier extends Notifier<VaultState> {
     final id = 'vault_${DateTime.now().millisecondsSinceEpoch}';
     final nowIso = DateTime.now().toIso8601String();
 
-    // Шифруем данные мастер-ключом на базе текущего PIN
     final encRes = _service.encryptString(title, state.activePin!);
     final encPayloadRes = _service.encryptString(payload, state.activePin!);
 
@@ -152,7 +188,6 @@ class VaultNotifier extends Notifier<VaultState> {
     SyncService.instance.syncAll();
   }
 
-  /// Удаление документа
   Future<void> deleteDocument(String id) async {
     final db = await DatabaseService.instance.database;
     await db.delete('vault_documents', where: 'id = ?', whereArgs: [id]);

@@ -12,28 +12,25 @@ class VaultService {
 
   static const String _prefPinHash = 'vault_pin_hash';
   static const String _prefSalt = 'vault_pin_salt';
+  static const String _prefBiometricKey = 'vault_bio_master_pin';
 
-  /// Генерация случайной криптостойкой соли
   String _generateSalt() {
     final rand = Random.secure();
     final bytes = List<int>.generate(16, (_) => rand.nextInt(256));
     return base64Encode(bytes);
   }
 
-  /// Получение 32-байтного (256-бит) ключа из PIN и соли
   Uint8List _deriveKey(String pin, String salt) {
     final keyBytes = utf8.encode('$pin:$salt:orbita_vault_v1');
     final digest = sha256.convert(keyBytes);
     return Uint8List.fromList(digest.bytes);
   }
 
-  /// Проверить, установлен ли уже PIN-код
   Future<bool> hasPin() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.containsKey(_prefPinHash);
   }
 
-  /// Установить новый PIN-код
   Future<void> setPin(String pin) async {
     final prefs = await SharedPreferences.getInstance();
     final salt = _generateSalt();
@@ -42,9 +39,14 @@ class VaultService {
 
     await prefs.setString(_prefSalt, salt);
     await prefs.setString(_prefPinHash, hash);
+    await prefs.setString(_prefBiometricKey, pin);
   }
 
-  /// Проверить введенный PIN-код
+  Future<String?> getSavedPinForBiometrics() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_prefBiometricKey);
+  }
+
   Future<bool> verifyPin(String pin) async {
     final prefs = await SharedPreferences.getInstance();
     final salt = prefs.getString(_prefSalt);
@@ -54,20 +56,22 @@ class VaultService {
 
     final key = _deriveKey(pin, salt);
     final inputHash = sha256.convert(key).toString();
-    return inputHash == savedHash;
+    final isValid = inputHash == savedHash;
+
+    if (isValid) {
+      await prefs.setString(_prefBiometricKey, pin);
+    }
+    return isValid;
   }
 
-  /// Сбросить PIN и данные сейфа (при необходимости)
   Future<void> resetVault() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefPinHash);
     await prefs.remove(_prefSalt);
+    await prefs.remove(_prefBiometricKey);
   }
 
-  /// Зашифровать открытый текст в AES-256
   Map<String, String> encryptString(String plainText, String pin) {
-    final prefs = SharedPreferences.getInstance();
-    // Извлекаем соль синхронно из кэша (или генерируем)
     final keyBytes = sha256
         .convert(utf8.encode('$pin:orbita_vault_salt_v1'))
         .bytes;
@@ -80,7 +84,6 @@ class VaultService {
     return {'cipherText': encrypted.base64, 'iv': iv.base64};
   }
 
-  /// Расшифровать шифротекст AES-256
   String decryptString(String cipherBase64, String ivBase64, String pin) {
     try {
       final keyBytes = sha256
