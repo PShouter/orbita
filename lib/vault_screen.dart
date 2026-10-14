@@ -369,7 +369,7 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
             File(payload),
             fit: BoxFit.cover,
             width: double.infinity,
-            errorBuilder: (_, __, ___) =>
+            errorBuilder: (_, _, _) =>
                 const Icon(Icons.broken_image, color: Colors.grey),
           );
         } else {

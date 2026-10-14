@@ -56,7 +56,9 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                 style: TextStyle(color: textPrimary, fontSize: 16),
                 decoration: InputDecoration(
                   hintText: 'Поиск по заголовку, дате, тексту...',
-                  hintStyle: TextStyle(color: textSecondary.withOpacity(0.6)),
+                  hintStyle: TextStyle(
+                    color: textSecondary.withValues(alpha: 0.6),
+                  ),
                   border: InputBorder.none,
                 ),
                 onChanged: (val) {
@@ -106,7 +108,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                   Icon(
                     Icons.auto_stories_outlined,
                     size: 64,
-                    color: textSecondary.withOpacity(0.4),
+                    color: textSecondary.withValues(alpha: 0.4),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -125,7 +127,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                 bottom: 84,
               ),
               itemCount: diaries.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final item = diaries[index];
                 final dateFormat = DateFormat('d MMMM yyyy, EEEE', 'ru');
@@ -153,7 +155,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: item.isDraft
-                              ? Colors.amber.withOpacity(0.5)
+                              ? Colors.amber.withValues(alpha: 0.5)
                               : borderColor,
                         ),
                       ),
@@ -196,10 +198,12 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.amber.withOpacity(0.18),
+                                    color: Colors.amber.withValues(alpha: 0.18),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: Colors.amber.withOpacity(0.6),
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.6,
+                                      ),
                                     ),
                                   ),
                                   child: const Row(
@@ -256,12 +260,13 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: item.images.length,
-                                separatorBuilder: (_, __) =>
+                                separatorBuilder: (_, _) =>
                                     const SizedBox(width: 8),
                                 itemBuilder: (ctx, i) {
                                   final file = File(item.images[i]);
-                                  if (!file.existsSync())
+                                  if (!file.existsSync()) {
                                     return const SizedBox.shrink();
+                                  }
                                   return ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
                                     child: Image.file(

@@ -500,8 +500,9 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                                                 ),
                                                 decoration: BoxDecoration(
                                                   color: isSel
-                                                      ? const Color(0xFF38BDF8)
-                                                            .withOpacity(0.2)
+                                                      ? const Color(
+                                                          0xFF38BDF8,
+                                                        ).withValues(alpha: 0.2)
                                                       : Colors.transparent,
                                                   shape: BoxShape.circle,
                                                   border: Border.all(
@@ -596,7 +597,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                       decoration: InputDecoration(
                         hintText: 'Заголовок дня...',
                         hintStyle: TextStyle(
-                          color: textSecondary.withOpacity(0.5),
+                          color: textSecondary.withValues(alpha: 0.5),
                           fontSize: 20,
                         ),
                         border: InputBorder.none,
@@ -609,7 +610,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: _images.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        separatorBuilder: (_, _) => const SizedBox(width: 10),
                         itemBuilder: (ctx, i) {
                           final file = File(_images[i]);
                           return Stack(
@@ -674,7 +675,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                       decoration: InputDecoration(
                         hintText: 'Напишите, как прошел ваш день...',
                         hintStyle: TextStyle(
-                          color: textSecondary.withOpacity(0.4),
+                          color: textSecondary.withValues(alpha: 0.4),
                           fontSize: 16,
                         ),
                         border: InputBorder.none,
@@ -698,7 +699,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                           tooltip: 'Предыдущая запись',
                           color: hasPrevious
                               ? textPrimary
-                              : textSecondary.withOpacity(0.3),
+                              : textSecondary.withValues(alpha: 0.3),
                           onPressed: hasPrevious
                               ? () => _loadDiary(diaries[currentIndex + 1])
                               : null,
@@ -712,7 +713,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                           tooltip: 'Следующая запись',
                           color: hasNext
                               ? textPrimary
-                              : textSecondary.withOpacity(0.3),
+                              : textSecondary.withValues(alpha: 0.3),
                           onPressed: hasNext
                               ? () => _loadDiary(diaries[currentIndex - 1])
                               : null,

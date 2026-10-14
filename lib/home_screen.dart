@@ -540,11 +540,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Свободный баланс: ${budgetState.balance.toStringAsFixed(0)} ₽',
+                'Свободно: ${budgetState.freeMoney.toStringAsFixed(0)} ₽',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: budgetState.balance >= 0
+                  color: budgetState.freeMoney >= 0
                       ? const Color(0xFF38BDF8)
                       : Colors.redAccent,
                 ),
@@ -553,19 +553,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Row(
                 children: [
                   Text(
-                    'Доходы: +${budgetState.totalIncome.toStringAsFixed(0)} ₽',
+                    'На счетах: ${budgetState.totalAccountsBalance.toStringAsFixed(0)} ₽',
                     style: const TextStyle(
                       fontSize: 11,
-                      color: Colors.green,
+                      color: Colors.grey,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'Расходы: -${budgetState.totalExpense.toStringAsFixed(0)} ₽',
+                    'В день: ~${budgetState.dailySafeLimit.toStringAsFixed(0)} ₽',
                     style: const TextStyle(
                       fontSize: 11,
-                      color: Colors.redAccent,
+                      color: Color(0xFFFBBF24),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

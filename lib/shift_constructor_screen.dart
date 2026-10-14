@@ -115,14 +115,16 @@ class _ShiftConstructorScreenState
                     borderRadius: BorderRadius.circular(20),
                     onTap: () {
                       setState(() {
-                        _types[index] = _types[index].copyWith(color: c.value);
+                        _types[index] = _types[index].copyWith(
+                          color: c.toARGB32(),
+                        );
                       });
                       Navigator.pop(ctx);
                     },
                     child: CircleAvatar(
                       backgroundColor: c,
                       radius: 20,
-                      child: (_types[index].color == c.value)
+                      child: (_types[index].color == c.toARGB32())
                           ? const Icon(Icons.check, color: Colors.white)
                           : null,
                     ),
@@ -142,7 +144,7 @@ class _ShiftConstructorScreenState
       id: newId,
       name: 'Новая смена',
       shortName: 'С',
-      color: _palette[_types.length % _palette.length].value,
+      color: _palette[_types.length % _palette.length].toARGB32(),
       isWork: true,
       startTime: '08:00',
       endTime: '20:00',

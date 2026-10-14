@@ -381,8 +381,9 @@ class _ShiftScheduleScreenState extends ConsumerState<ShiftScheduleScreen> {
                     ),
                   ],
                   onChanged: (id) {
-                    if (id != null)
+                    if (id != null) {
                       ref.read(shiftProvider.notifier).switchSchedule(id);
+                    }
                   },
                 ),
               ),

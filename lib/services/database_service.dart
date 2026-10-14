@@ -19,14 +19,14 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 11, // Подняли до 11 для обновления таблицы заметок
+      version: 12, // Подняли до 12 для модуля Бюджета
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
-    // 0. Категории задач (Task Categories)
+    // 0. Категории задач
     await db.execute('''
       CREATE TABLE task_categories (
         id TEXT PRIMARY KEY,
@@ -37,7 +37,6 @@ class DatabaseService {
       )
     ''');
 
-    // Дефолтная категория
     await db.insert('task_categories', {
       'id': 'cat_personal',
       'name': 'Личное',
@@ -45,7 +44,7 @@ class DatabaseService {
       'updated_at': DateTime.now().toIso8601String(),
     });
 
-    // 1. Задачи (Tasks)
+    // 1. Задачи
     await db.execute('''
       CREATE TABLE tasks (
         id TEXT PRIMARY KEY,
@@ -71,7 +70,7 @@ class DatabaseService {
       )
     ''');
 
-    // 2. События Календаря (Calendar Events)
+    // 2. События Календаря
     await db.execute('''
       CREATE TABLE calendar_events (
         id TEXT PRIMARY KEY,
@@ -93,7 +92,7 @@ class DatabaseService {
       )
     ''');
 
-    // 3. Привычки (Habits)
+    // 3. Привычки
     await db.execute('''
       CREATE TABLE habits (
         id TEXT PRIMARY KEY,
@@ -118,7 +117,7 @@ class DatabaseService {
       )
     ''');
 
-    // 3.1 Логи выполнения привычек (Habit Logs)
+    // 3.1 Логи привычек
     await db.execute('''
       CREATE TABLE habit_logs (
         id TEXT PRIMARY KEY,
@@ -138,7 +137,7 @@ class DatabaseService {
       CREATE INDEX idx_habit_logs_date ON habit_logs(habit_id, date);
     ''');
 
-    // 4. Заметки (Notes)
+    // 4. Заметки
     await db.execute('''
       CREATE TABLE notes (
         id TEXT PRIMARY KEY,
@@ -156,22 +155,55 @@ class DatabaseService {
       )
     ''');
 
-    // 5. Транзакции бюджета (Budget Transactions)
+    // 5. Бюджет: Счета (Accounts)
+    await db.execute('''
+      CREATE TABLE budget_accounts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL, -- 'card', 'saving', 'debt', 'credit'
+        balance REAL NOT NULL DEFAULT 0.0,
+        currency TEXT DEFAULT '₽',
+        color INTEGER DEFAULT 4281373137,
+        is_synced INTEGER DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // 5.1 Бюджет: Категории (Categories)
+    await db.execute('''
+      CREATE TABLE budget_categories (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL, -- 'expense', 'income'
+        icon TEXT DEFAULT 'category',
+        color INTEGER DEFAULT 4281373137,
+        monthly_limit REAL DEFAULT 0.0,
+        is_synced INTEGER DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    // 5.2 Бюджет: Транзакции (Transactions)
     await db.execute('''
       CREATE TABLE budget_transactions (
         id TEXT PRIMARY KEY,
         user_id TEXT,
         title TEXT NOT NULL,
         amount REAL NOT NULL,
-        type TEXT NOT NULL,
+        type TEXT NOT NULL, -- 'expense', 'income'
         category TEXT NOT NULL,
+        account_id TEXT,
         date TEXT NOT NULL,
+        is_planned INTEGER DEFAULT 0,
+        is_completed INTEGER DEFAULT 1,
         is_synced INTEGER DEFAULT 0,
         updated_at TEXT NOT NULL
       )
     ''');
 
-    // 6. Записи дневника (Diary Entries)
+    // 6. Дневник
     await db.execute('''
       CREATE TABLE diary_entries (
         id TEXT PRIMARY KEY,
@@ -185,7 +217,7 @@ class DatabaseService {
       )
     ''');
 
-    // 7. График смен (Shift Schedules)
+    // 7. График смен
     await db.execute('''
       CREATE TABLE shift_schedules (
         id TEXT PRIMARY KEY,
@@ -199,7 +231,7 @@ class DatabaseService {
       )
     ''');
 
-    // 8. Сейф - зашифрованные документы (Vault Documents)
+    // 8. Сейф
     await db.execute('''
       CREATE TABLE vault_documents (
         id TEXT PRIMARY KEY,
@@ -213,7 +245,7 @@ class DatabaseService {
       )
     ''');
 
-    // 9. Календари пользователя (User Calendars)
+    // 9. Календари
     await db.execute('''
       CREATE TABLE user_calendars (
         id TEXT PRIMARY KEY,
@@ -227,7 +259,7 @@ class DatabaseService {
       )
     ''');
 
-    // 10. Очередь удаления (Delete Queue)
+    // 10. Очередь удаления
     await db.execute('''
       CREATE TABLE delete_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -237,7 +269,7 @@ class DatabaseService {
       )
     ''');
 
-    // 11. Настройки приложения (App Settings)
+    // 11. Настройки
     await db.execute('''
       CREATE TABLE app_settings (
         key TEXT PRIMARY KEY,
@@ -247,209 +279,59 @@ class DatabaseService {
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    // 0. Категории задач
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS task_categories (
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        name TEXT NOT NULL,
-        is_synced INTEGER DEFAULT 0,
-        updated_at TEXT NOT NULL
-      )
-    ''');
+    if (oldVersion < 12) {
+      // Создаем счета
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS budget_accounts (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          balance REAL NOT NULL DEFAULT 0.0,
+          currency TEXT DEFAULT '₽',
+          color INTEGER DEFAULT 4281373137,
+          is_synced INTEGER DEFAULT 0,
+          updated_at TEXT NOT NULL
+        )
+      ''');
 
-    final catCount = Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM task_categories'),
-    );
-    if (catCount == 0) {
-      await db.insert('task_categories', {
-        'id': 'cat_personal',
-        'name': 'Личное',
-        'is_synced': 0,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    }
+      // Создаем категории бюджета
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS budget_categories (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          icon TEXT DEFAULT 'category',
+          color INTEGER DEFAULT 4281373137,
+          monthly_limit REAL DEFAULT 0.0,
+          is_synced INTEGER DEFAULT 0,
+          updated_at TEXT NOT NULL
+        )
+      ''');
 
-    // 1. Задачи
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS tasks (
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        title TEXT NOT NULL,
-        description TEXT,
-        date TEXT,
-        time TEXT,
-        is_no_date INTEGER DEFAULT 0,
-        is_all_day INTEGER DEFAULT 0,
-        priority TEXT DEFAULT 'normal',
-        status TEXT DEFAULT 'todo',
-        done INTEGER DEFAULT 0,
-        category TEXT DEFAULT 'Личное',
-        color INTEGER DEFAULT 4281373137,
-        reminder_minutes INTEGER DEFAULT -1,
-        recurrence TEXT DEFAULT 'none',
-        attachments TEXT,
-        subtasks TEXT,
-        tags TEXT,
-        is_synced INTEGER DEFAULT 0,
-        updated_at TEXT NOT NULL
-      )
-    ''');
-
-    final taskColumns = await db.rawQuery('PRAGMA table_info(tasks)');
-    final colNames = taskColumns.map((c) => c['name'] as String).toSet();
-
-    if (!colNames.contains('status')) {
-      await db.execute(
-        "ALTER TABLE tasks ADD COLUMN status TEXT DEFAULT 'todo'",
+      // Дополняем существующую таблицу budget_transactions новыми колонками
+      final txCols = await db.rawQuery(
+        'PRAGMA table_info(budget_transactions)',
       );
-    }
-    if (!colNames.contains('category')) {
-      await db.execute(
-        "ALTER TABLE tasks ADD COLUMN category TEXT DEFAULT 'Личное'",
-      );
-    }
-    if (!colNames.contains('color')) {
-      await db.execute(
-        "ALTER TABLE tasks ADD COLUMN color INTEGER DEFAULT 4281373137",
-      );
-    }
-    if (!colNames.contains('reminder_minutes')) {
-      await db.execute(
-        "ALTER TABLE tasks ADD COLUMN reminder_minutes INTEGER DEFAULT -1",
-      );
-    }
-    if (!colNames.contains('recurrence')) {
-      await db.execute(
-        "ALTER TABLE tasks ADD COLUMN recurrence TEXT DEFAULT 'none'",
-      );
-    }
-    if (!colNames.contains('attachments')) {
-      await db.execute("ALTER TABLE tasks ADD COLUMN attachments TEXT");
-    }
+      final colNames = txCols.map((c) => c['name'] as String).toSet();
 
-    // 3. Привычки и новые поля
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS habits (
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        title TEXT NOT NULL,
-        question TEXT,
-        description TEXT,
-        type TEXT DEFAULT 'boolean',
-        target_value REAL DEFAULT 1.0,
-        unit TEXT,
-        color INTEGER NOT NULL,
-        frequency_type TEXT DEFAULT 'daily',
-        frequency_days TEXT,
-        frequency_count INTEGER DEFAULT 1,
-        reminder_time TEXT,
-        position INTEGER DEFAULT 0,
-        streak INTEGER DEFAULT 0,
-        is_archived INTEGER DEFAULT 0,
-        is_synced INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    ''');
-
-    final habitColumns = await db.rawQuery('PRAGMA table_info(habits)');
-    final hCols = habitColumns.map((c) => c['name'] as String).toSet();
-
-    if (!hCols.contains('question')) {
-      await db.execute("ALTER TABLE habits ADD COLUMN question TEXT");
+      if (!colNames.contains('account_id')) {
+        await db.execute(
+          "ALTER TABLE budget_transactions ADD COLUMN account_id TEXT",
+        );
+      }
+      if (!colNames.contains('is_planned')) {
+        await db.execute(
+          "ALTER TABLE budget_transactions ADD COLUMN is_planned INTEGER DEFAULT 0",
+        );
+      }
+      if (!colNames.contains('is_completed')) {
+        await db.execute(
+          "ALTER TABLE budget_transactions ADD COLUMN is_completed INTEGER DEFAULT 1",
+        );
+      }
     }
-    if (!hCols.contains('description')) {
-      await db.execute("ALTER TABLE habits ADD COLUMN description TEXT");
-    }
-    if (!hCols.contains('frequency_type')) {
-      await db.execute(
-        "ALTER TABLE habits ADD COLUMN frequency_type TEXT DEFAULT 'daily'",
-      );
-    }
-    if (!hCols.contains('frequency_days')) {
-      await db.execute("ALTER TABLE habits ADD COLUMN frequency_days TEXT");
-    }
-    if (!hCols.contains('frequency_count')) {
-      await db.execute(
-        "ALTER TABLE habits ADD COLUMN frequency_count INTEGER DEFAULT 1",
-      );
-    }
-    if (!hCols.contains('position')) {
-      await db.execute(
-        "ALTER TABLE habits ADD COLUMN position INTEGER DEFAULT 0",
-      );
-    }
-    if (!hCols.contains('is_archived')) {
-      await db.execute(
-        "ALTER TABLE habits ADD COLUMN is_archived INTEGER DEFAULT 0",
-      );
-    }
-    if (!hCols.contains('created_at')) {
-      await db.execute(
-        "ALTER TABLE habits ADD COLUMN created_at TEXT DEFAULT ''",
-      );
-    }
-
-    // 3.1 Логи выполнения привычек
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS habit_logs (
-        id TEXT PRIMARY KEY,
-        habit_id TEXT NOT NULL,
-        date TEXT NOT NULL,
-        value REAL NOT NULL DEFAULT 1.0,
-        completed INTEGER NOT NULL DEFAULT 1,
-        notes TEXT,
-        is_synced INTEGER DEFAULT 0,
-        updated_at TEXT NOT NULL,
-        UNIQUE(habit_id, date),
-        FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE
-      )
-    ''');
-
-    await db.execute('''
-      CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(habit_id, date);
-    ''');
-
-    // 4. Миграция таблицы заметок (Notes)
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS notes (
-        id TEXT PRIMARY KEY,
-        user_id TEXT,
-        title TEXT NOT NULL,
-        body TEXT,
-        image_path TEXT,
-        category TEXT DEFAULT 'Общее',
-        is_pinned INTEGER DEFAULT 0,
-        is_synced INTEGER DEFAULT 0,
-        updated_at TEXT NOT NULL
-      )
-    ''');
-
-    final noteColumns = await db.rawQuery('PRAGMA table_info(notes)');
-    final nCols = noteColumns.map((c) => c['name'] as String).toSet();
-
-    if (!nCols.contains('created_at')) {
-      await db.execute("ALTER TABLE notes ADD COLUMN created_at TEXT");
-      // Заполняем датой обновления для старых записей
-      await db.execute(
-        "UPDATE notes SET created_at = updated_at WHERE created_at IS NULL",
-      );
-    }
-    if (!nCols.contains('tags')) {
-      await db.execute("ALTER TABLE notes ADD COLUMN tags TEXT");
-    }
-    if (!nCols.contains('attachments')) {
-      await db.execute("ALTER TABLE notes ADD COLUMN attachments TEXT");
-    }
-
-    // 11. Настройки приложения
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS app_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      )
-    ''');
   }
 
   Future<void> clearAllData() async {
@@ -461,6 +343,8 @@ class DatabaseService {
       await txn.delete('habits');
       await txn.delete('habit_logs');
       await txn.delete('notes');
+      await txn.delete('budget_accounts');
+      await txn.delete('budget_categories');
       await txn.delete('budget_transactions');
       await txn.delete('diary_entries');
       await txn.delete('shift_schedules');
