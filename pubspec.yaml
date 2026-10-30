@@ -2,10 +2,10 @@ name: orbita
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 0.3.7+5
 
 environment:
-  sdk: ^3.13.4
+  sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -21,7 +21,7 @@ dependencies:
   crypto: ^3.0.3
   flutter_local_notifications: ^17.2.2
   timezone: ^0.9.4
-  google_sign_in: ^6.2.1
+  google_sign_in: ^6.2.2
   googleapis: ^13.2.0
   extension_google_sign_in_as_googleapis_auth: ^2.0.12
   path_provider: ^2.1.6
@@ -36,6 +36,14 @@ dependencies:
   file_saver: ^0.7.0
   pdf: ^3.13.1
   printing: ^5.15.1
+  permission_handler: ^11.3.1
+  package_info_plus: ^9.0.1
+  ota_update: ^7.1.0
+  file_picker: ^10.0.0
+  open_filex: ^4.5.0
+  flutter_dotenv: ^6.0.1
+  flutter_secure_storage: ^10.3.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -44,15 +52,15 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: "launcher_icon"
-  ios: false # если пока только Android
+  ios: false
   image_path: "assets/icons/app_icon.png"
   min_sdk_android: 21
-  # Настройки адаптивной иконки (Android 8.0+):
-  adaptive_icon_background: "#0D1117" # Цвет фона (например, под твою темную тему)
-  adaptive_icon_foreground: "assets/icons/app_icon.png" # Картинка переднего плана
+  adaptive_icon_background: "#0D1117"
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/icons/
+    - .env

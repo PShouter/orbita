@@ -7,7 +7,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../services/sync_service.dart';
+import 'gamification_provider.dart';
 
 class DiaryMood {
   final String id;
@@ -97,6 +99,7 @@ final diarySearchQueryProvider =
 
 class DiaryNotifier extends Notifier<List<DiaryItem>> {
   static const _uuid = Uuid();
+  static const int _diaryNotificationId = 90001;
 
   @override
   List<DiaryItem> build() {
@@ -104,6 +107,8 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
     cleanExpiredDrafts();
     return [];
   }
+
+  Future<void> loadEntries() => loadDiaries();
 
   Future<void> cleanExpiredDrafts() async {
     try {
@@ -125,7 +130,6 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
     try {
       final db = await DatabaseService.instance.database;
 
-      // Защитная проверка: создаем таблицу diaries, если при обновлении версии она не создалась
       await db.execute('''
         CREATE TABLE IF NOT EXISTS diaries (
           id TEXT PRIMARY KEY,
@@ -147,7 +151,7 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
         orderBy: 'date DESC, created_at DESC',
       );
 
-      state = rows.map((r) {
+      final items = rows.map((r) {
         List<String> imgs = [];
         if (r['images'] != null && (r['images'] as String).isNotEmpty) {
           try {
@@ -171,6 +175,9 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
               DateTime.now(),
         );
       }).toList();
+
+      state = items;
+      _checkTodayDiaryNotification(items);
     } catch (e) {
       debugPrint('Ошибка загрузки дневников: $e');
     }
@@ -211,14 +218,12 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
       'updated_at': nowIso,
     };
 
-    // 1. Сохраняем локально в SQLite
     await db.insert(
       'diaries',
       row,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    // 2. Сразу обновляем стейт в памяти, чтобы интерфейс мгновенно среагировал
     final newItem = DiaryItem(
       id: diaryId,
       title: title,
@@ -232,15 +237,25 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
     );
 
     final existingIndex = state.indexWhere((d) => d.id == diaryId);
+    List<DiaryItem> updatedList;
     if (existingIndex >= 0) {
-      final updatedList = List<DiaryItem>.from(state);
+      updatedList = List<DiaryItem>.from(state);
       updatedList[existingIndex] = newItem;
-      state = updatedList;
     } else {
-      state = [newItem, ...state];
+      updatedList = [newItem, ...state];
+    }
+    state = updatedList;
+
+    if (!isDraft) {
+      ref.read(gamificationProvider.notifier).addExp(ExpSource.diary, 25);
     }
 
-    // 3. Синхронизацию вызываем асинхронно в фоне, не блокируя UI и не роняя метод
+    if (!isDraft && _isSameDay(date, now)) {
+      await NotificationService.instance.cancelNotification(
+        _diaryNotificationId,
+      );
+    }
+
     try {
       SyncService.instance.syncAll();
     } catch (e) {
@@ -261,11 +276,36 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
         'created_at': DateTime.now().toIso8601String(),
       });
 
-      state = state.where((d) => d.id != id).toList();
+      final updated = state.where((d) => d.id != id).toList();
+      state = updated;
+      _checkTodayDiaryNotification(updated);
+
       SyncService.instance.syncAll();
     } catch (e) {
       debugPrint('Ошибка удаления дневника: $e');
     }
+  }
+
+  void _checkTodayDiaryNotification(List<DiaryItem> items) {
+    final now = DateTime.now();
+    final hasEntryToday = items.any(
+      (d) => !d.isDraft && _isSameDay(d.date, now),
+    );
+
+    if (!hasEntryToday) {
+      NotificationService.instance.scheduleDailyNotification(
+        id: _diaryNotificationId,
+        title: 'Дневник Орбиты',
+        body: 'Как прошел твой день? Зафиксируй важные мысли и события.',
+        hour: 21,
+        minute: 30,
+        payload: 'screen_diary',
+      );
+    }
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
 

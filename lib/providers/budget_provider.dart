@@ -1,7 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../services/sync_service.dart';
 
 class BudgetState {
@@ -16,6 +19,12 @@ class BudgetState {
   final double freeMoney;
   final double dailySafeLimit;
   final int daysLeftInMonth;
+  final String currency;
+
+  final double ratioAccounts;
+  final double ratioIncome;
+  final double ratioDebts;
+  final double ratioPlanned;
 
   double get balance => freeMoney;
   double get totalIncome => expectedIncome;
@@ -41,6 +50,11 @@ class BudgetState {
     required this.freeMoney,
     required this.dailySafeLimit,
     required this.daysLeftInMonth,
+    this.currency = '₽',
+    required this.ratioAccounts,
+    required this.ratioIncome,
+    required this.ratioDebts,
+    required this.ratioPlanned,
     required this.recentExpenses,
     required this.recentIncomes,
     required this.plannedExpenseList,
@@ -62,6 +76,11 @@ class BudgetState {
       freeMoney: 0.0,
       dailySafeLimit: 0.0,
       daysLeftInMonth: 1,
+      currency: '₽',
+      ratioAccounts: 0.25,
+      ratioIncome: 0.25,
+      ratioDebts: 0.25,
+      ratioPlanned: 0.25,
       recentExpenses: const [],
       recentIncomes: const [],
       plannedExpenseList: const [],
@@ -81,6 +100,11 @@ class BudgetNotifier extends Notifier<BudgetState> {
   }
 
   Future<void> loadAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userCurrency = prefs.getString('budget_currency') ?? '₽';
+    final salaryDay = prefs.getInt('budget_salary_day') ?? 1;
+    final includeDebts = prefs.getBool('budget_include_debts') ?? true;
+
     final db = await DatabaseService.instance.database;
 
     final accRows = await db.query(
@@ -89,21 +113,24 @@ class BudgetNotifier extends Notifier<BudgetState> {
     );
     final accounts = accRows.map((r) => Map<String, dynamic>.from(r)).toList();
 
+    final initFlagRows = await db.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: ['budget_categories_initialized'],
+    );
+
+    if (initFlagRows.isEmpty) {
+      await _insertDefaultCategories(db);
+      await db.insert('app_settings', {
+        'key': 'budget_categories_initialized',
+        'value': 'true',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
     final catRows = await db.query('budget_categories', orderBy: 'name ASC');
-    List<Map<String, dynamic>> categories = catRows
+    final categories = catRows
         .map((r) => Map<String, dynamic>.from(r))
         .toList();
-
-    if (categories.isEmpty) {
-      await _insertDefaultCategories(db);
-      final reloadedCats = await db.query(
-        'budget_categories',
-        orderBy: 'name ASC',
-      );
-      categories = reloadedCats
-          .map((r) => Map<String, dynamic>.from(r))
-          .toList();
-    }
 
     final txRows = await db.query('budget_transactions', orderBy: 'date DESC');
     final transactions = txRows.map((r) {
@@ -114,8 +141,15 @@ class BudgetNotifier extends Notifier<BudgetState> {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final lastDayOfMonth = DateTime(now.year, now.month + 1, 0);
-    final daysLeft = lastDayOfMonth.day - now.day + 1;
+
+    // Расчет финансового месяца от salaryDay до следующего salaryDay
+    DateTime periodEnd;
+    if (now.day < salaryDay) {
+      periodEnd = DateTime(now.year, now.month, salaryDay);
+    } else {
+      periodEnd = DateTime(now.year, now.month + 1, salaryDay);
+    }
+    final daysLeft = periodEnd.difference(today).inDays;
 
     double accountsBalance = 0;
     double debtsAndCredits = 0;
@@ -190,8 +224,23 @@ class BudgetNotifier extends Notifier<BudgetState> {
       (a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime),
     );
 
-    final free = accountsBalance + expIncome - debtsAndCredits - planExpense;
+    // Учет долгов в свободных деньгах по настройке
+    final debtDeduction = includeDebts ? debtsAndCredits : 0.0;
+    final free = accountsBalance + expIncome - debtDeduction - planExpense;
     final dailySafe = daysLeft > 0 ? (free / daysLeft) : 0.0;
+
+    final totalSum =
+        (accountsBalance.abs() +
+        expIncome.abs() +
+        debtsAndCredits.abs() +
+        planExpense.abs());
+    double rAcc = 0.25, rInc = 0.25, rDeb = 0.25, rPlan = 0.25;
+    if (totalSum > 0) {
+      rAcc = accountsBalance.abs() / totalSum;
+      rInc = expIncome.abs() / totalSum;
+      rDeb = debtsAndCredits.abs() / totalSum;
+      rPlan = planExpense.abs() / totalSum;
+    }
 
     state = BudgetState(
       accounts: accounts,
@@ -204,6 +253,11 @@ class BudgetNotifier extends Notifier<BudgetState> {
       freeMoney: free,
       dailySafeLimit: dailySafe,
       daysLeftInMonth: daysLeft > 0 ? daysLeft : 1,
+      currency: userCurrency,
+      ratioAccounts: rAcc,
+      ratioIncome: rInc,
+      ratioDebts: rDeb,
+      ratioPlanned: rPlan,
       recentExpenses: recentExp.take(10).toList(),
       recentIncomes: recentInc.take(10).toList(),
       plannedExpenseList: planExp.take(10).toList(),
@@ -287,7 +341,7 @@ class BudgetNotifier extends Notifier<BudgetState> {
         'monthly_limit': 0.0,
         'is_synced': 0,
         'updated_at': DateTime.now().toIso8601String(),
-      });
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
@@ -305,7 +359,7 @@ class BudgetNotifier extends Notifier<BudgetState> {
       'name': name,
       'type': type,
       'balance': balance,
-      'currency': '₽',
+      'currency': state.currency,
       'color': 0xFF7C3AED,
       'is_synced': 0,
       'updated_at': nowIso,
@@ -351,6 +405,11 @@ class BudgetNotifier extends Notifier<BudgetState> {
   Future<void> deleteCategory(String id) async {
     final db = await DatabaseService.instance.database;
     await db.delete('budget_categories', where: 'id = ?', whereArgs: [id]);
+    await db.insert('delete_queue', {
+      'table_name': 'budget_categories',
+      'record_id': id,
+      'created_at': DateTime.now().toIso8601String(),
+    });
     await loadAll();
     SyncService.instance.syncAll();
   }
@@ -390,6 +449,40 @@ class BudgetNotifier extends Notifier<BudgetState> {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
+    // Управление напоминаниями о запланированных платежах с учетом настроек
+    final notifId = txId.hashCode;
+    if (isPlanned && !isCompleted) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final isRemindEnabled = prefs.getBool('budget_remind_planned') ?? true;
+        if (isRemindEnabled) {
+          final timeStr = prefs.getString('budget_planned_time') ?? '09:00';
+          final parts = timeStr.split(':');
+          final h = int.tryParse(parts[0]) ?? 9;
+          final m = int.tryParse(parts[1]) ?? 0;
+
+          final remindTime = DateTime(date.year, date.month, date.day, h, m);
+          if (remindTime.isAfter(DateTime.now())) {
+            final isExp = type == 'expense';
+            await NotificationService.instance.scheduleNotification(
+              id: notifId,
+              title: isExp
+                  ? 'Запланированный расход: $title'
+                  : 'Ожидаемый доход: $title',
+              body:
+                  '${isExp ? 'К оплате' : 'Поступление'}: ${amount.toInt()} ${state.currency} ($category)',
+              scheduledDate: remindTime,
+              payload: 'screen_budget',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Ошибка напоминания бюджета: $e');
+      }
+    } else {
+      await NotificationService.instance.cancelNotification(notifId);
+    }
+
     if (accountId != null && isCompleted) {
       final accRes = await db.query(
         'budget_accounts',
@@ -422,6 +515,8 @@ class BudgetNotifier extends Notifier<BudgetState> {
       'record_id': txId,
       'created_at': DateTime.now().toIso8601String(),
     });
+
+    await NotificationService.instance.cancelNotification(txId.hashCode);
 
     await loadAll();
     SyncService.instance.syncAll();

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,47 +8,68 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Сервисы
-import 'notification_service.dart';
+import 'services/notification_service.dart';
+import 'services/permission_service.dart';
 import 'services/sync_service.dart';
+import 'services/update_service.dart';
+
+// Провайдеры
 import 'providers/profile_provider.dart';
+import 'providers/calendar_provider.dart';
+import 'providers/tasks_provider.dart';
+import 'providers/habits_provider.dart';
+import 'providers/diary_provider.dart';
+import 'providers/notes_provider.dart';
+import 'providers/shift_provider.dart';
+import 'providers/budget_provider.dart';
+import 'providers/gamification_provider.dart';
+import 'providers/navigation_tabs_provider.dart';
+
+// Виджеты диалогов
+import 'widgets/update_dialog.dart';
 
 // Экраны приложения
-import 'auth_screen.dart';
-import 'profile_screen.dart';
-import 'budget_screen.dart';
-import 'shift_schedule_screen.dart';
-import 'friends_screen.dart';
-import 'app_info_screen.dart';
-import 'home_screen.dart';
-import 'tasks_screen.dart';
-import 'notes_screen.dart';
-import 'calendar_screen.dart';
-import 'habits_screen.dart';
-import 'diary_screen.dart';
-import 'vault_screen.dart';
-import 'settings_screen.dart';
+import 'screens/auth/auth_screen.dart';
+import 'screens/onboarding/permissions_onboarding_screen.dart';
+import 'screens/profile/profile_screen.dart';
+import 'screens/budget/budget_screen.dart';
+import 'screens/shifts/shift_schedule_screen.dart';
+import 'screens/friends/friends_screen.dart';
+import 'screens/home/home_screen.dart';
+import 'screens/tasks/tasks_screen.dart';
+import 'screens/notes/notes_screen.dart';
+import 'screens/calendar/calendar_screen.dart';
+import 'screens/habits/habits_screen.dart';
+import 'screens/diary/diary_screen.dart';
+import 'screens/vault/vault_screen.dart';
+import 'screens/settings/settings_screen.dart';
+import 'screens/gamification/orbital_station_screen.dart';
 
 const String kSupabaseUrl = 'https://zttfujvamtcfkraotxif.supabase.co';
 const String kSupabaseAnonKey =
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0dGZ1anZhbXRjZmtyYW90eGlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MDk0ODksImV4cCI6MjEwNjE4NTQ4OX0.xLzvSDMuyuYCGmzyV7EKZhpjKhOc3Sb2JCYnZvMkeVs';
 
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await NotificationService().init();
+    await NotificationService.instance.init(
+      onSelectNotification: (payload) {
+        _handleNotificationNavigation(payload);
+      },
+    );
   } catch (e) {
     debugPrint('Notification init notice: $e');
   }
 
-  // 1. СНАЧАЛА инициализируем Supabase
   try {
     await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
   } catch (e) {
     debugPrint('Supabase init notice: $e');
   }
 
-  // 2. И ТОЛЬКО ПОТОМ запускаем слушатель синхронизации
   try {
     SyncService.instance.initListener();
   } catch (e) {
@@ -57,11 +79,84 @@ Future<void> main() async {
   runApp(const ProviderScope(child: OrbitaApp()));
 }
 
-class OrbitaApp extends ConsumerWidget {
+void _handleNotificationNavigation(String payload) {
+  final navState = rootNavigatorKey.currentState;
+  if (navState == null) return;
+
+  switch (payload) {
+    case 'screen_calendar':
+      MainShell.switchTabByKey(AppTabKey.calendar);
+      break;
+    case 'screen_tasks':
+      MainShell.switchTabByKey(AppTabKey.tasks);
+      break;
+    case 'screen_habits':
+      MainShell.switchTabByKey(AppTabKey.habits);
+      break;
+    case 'screen_notes':
+      MainShell.switchTabByKey(AppTabKey.notes);
+      break;
+    case 'screen_diary':
+      MainShell.switchTabByKey(AppTabKey.diary);
+      break;
+    case 'screen_shifts':
+      MainShell.switchTabByKey(AppTabKey.shifts);
+      break;
+    case 'screen_budget':
+      MainShell.openBudgetMode();
+      break;
+    default:
+      break;
+  }
+}
+
+class OrbitaApp extends ConsumerStatefulWidget {
   const OrbitaApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrbitaApp> createState() => _OrbitaAppState();
+}
+
+class _OrbitaAppState extends ConsumerState<OrbitaApp> {
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAuthListener();
+  }
+
+  void _initAuthListener() {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
+      (data) {
+        final AuthChangeEvent event = data.event;
+        final Session? session = data.session;
+
+        if (event == AuthChangeEvent.signedOut ||
+            (event == AuthChangeEvent.tokenRefreshed && session == null)) {
+          ref.read(profileProvider.notifier).logout();
+        }
+      },
+      onError: (error) {
+        debugPrint('Auth state error: $error');
+        if (error is AuthException &&
+            (error.statusCode == '401' ||
+                error.message.contains('JWT expired'))) {
+          Supabase.instance.client.auth.signOut();
+          ref.read(profileProvider.notifier).logout();
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
 
     if (profile.isCheckingAuth) {
@@ -72,6 +167,7 @@ class OrbitaApp extends ConsumerWidget {
     }
 
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       title: 'Орбита',
       debugShowCheckedModeBanner: false,
       themeMode: profile.isDarkMode ? ThemeMode.dark : ThemeMode.light,
@@ -104,11 +200,47 @@ class OrbitaApp extends ConsumerWidget {
         ),
       ),
       home: profile.isAuthenticated
-          ? const MainShell()
+          ? FutureBuilder<bool>(
+              future: PermissionService.shouldShowOnboarding(),
+              builder: (ctx, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final shouldShow = snapshot.data ?? false;
+                if (shouldShow) {
+                  return PermissionsOnboardingScreen(
+                    onComplete: () {
+                      rootNavigatorKey.currentState?.pushReplacement(
+                        MaterialPageRoute(builder: (_) => const MainShell()),
+                      );
+                    },
+                  );
+                }
+                return const MainShell();
+              },
+            )
           : AuthScreen(
               isDarkMode: profile.isDarkMode,
-              onAuthenticated: () =>
-                  ref.read(profileProvider.notifier).markAuthenticated(),
+              onAuthenticated: () async {
+                ref.read(profileProvider.notifier).markAuthenticated();
+                try {
+                  await SyncService.instance.pullAllFromCloud(
+                    forceReplace: true,
+                  );
+                  ref.read(calendarProvider.notifier).loadEvents();
+                  ref.read(tasksProvider.notifier).loadTasks();
+                  ref.read(habitsProvider.notifier).loadHabits();
+                  ref.read(diaryProvider.notifier).loadDiaries();
+                  ref.read(notesProvider.notifier).loadNotes();
+                  ref.read(shiftProvider.notifier).loadSchedules();
+                  ref.read(budgetProvider.notifier).loadAll();
+                  ref.read(gamificationProvider.notifier).loadData();
+                } catch (e) {
+                  debugPrint('Ошибка первоначальной выгрузки: $e');
+                }
+              },
             ),
     );
   }
@@ -116,6 +248,20 @@ class OrbitaApp extends ConsumerWidget {
 
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
+
+  static _MainShellState? _instance;
+
+  static void switchTab(int index) {
+    _instance?.setNavIndex(index);
+  }
+
+  static void switchTabByKey(AppTabKey key) {
+    _instance?.switchToKey(key);
+  }
+
+  static void openBudgetMode() {
+    _instance?.setBudgetMode(true);
+  }
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -125,6 +271,64 @@ class _MainShellState extends ConsumerState<MainShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _navIndex = 0;
   bool _isBudgetModeActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    MainShell._instance = this;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final release = await UpdateService.instance.checkForUpdate();
+        if (release != null && mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: !release.isMandatory,
+            builder: (_) => UpdateDialog(releaseInfo: release),
+          );
+        }
+      } catch (e) {
+        debugPrint('Ошибка фоновой проверки обновлений: $e');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    if (MainShell._instance == this) {
+      MainShell._instance = null;
+    }
+    super.dispose();
+  }
+
+  void setNavIndex(int index) {
+    setState(() {
+      _isBudgetModeActive = false;
+      _navIndex = index;
+    });
+  }
+
+  void switchToKey(AppTabKey key) {
+    final activeTabs = ref.read(navigationTabsProvider);
+    final idx = activeTabs.indexOf(key);
+    if (idx != -1) {
+      setNavIndex(idx + 1);
+    } else {
+      final isDark = ref.read(profileProvider).isDarkMode;
+      final widget = _getScreenWidget(key, isDark);
+      if (widget != null) {
+        rootNavigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => widget),
+        );
+      }
+    }
+  }
+
+  void setBudgetMode(bool active) {
+    setState(() {
+      _isBudgetModeActive = active;
+    });
+  }
 
   void _openProfileScreen(ProfileState profile) {
     Navigator.push(
@@ -163,10 +367,37 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
+  Widget? _getScreenWidget(AppTabKey key, bool isDark) {
+    switch (key) {
+      case AppTabKey.calendar:
+        return CalendarScreen(isDarkMode: isDark);
+      case AppTabKey.tasks:
+        return TasksScreen(isDarkMode: isDark);
+      case AppTabKey.habits:
+        return HabitsScreen(isDarkMode: isDark);
+      case AppTabKey.notes:
+        return NotesScreen(isDarkMode: isDark);
+      case AppTabKey.diary:
+        return DiaryScreen(isDarkMode: isDark);
+      case AppTabKey.shifts:
+        return ShiftScheduleScreen(isDarkMode: isDark);
+      case AppTabKey.vault:
+        return VaultScreen(isDarkMode: isDark);
+      case AppTabKey.budget:
+        return BudgetScreen(
+          isDarkMode: isDark,
+          onExitBudget: () => setNavIndex(0),
+        );
+      case AppTabKey.station:
+        return OrbitalStationScreen(isDarkMode: isDark);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
     final profileNotifier = ref.read(profileProvider.notifier);
+    final activeTabs = ref.watch(navigationTabsProvider);
 
     if (_isBudgetModeActive) {
       return BudgetScreen(
@@ -179,6 +410,56 @@ class _MainShellState extends ConsumerState<MainShell> {
     final textPrimary = isDark
         ? const Color(0xFFF0F6FC)
         : const Color(0xFF24292F);
+
+    final maxValidIndex = activeTabs.length;
+    if (_navIndex > maxValidIndex) {
+      _navIndex = 0;
+    }
+
+    Widget currentScreen;
+    if (_navIndex == 0) {
+      currentScreen = HomeScreen(
+        isDarkMode: isDark,
+        onOpenCreateTask: () => switchToKey(AppTabKey.tasks),
+        onOpenCreateEvent: () => switchToKey(AppTabKey.calendar),
+        onOpenCreateHabit: () => switchToKey(AppTabKey.habits),
+        onOpenBudget: () => setState(() => _isBudgetModeActive = true),
+      );
+    } else {
+      final tabKey = activeTabs[_navIndex - 1];
+      currentScreen =
+          _getScreenWidget(tabKey, isDark) ?? const SizedBox.shrink();
+    }
+
+    final navItems = <BottomNavigationBarItem>[];
+
+    // 1. Главная
+    navItems.add(
+      BottomNavigationBarItem(
+        icon: _buildSvgNavIcon('assets/icons/home.svg', _navIndex == 0),
+        label: 'Главная',
+      ),
+    );
+
+    // 2. Центральные настраиваемые вкладки
+    for (int i = 0; i < activeTabs.length; i++) {
+      final tabKey = activeTabs[i];
+      final meta = kAllAvailableTabs.firstWhere((t) => t.key == tabKey);
+      navItems.add(
+        BottomNavigationBarItem(
+          icon: _buildSvgNavIcon(meta.assetIcon, _navIndex == (i + 1)),
+          label: meta.title,
+        ),
+      );
+    }
+
+    // 3. Еще (открывает Drawer)
+    navItems.add(
+      BottomNavigationBarItem(
+        icon: _buildSvgNavIcon('assets/icons/more.svg', false),
+        label: 'Еще',
+      ),
+    );
 
     return Scaffold(
       key: _scaffoldKey,
@@ -240,13 +521,13 @@ class _MainShellState extends ConsumerState<MainShell> {
                           textPrimary,
                           BlendMode.srcIn,
                         ),
-                        placeholderBuilder: (_) => CircleAvatar(
+                        placeholderBuilder: (_) => const CircleAvatar(
                           radius: 16,
-                          backgroundColor: const Color(0xFF2C69D1),
+                          backgroundColor: Color(0xFF2C69D1),
                           child: Icon(
                             Icons.person,
                             size: 18,
-                            color: textPrimary,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -255,11 +536,11 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
         ],
       ),
-      body: _buildCurrentBody(profile.isDarkMode),
+      body: currentScreen,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _navIndex,
         onTap: (i) {
-          if (i == 6) {
+          if (i == activeTabs.length + 1) {
             _scaffoldKey.currentState?.openDrawer();
           } else {
             setState(() => _navIndex = i);
@@ -270,63 +551,9 @@ class _MainShellState extends ConsumerState<MainShell> {
         unselectedItemColor: Colors.grey,
         selectedFontSize: 11,
         unselectedFontSize: 11,
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildSvgNavIcon('assets/icons/home.svg', _navIndex == 0),
-            label: 'Главная',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildSvgNavIcon('assets/icons/calendar.svg', _navIndex == 1),
-            label: 'Календарь',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildSvgNavIcon('assets/icons/task.svg', _navIndex == 2),
-            label: 'Задачи',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildSvgNavIcon('assets/icons/habits.svg', _navIndex == 3),
-            label: 'Привычки',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildSvgNavIcon('assets/icons/note.svg', _navIndex == 4),
-            label: 'Заметки',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildSvgNavIcon('assets/icons/diary.svg', _navIndex == 5),
-            label: 'Дневник',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildSvgNavIcon('assets/icons/more.svg', false),
-            label: 'Еще',
-          ),
-        ],
+        items: navItems,
       ),
     );
-  }
-
-  Widget _buildCurrentBody(bool isDark) {
-    switch (_navIndex) {
-      case 0:
-        return HomeScreen(
-          isDarkMode: isDark,
-          onOpenCreateTask: () => setState(() => _navIndex = 2),
-          onOpenCreateEvent: () => setState(() => _navIndex = 1),
-          onOpenCreateHabit: () => setState(() => _navIndex = 3),
-          onOpenBudget: () => setState(() => _isBudgetModeActive = true),
-        );
-      case 1:
-        return CalendarScreen(isDarkMode: isDark);
-      case 2:
-        return TasksScreen(isDarkMode: isDark);
-      case 3:
-        return HabitsScreen(isDarkMode: isDark);
-      case 4:
-        return NotesScreen(isDarkMode: isDark);
-      case 5:
-        return DiaryScreen(isDarkMode: isDark);
-      default:
-        return const SizedBox.shrink();
-    }
   }
 
   Widget _buildDrawer(
@@ -342,6 +569,9 @@ class _MainShellState extends ConsumerState<MainShell> {
     final Color borderColor = isDark
         ? const Color(0xFF30363D)
         : const Color(0xFFD0D7DE);
+
+    final dynamicDrawerTabs = ref.watch(drawerTabsProvider);
+    final activeBottomTabs = ref.watch(navigationTabsProvider);
 
     Widget buildDrawerIcon(String assetPath, IconData fallbackIcon) {
       return SvgPicture.asset(
@@ -361,6 +591,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       child: SafeArea(
         child: Column(
           children: [
+            // 1. Профиль
             InkWell(
               onTap: () {
                 Navigator.pop(context);
@@ -445,17 +676,20 @@ class _MainShellState extends ConsumerState<MainShell> {
               ),
             ),
             const SizedBox(height: 8),
+
+            // Список пунктов бокового меню
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 children: [
+                  // 1. Профиль
                   ListTile(
                     leading: buildDrawerIcon(
                       'assets/icons/avatar.svg',
                       Icons.person_outline,
                     ),
                     title: Text(
-                      'Мой профиль',
+                      'Профиль',
                       style: TextStyle(
                         color: textPrimary,
                         fontWeight: FontWeight.w500,
@@ -466,6 +700,35 @@ class _MainShellState extends ConsumerState<MainShell> {
                       _openProfileScreen(profile);
                     },
                   ),
+
+                  // 2. Орбитальная станция
+                  if (!activeBottomTabs.contains(AppTabKey.station))
+                    ListTile(
+                      leading: const Icon(
+                        Icons.radar_outlined,
+                        color: Color(0xFF38BDF8),
+                        size: 22,
+                      ),
+                      title: Text(
+                        'Орбитальная станция',
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                OrbitalStationScreen(isDarkMode: isDark),
+                          ),
+                        );
+                      },
+                    ),
+
+                  // 3. Друзья
                   ListTile(
                     leading: buildDrawerIcon(
                       'assets/icons/friends.svg',
@@ -491,68 +754,86 @@ class _MainShellState extends ConsumerState<MainShell> {
                       );
                     },
                   ),
+
+                  // 4. Сообщения
                   ListTile(
-                    leading: buildDrawerIcon(
-                      'assets/icons/work.svg',
-                      Icons.calendar_view_month,
+                    leading: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Colors.grey,
+                      size: 22,
                     ),
-                    title: Text(
-                      'График смен',
-                      style: TextStyle(
-                        color: textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    title: Row(
+                      children: [
+                        Text(
+                          'Сообщения',
+                          style: TextStyle(
+                            color: textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Скоро',
+                            style: TextStyle(fontSize: 10, color: Colors.grey),
+                          ),
+                        ),
+                      ],
                     ),
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              ShiftScheduleScreen(isDarkMode: isDark),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Раздел сообщений в разработке'),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     },
                   ),
-                  ListTile(
-                    leading: buildDrawerIcon(
-                      'assets/icons/vault.svg',
-                      Icons.shield_outlined,
-                    ),
-                    title: Text(
-                      'Сейф',
-                      style: TextStyle(
-                        color: textPrimary,
-                        fontWeight: FontWeight.w500,
+
+                  const Divider(),
+
+                  // 5–12. Динамические разделы
+                  ...dynamicDrawerTabs.map((tabMeta) {
+                    return ListTile(
+                      leading: buildDrawerIcon(
+                        tabMeta.assetIcon,
+                        Icons.circle_outlined,
                       ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => VaultScreen(isDarkMode: isDark),
+                      title: Text(
+                        tabMeta.title,
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontWeight: FontWeight.w500,
                         ),
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: buildDrawerIcon(
-                      'assets/icons/budget.svg',
-                      Icons.account_balance_wallet_outlined,
-                    ),
-                    title: Text(
-                      'Бюджет',
-                      style: TextStyle(
-                        color: textPrimary,
-                        fontWeight: FontWeight.w500,
                       ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      setState(() => _isBudgetModeActive = true);
-                    },
-                  ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (tabMeta.key == AppTabKey.budget) {
+                          setState(() => _isBudgetModeActive = true);
+                        } else {
+                          final screen = _getScreenWidget(tabMeta.key, isDark);
+                          if (screen != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => screen),
+                            );
+                          }
+                        }
+                      },
+                    );
+                  }),
+
+                  const Divider(),
+
+                  // 13. Настройки
                   ListTile(
                     leading: buildDrawerIcon(
                       'assets/icons/settings.svg',
@@ -586,58 +867,17 @@ class _MainShellState extends ConsumerState<MainShell> {
                       );
                     },
                   ),
-                  ListTile(
-                    leading: buildDrawerIcon(
-                      'assets/icons/info.svg',
-                      Icons.info_outline,
-                    ),
-                    title: Text(
-                      'О приложении',
-                      style: TextStyle(
-                        color: textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AppInfoScreen(isDarkMode: isDark),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: const Icon(
-                      Icons.logout,
-                      color: Colors.redAccent,
-                      size: 22,
-                    ),
-                    title: const Text(
-                      'Выйти из аккаунта',
-                      style: TextStyle(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      notifier.logout();
-                    },
-                  ),
                 ],
               ),
             ),
             Divider(color: borderColor, height: 1),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: const Row(
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Global Demo 0.3.0',
+                    'Версия: Demo 0.3.7',
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   Text(

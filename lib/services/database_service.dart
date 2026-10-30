@@ -19,14 +19,13 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 12, // Подняли до 12 для модуля Бюджета
+      version: 17, // Повышено до 17 для миграции колонки history
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
-    // 0. Категории задач
     await db.execute('''
       CREATE TABLE task_categories (
         id TEXT PRIMARY KEY,
@@ -44,7 +43,6 @@ class DatabaseService {
       'updated_at': DateTime.now().toIso8601String(),
     });
 
-    // 1. Задачи
     await db.execute('''
       CREATE TABLE tasks (
         id TEXT PRIMARY KEY,
@@ -70,7 +68,6 @@ class DatabaseService {
       )
     ''');
 
-    // 2. События Календаря
     await db.execute('''
       CREATE TABLE calendar_events (
         id TEXT PRIMARY KEY,
@@ -92,7 +89,6 @@ class DatabaseService {
       )
     ''');
 
-    // 3. Привычки
     await db.execute('''
       CREATE TABLE habits (
         id TEXT PRIMARY KEY,
@@ -108,6 +104,7 @@ class DatabaseService {
         frequency_days TEXT,
         frequency_count INTEGER DEFAULT 1,
         reminder_time TEXT,
+        history TEXT,
         position INTEGER DEFAULT 0,
         streak INTEGER DEFAULT 0,
         is_archived INTEGER DEFAULT 0,
@@ -117,7 +114,6 @@ class DatabaseService {
       )
     ''');
 
-    // 3.1 Логи привычек
     await db.execute('''
       CREATE TABLE habit_logs (
         id TEXT PRIMARY KEY,
@@ -133,11 +129,6 @@ class DatabaseService {
       )
     ''');
 
-    await db.execute('''
-      CREATE INDEX idx_habit_logs_date ON habit_logs(habit_id, date);
-    ''');
-
-    // 4. Заметки
     await db.execute('''
       CREATE TABLE notes (
         id TEXT PRIMARY KEY,
@@ -155,13 +146,12 @@ class DatabaseService {
       )
     ''');
 
-    // 5. Бюджет: Счета (Accounts)
     await db.execute('''
       CREATE TABLE budget_accounts (
         id TEXT PRIMARY KEY,
         user_id TEXT,
         name TEXT NOT NULL,
-        type TEXT NOT NULL, -- 'card', 'saving', 'debt', 'credit'
+        type TEXT NOT NULL,
         balance REAL NOT NULL DEFAULT 0.0,
         currency TEXT DEFAULT '₽',
         color INTEGER DEFAULT 4281373137,
@@ -170,13 +160,12 @@ class DatabaseService {
       )
     ''');
 
-    // 5.1 Бюджет: Категории (Categories)
     await db.execute('''
       CREATE TABLE budget_categories (
         id TEXT PRIMARY KEY,
         user_id TEXT,
         name TEXT NOT NULL,
-        type TEXT NOT NULL, -- 'expense', 'income'
+        type TEXT NOT NULL,
         icon TEXT DEFAULT 'category',
         color INTEGER DEFAULT 4281373137,
         monthly_limit REAL DEFAULT 0.0,
@@ -185,14 +174,13 @@ class DatabaseService {
       )
     ''');
 
-    // 5.2 Бюджет: Транзакции (Transactions)
     await db.execute('''
       CREATE TABLE budget_transactions (
         id TEXT PRIMARY KEY,
         user_id TEXT,
         title TEXT NOT NULL,
         amount REAL NOT NULL,
-        type TEXT NOT NULL, -- 'expense', 'income'
+        type TEXT NOT NULL,
         category TEXT NOT NULL,
         account_id TEXT,
         date TEXT NOT NULL,
@@ -203,7 +191,6 @@ class DatabaseService {
       )
     ''');
 
-    // 6. Дневник
     await db.execute('''
       CREATE TABLE diary_entries (
         id TEXT PRIMARY KEY,
@@ -217,7 +204,22 @@ class DatabaseService {
       )
     ''');
 
-    // 7. График смен
+    await db.execute('''
+      CREATE TABLE diaries (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        title TEXT,
+        content TEXT,
+        date TEXT NOT NULL,
+        mood TEXT DEFAULT 'good',
+        images TEXT,
+        is_draft INTEGER DEFAULT 0,
+        is_synced INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
     await db.execute('''
       CREATE TABLE shift_schedules (
         id TEXT PRIMARY KEY,
@@ -226,12 +228,12 @@ class DatabaseService {
         start_date TEXT NOT NULL,
         cycle_days TEXT NOT NULL,
         overrides TEXT,
+        custom_types TEXT,
         is_synced INTEGER DEFAULT 0,
         updated_at TEXT NOT NULL
       )
     ''');
 
-    // 8. Сейф
     await db.execute('''
       CREATE TABLE vault_documents (
         id TEXT PRIMARY KEY,
@@ -245,7 +247,6 @@ class DatabaseService {
       )
     ''');
 
-    // 9. Календари
     await db.execute('''
       CREATE TABLE user_calendars (
         id TEXT PRIMARY KEY,
@@ -259,7 +260,6 @@ class DatabaseService {
       )
     ''');
 
-    // 10. Очередь удаления
     await db.execute('''
       CREATE TABLE delete_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -269,67 +269,134 @@ class DatabaseService {
       )
     ''');
 
-    // 11. Настройки
     await db.execute('''
       CREATE TABLE app_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE user_gamification (
+        user_id TEXT PRIMARY KEY,
+        total_exp INTEGER DEFAULT 0,
+        weekly_exp INTEGER DEFAULT 0,
+        last_week_reset TEXT,
+        habits_exp INTEGER DEFAULT 0,
+        diary_exp INTEGER DEFAULT 0,
+        budget_exp INTEGER DEFAULT 0,
+        tasks_exp INTEGER DEFAULT 0,
+        is_synced INTEGER DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE user_achievements (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        achievement_key TEXT NOT NULL UNIQUE,
+        current_value INTEGER DEFAULT 0,
+        target_value INTEGER NOT NULL,
+        is_unlocked INTEGER DEFAULT 0,
+        unlocked_at TEXT,
+        is_synced INTEGER DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+
+    await _createIndexes(db);
+  }
+
+  Future<void> _createIndexes(Database db) async {
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(habit_id, date);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_calendar_user_id ON calendar_events(user_id);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_habits_user_id ON habits(user_id);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_diary_user_id ON diary_entries(user_id);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_shifts_user_id ON shift_schedules(user_id);',
+    );
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 12) {
-      // Создаем счета
+    if (oldVersion < 14) {
       await db.execute('''
-        CREATE TABLE IF NOT EXISTS budget_accounts (
-          id TEXT PRIMARY KEY,
-          user_id TEXT,
-          name TEXT NOT NULL,
-          type TEXT NOT NULL,
-          balance REAL NOT NULL DEFAULT 0.0,
-          currency TEXT DEFAULT '₽',
-          color INTEGER DEFAULT 4281373137,
+        CREATE TABLE IF NOT EXISTS user_gamification (
+          user_id TEXT PRIMARY KEY,
+          total_exp INTEGER DEFAULT 0,
+          weekly_exp INTEGER DEFAULT 0,
+          last_week_reset TEXT,
+          habits_exp INTEGER DEFAULT 0,
+          diary_exp INTEGER DEFAULT 0,
+          budget_exp INTEGER DEFAULT 0,
+          tasks_exp INTEGER DEFAULT 0,
           is_synced INTEGER DEFAULT 0,
           updated_at TEXT NOT NULL
         )
       ''');
-
-      // Создаем категории бюджета
+    }
+    if (oldVersion < 15) {
       await db.execute('''
-        CREATE TABLE IF NOT EXISTS budget_categories (
+        CREATE TABLE IF NOT EXISTS user_achievements (
           id TEXT PRIMARY KEY,
           user_id TEXT,
-          name TEXT NOT NULL,
-          type TEXT NOT NULL,
-          icon TEXT DEFAULT 'category',
-          color INTEGER DEFAULT 4281373137,
-          monthly_limit REAL DEFAULT 0.0,
+          achievement_key TEXT NOT NULL UNIQUE,
+          current_value INTEGER DEFAULT 0,
+          target_value INTEGER NOT NULL,
+          is_unlocked INTEGER DEFAULT 0,
+          unlocked_at TEXT,
           is_synced INTEGER DEFAULT 0,
           updated_at TEXT NOT NULL
         )
       ''');
-
-      // Дополняем существующую таблицу budget_transactions новыми колонками
-      final txCols = await db.rawQuery(
-        'PRAGMA table_info(budget_transactions)',
-      );
-      final colNames = txCols.map((c) => c['name'] as String).toSet();
-
-      if (!colNames.contains('account_id')) {
+    }
+    if (oldVersion < 16) {
+      final shiftCols = await db.rawQuery('PRAGMA table_info(shift_schedules)');
+      final colNames = shiftCols.map((c) => c['name'] as String).toSet();
+      if (!colNames.contains('custom_types')) {
         await db.execute(
-          "ALTER TABLE budget_transactions ADD COLUMN account_id TEXT",
+          'ALTER TABLE shift_schedules ADD COLUMN custom_types TEXT',
         );
       }
-      if (!colNames.contains('is_planned')) {
-        await db.execute(
-          "ALTER TABLE budget_transactions ADD COLUMN is_planned INTEGER DEFAULT 0",
-        );
-      }
-      if (!colNames.contains('is_completed')) {
-        await db.execute(
-          "ALTER TABLE budget_transactions ADD COLUMN is_completed INTEGER DEFAULT 1",
-        );
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS diaries (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          title TEXT,
+          content TEXT,
+          date TEXT NOT NULL,
+          mood TEXT DEFAULT 'good',
+          images TEXT,
+          is_draft INTEGER DEFAULT 0,
+          is_synced INTEGER DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+
+      await _createIndexes(db);
+    }
+    if (oldVersion < 17) {
+      // Добавляем недостающую колонку history в таблицу habits
+      final habitCols = await db.rawQuery('PRAGMA table_info(habits)');
+      final colNames = habitCols.map((c) => c['name'] as String).toSet();
+      if (!colNames.contains('history')) {
+        await db.execute('ALTER TABLE habits ADD COLUMN history TEXT;');
       }
     }
   }
@@ -347,11 +414,14 @@ class DatabaseService {
       await txn.delete('budget_categories');
       await txn.delete('budget_transactions');
       await txn.delete('diary_entries');
+      await txn.delete('diaries');
       await txn.delete('shift_schedules');
       await txn.delete('vault_documents');
       await txn.delete('user_calendars');
       await txn.delete('delete_queue');
       await txn.delete('app_settings');
+      await txn.delete('user_gamification');
+      await txn.delete('user_achievements');
     });
   }
 

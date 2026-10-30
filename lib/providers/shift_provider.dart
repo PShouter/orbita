@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../services/sync_service.dart';
 
 class ShiftType {
@@ -83,28 +85,27 @@ class ShiftType {
 }
 
 final defaultWorkShift = ShiftType(
-  id: 'shift_work',
+  id: '00000000-0000-4000-8000-000000000010',
   name: 'Работа',
   shortName: 'Р',
-  color: Colors.redAccent.value,
+  color: Colors.redAccent.toARGB32(),
   isWork: true,
   startTime: '08:00',
   endTime: '20:00',
 );
 
 final defaultRestShift = ShiftType(
-  id: 'shift_rest',
+  id: '00000000-0000-4000-8000-000000000020',
   name: 'Выходной',
   shortName: 'В',
-  color: Colors.green.value,
+  color: Colors.green.toARGB32(),
   isWork: false,
   startTime: '',
   endTime: '',
 );
 
-// Сохраненное переопределение дня (с возможностью кастомных часов для конкретной даты)
 class ShiftOverride {
-  final String shiftId; // или 'empty'
+  final String shiftId;
   final String? customStartTime;
   final String? customEndTime;
 
@@ -217,12 +218,13 @@ class ShiftState {
 
 class ShiftNotifier extends Notifier<ShiftState> {
   static const _uuid = Uuid();
+  static const _activeSchedulePrefKey = 'active_shift_schedule_id';
+  static const _defaultValidUuid = '00000000-0000-4000-8000-000000000001';
 
   @override
   ShiftState build() {
-    final defaultId = 'schedule_main';
     final initial = ShiftScheduleState(
-      id: defaultId,
+      id: _defaultValidUuid,
       name: 'Основная работа',
       startDate: DateTime.now(),
       cycleShiftIds: [],
@@ -232,7 +234,10 @@ class ShiftNotifier extends Notifier<ShiftState> {
 
     Future.microtask(() => loadSchedules());
 
-    return ShiftState(schedules: [initial], activeScheduleId: defaultId);
+    return ShiftState(
+      schedules: [initial],
+      activeScheduleId: _defaultValidUuid,
+    );
   }
 
   Future<void> loadSchedules() async {
@@ -254,16 +259,19 @@ class ShiftNotifier extends Notifier<ShiftState> {
       ''');
 
       final rows = await db.query('shift_schedules', orderBy: 'updated_at ASC');
+      final prefs = await SharedPreferences.getInstance();
+      final savedActiveId = prefs.getString(_activeSchedulePrefKey);
+
       if (rows.isEmpty) {
         final initial = ShiftScheduleState(
-          id: _uuid.v4(),
+          id: _defaultValidUuid,
           name: 'Основная работа',
           startDate: DateTime.now(),
           cycleShiftIds: [],
           overrides: {},
           customShiftTypes: [defaultWorkShift, defaultRestShift],
         );
-        await _saveToDb(initial);
+        await _saveToDb(initial, autoSyncCalendar: false);
         state = ShiftState(schedules: [initial], activeScheduleId: initial.id);
       } else {
         final loaded = rows.map((r) {
@@ -292,8 +300,13 @@ class ShiftNotifier extends Notifier<ShiftState> {
             } catch (_) {}
           }
 
+          var schedId = r['id'] as String;
+          if (schedId == 'schedule_main') {
+            schedId = _defaultValidUuid;
+          }
+
           return ShiftScheduleState(
-            id: r['id'] as String,
+            id: schedId,
             name: r['name'] as String? ?? 'График',
             startDate:
                 DateTime.tryParse(r['start_date'] as String? ?? '') ??
@@ -304,9 +317,10 @@ class ShiftNotifier extends Notifier<ShiftState> {
           );
         }).toList();
 
-        final currentActive = loaded.any((s) => s.id == state.activeScheduleId)
-            ? state.activeScheduleId
-            : loaded.first.id;
+        String currentActive = loaded.first.id;
+        if (savedActiveId != null && loaded.any((s) => s.id == savedActiveId)) {
+          currentActive = savedActiveId;
+        }
 
         state = ShiftState(schedules: loaded, activeScheduleId: currentActive);
       }
@@ -315,9 +329,11 @@ class ShiftNotifier extends Notifier<ShiftState> {
     }
   }
 
-  void switchSchedule(String id) {
+  Future<void> switchSchedule(String id) async {
     if (state.schedules.any((s) => s.id == id)) {
       state = ShiftState(schedules: state.schedules, activeScheduleId: id);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_activeSchedulePrefKey, id);
     }
   }
 
@@ -331,7 +347,7 @@ class ShiftNotifier extends Notifier<ShiftState> {
       customShiftTypes: [
         defaultWorkShift.copyWith(
           id: _uuid.v4(),
-          color: Colors.blueAccent.value,
+          color: Colors.blueAccent.toARGB32(),
         ),
         defaultRestShift.copyWith(id: _uuid.v4()),
       ],
@@ -339,24 +355,62 @@ class ShiftNotifier extends Notifier<ShiftState> {
 
     final updated = [...state.schedules, newSchedule];
     state = ShiftState(schedules: updated, activeScheduleId: newSchedule.id);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeSchedulePrefKey, newSchedule.id);
+
     await _saveToDb(newSchedule);
   }
 
   Future<void> deleteActiveSchedule() async {
-    if (state.schedules.length <= 1) return; // Не удаляем последний график
+    if (state.schedules.length <= 1) return;
     final activeId = state.activeScheduleId;
 
     final db = await DatabaseService.instance.database;
     await db.delete('shift_schedules', where: 'id = ?', whereArgs: [activeId]);
+
+    final rows = await db.query(
+      'calendar_events',
+      where: "calendar = 'Смены' AND description LIKE ?",
+      whereArgs: ['%$activeId%'],
+    );
+    for (final r in rows) {
+      final evId = r['id'] as String;
+      await NotificationService.instance.cancelNotification(
+        ('eve_$evId').hashCode,
+      );
+      await NotificationService.instance.cancelNotification(
+        ('warn_$evId').hashCode,
+      );
+      await db.insert('delete_queue', {
+        'table_name': 'calendar_events',
+        'record_id': evId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
+
+    await db.delete(
+      'calendar_events',
+      where: "calendar = 'Смены' AND description LIKE ?",
+      whereArgs: ['%$activeId%'],
+    );
 
     final remaining = state.schedules.where((s) => s.id != activeId).toList();
     state = ShiftState(
       schedules: remaining,
       activeScheduleId: remaining.first.id,
     );
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeSchedulePrefKey, remaining.first.id);
+
+    await syncAllSchedulesToCalendar(3);
   }
 
-  Future<void> _saveToDb(ShiftScheduleState schedule) async {
+  Future<void> _saveToDb(
+    ShiftScheduleState schedule, {
+    bool autoSyncCalendar = true,
+  }) async {
     try {
       final db = await DatabaseService.instance.database;
 
@@ -382,6 +436,10 @@ class ShiftNotifier extends Notifier<ShiftState> {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       SyncService.instance.syncAll();
+
+      if (autoSyncCalendar) {
+        await syncAllSchedulesToCalendar(3);
+      }
     } catch (e) {
       debugPrint('Ошибка сохранения графика в БД: $e');
     }
@@ -442,9 +500,33 @@ class ShiftNotifier extends Notifier<ShiftState> {
     if (active == null) return;
 
     final newOverrides = Map<String, ShiftOverride>.from(active.overrides);
+    final db = await DatabaseService.instance.database;
+
     for (final d in dates) {
       final key = DateFormat('yyyy-MM-dd').format(d);
       newOverrides[key] = ShiftOverride(shiftId: 'empty');
+
+      final rows = await db.query(
+        'calendar_events',
+        where: "calendar = 'Смены' AND date = ?",
+        whereArgs: [key],
+      );
+      for (final r in rows) {
+        final evId = r['id'] as String;
+        await db.delete('calendar_events', where: 'id = ?', whereArgs: [evId]);
+        await db.insert('delete_queue', {
+          'table_name': 'calendar_events',
+          'record_id': evId,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        await NotificationService.instance.cancelNotification(
+          ('eve_$evId').hashCode,
+        );
+        await NotificationService.instance.cancelNotification(
+          ('warn_$evId').hashCode,
+        );
+      }
     }
 
     final updatedSchedule = active.copyWith(overrides: newOverrides);
@@ -452,12 +534,32 @@ class ShiftNotifier extends Notifier<ShiftState> {
         .map((s) => s.id == active.id ? updatedSchedule : s)
         .toList();
     state = ShiftState(schedules: newSchedules, activeScheduleId: active.id);
-    await _saveToDb(updatedSchedule);
+    await _saveToDb(updatedSchedule, autoSyncCalendar: false);
   }
 
   Future<void> clearEntireActiveSchedule() async {
     final active = state.activeSchedule;
     if (active == null) return;
+
+    final db = await DatabaseService.instance.database;
+
+    final rows = await db.query('calendar_events', where: "calendar = 'Смены'");
+    for (final r in rows) {
+      final evId = r['id'] as String;
+      await NotificationService.instance.cancelNotification(
+        ('eve_$evId').hashCode,
+      );
+      await NotificationService.instance.cancelNotification(
+        ('warn_$evId').hashCode,
+      );
+      await db.insert('delete_queue', {
+        'table_name': 'calendar_events',
+        'record_id': evId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
+
+    await db.delete('calendar_events', where: "calendar = 'Смены'");
 
     final updatedSchedule = active.copyWith(cycleShiftIds: [], overrides: {});
 
@@ -465,27 +567,61 @@ class ShiftNotifier extends Notifier<ShiftState> {
         .map((s) => s.id == active.id ? updatedSchedule : s)
         .toList();
     state = ShiftState(schedules: newSchedules, activeScheduleId: active.id);
-    await _saveToDb(updatedSchedule);
+    await _saveToDb(updatedSchedule, autoSyncCalendar: false);
   }
 
-  /// Синхронизация ВСЕХ графиков пользователя в календарь
   Future<int> syncAllSchedulesToCalendar(int monthsCount) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final isSyncEnabled = prefs.getBool('shifts_sync_main_calendar') ?? true;
+      final remindEve = prefs.getBool('shifts_remind_evening') ?? true;
+      final eveTimeStr = prefs.getString('shifts_evening_time') ?? '20:00';
+      final remindBefore = prefs.getBool('shifts_remind_before') ?? true;
+      final remindBeforeMinutes =
+          prefs.getInt('shifts_remind_before_minutes') ?? 90;
+
       final db = await DatabaseService.instance.database;
 
       final now = DateTime.now();
-      final startRange = DateTime(now.year, now.month, 1);
+      final startRange = DateTime(now.year, now.month - 1, 1);
       final endRange = DateTime(now.year, now.month + monthsCount, 0);
 
       final startIso = DateFormat('yyyy-MM-dd').format(startRange);
       final endIso = DateFormat('yyyy-MM-dd').format(endRange);
 
-      // Очищаем старые события со смен
+      final existingRows = await db.query(
+        'calendar_events',
+        where: "calendar = 'Смены' AND date >= ? AND date <= ?",
+        whereArgs: [startIso, endIso],
+      );
+      for (final r in existingRows) {
+        final evId = r['id'] as String;
+        await NotificationService.instance.cancelNotification(
+          ('eve_$evId').hashCode,
+        );
+        await NotificationService.instance.cancelNotification(
+          ('warn_$evId').hashCode,
+        );
+        await db.insert('delete_queue', {
+          'table_name': 'calendar_events',
+          'record_id': evId,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+
       await db.delete(
         'calendar_events',
         where: "calendar = 'Смены' AND date >= ? AND date <= ?",
         whereArgs: [startIso, endIso],
       );
+
+      // Если синхронизация отключена в настройках — очищаем и выходим
+      if (!isSyncEnabled) {
+        try {
+          SyncService.instance.syncAll();
+        } catch (_) {}
+        return 0;
+      }
 
       var insertedCount = 0;
 
@@ -510,10 +646,64 @@ class ShiftNotifier extends Notifier<ShiftState> {
               'calendar': 'Смены',
               'color': shift.color,
               'description':
-                  'График: ${schedule.name}\nВремя: ${shift.startTime} - ${shift.endTime}',
+                  'График: ${schedule.name} [${schedule.id}]\nВремя: ${shift.startTime} - ${shift.endTime}',
               'is_synced': 0,
               'updated_at': nowIso,
-            });
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+            // Напоминание накануне вечером
+            if (remindEve) {
+              final eveParts = eveTimeStr.split(':');
+              final eveH = int.tryParse(eveParts[0]) ?? 20;
+              final eveM = int.tryParse(eveParts[1]) ?? 0;
+
+              final eveDate = cur.subtract(const Duration(days: 1));
+              final scheduleEveDate = DateTime(
+                eveDate.year,
+                eveDate.month,
+                eveDate.day,
+                eveH,
+                eveM,
+              );
+
+              if (scheduleEveDate.isAfter(DateTime.now())) {
+                await NotificationService.instance.scheduleNotification(
+                  id: ('eve_$eventId').hashCode,
+                  title: 'Завтра смена: ${shift.name}',
+                  body:
+                      'Время: ${shift.startTime} - ${shift.endTime} (${schedule.name})',
+                  scheduledDate: scheduleEveDate,
+                  payload: 'screen_shifts',
+                );
+              }
+            }
+
+            // Напоминание перед началом смены
+            if (remindBefore) {
+              try {
+                final startParts = shift.startTime.split(':');
+                final shiftStartTime = DateTime(
+                  cur.year,
+                  cur.month,
+                  cur.day,
+                  int.parse(startParts[0]),
+                  int.parse(startParts[1]),
+                );
+                final notifyTime = shiftStartTime.subtract(
+                  Duration(minutes: remindBeforeMinutes),
+                );
+                if (notifyTime.isAfter(DateTime.now())) {
+                  await NotificationService.instance.scheduleNotification(
+                    id: ('warn_$eventId').hashCode,
+                    title: 'Скоро смена: ${shift.name}',
+                    body: 'Начало в ${shift.startTime}. Пора собираться!',
+                    scheduledDate: notifyTime,
+                    payload: 'screen_shifts',
+                  );
+                }
+              } catch (_) {}
+            }
+
             insertedCount++;
           }
           cur = cur.add(const Duration(days: 1));

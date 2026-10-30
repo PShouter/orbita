@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../services/database_service.dart';
@@ -74,6 +78,64 @@ class VaultNotifier extends Notifier<VaultState> {
     );
   }
 
+  /// Безопасная смена PIN: расшифровывает существующие записи старым PIN
+  /// и перешифровывает их новым PIN
+  Future<bool> changePin(String oldPin, String newPin) async {
+    final isOldValid = await _service.verifyPin(oldPin);
+    if (!isOldValid) {
+      state = state.copyWith(errorMessage: 'Текущий PIN указан неверно');
+      return false;
+    }
+
+    try {
+      final db = await DatabaseService.instance.database;
+      final rows = await db.query('vault_documents');
+
+      // Перешифровываем все документы новым PIN-кодом
+      for (final row in rows) {
+        final id = row['id'] as String;
+        final encTitle = row['encrypted_title'] as String;
+        final encPayload = row['encrypted_payload'] as String;
+        final iv = row['iv'] as String;
+
+        final title = _service.decryptString(encTitle, iv, oldPin);
+        String payload = '';
+        if (encPayload.contains(':::')) {
+          final parts = encPayload.split(':::');
+          payload = _service.decryptString(parts[0], parts[1], oldPin);
+        } else {
+          payload = _service.decryptString(encPayload, iv, oldPin);
+        }
+
+        final newEncTitle = _service.encryptString(title, newPin);
+        final newEncPayload = _service.encryptString(payload, newPin);
+        final combinedPayload =
+            '${newEncPayload['cipherText']!}:::${newEncPayload['iv']!}';
+
+        await db.update(
+          'vault_documents',
+          {
+            'encrypted_title': newEncTitle['cipherText']!,
+            'encrypted_payload': combinedPayload,
+            'iv': newEncTitle['iv']!,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+
+      await _service.setPin(newPin);
+      state = state.copyWith(activePin: newPin, errorMessage: null);
+      await loadDocuments();
+      return true;
+    } catch (e) {
+      debugPrint('Ошибка при смене PIN сейфа: $e');
+      state = state.copyWith(errorMessage: 'Ошибка перешифрования данных');
+      return false;
+    }
+  }
+
   Future<bool> unlock(String pin) async {
     final isValid = await _service.verifyPin(pin);
     if (isValid) {
@@ -133,20 +195,40 @@ class VaultNotifier extends Notifier<VaultState> {
 
     final db = await DatabaseService.instance.database;
     final rows = await db.query('vault_documents', orderBy: 'updated_at DESC');
+    final appDir = await getApplicationDocumentsDirectory();
 
     final decryptedDocs = <Map<String, dynamic>>[];
     for (final row in rows) {
       final encTitle = row['encrypted_title'] as String;
       final encPayload = row['encrypted_payload'] as String;
       final iv = row['iv'] as String;
+      final category = row['category'] as String? ?? 'text';
 
-      final title = _service.decryptString(encTitle, iv, state.activePin!);
-      final payload = _service.decryptString(encPayload, iv, state.activePin!);
+      String title = _service.decryptString(encTitle, iv, state.activePin!);
+      String payload = '';
+      if (encPayload.contains(':::')) {
+        final parts = encPayload.split(':::');
+        payload = _service.decryptString(parts[0], parts[1], state.activePin!);
+      } else {
+        payload = _service.decryptString(encPayload, iv, state.activePin!);
+      }
+
+      if (category == 'image' || category == 'document') {
+        if (!payload.startsWith('/')) {
+          payload = '${appDir.path}/$payload';
+        } else {
+          final fileName = payload.split('/').last;
+          final refreshedFile = File('${appDir.path}/$fileName');
+          if (refreshedFile.existsSync()) {
+            payload = refreshedFile.path;
+          }
+        }
+      }
 
       decryptedDocs.add({
         'id': row['id'],
         'title': title,
-        'category': row['category'],
+        'category': category,
         'payload': payload,
         'updated_at': row['updated_at'],
       });
@@ -166,15 +248,29 @@ class VaultNotifier extends Notifier<VaultState> {
     final id = 'vault_${DateTime.now().millisecondsSinceEpoch}';
     final nowIso = DateTime.now().toIso8601String();
 
-    final encRes = _service.encryptString(title, state.activePin!);
-    final encPayloadRes = _service.encryptString(payload, state.activePin!);
+    String sanitizedPayload = payload;
+    if (category == 'image' || category == 'document') {
+      final appDir = await getApplicationDocumentsDirectory();
+      if (payload.startsWith(appDir.path)) {
+        sanitizedPayload = payload.substring(appDir.path.length + 1);
+      }
+    }
+
+    final encTitleRes = _service.encryptString(title, state.activePin!);
+    final encPayloadRes = _service.encryptString(
+      sanitizedPayload,
+      state.activePin!,
+    );
+
+    final combinedPayload =
+        '${encPayloadRes['cipherText']!}:::${encPayloadRes['iv']!}';
 
     final row = {
       'id': id,
-      'encrypted_title': encRes['cipherText']!,
+      'encrypted_title': encTitleRes['cipherText']!,
       'category': category,
-      'encrypted_payload': encPayloadRes['cipherText']!,
-      'iv': encRes['iv']!,
+      'encrypted_payload': combinedPayload,
+      'iv': encTitleRes['iv']!,
       'is_synced': 0,
       'updated_at': nowIso,
     };
@@ -190,6 +286,20 @@ class VaultNotifier extends Notifier<VaultState> {
 
   Future<void> deleteDocument(String id) async {
     final db = await DatabaseService.instance.database;
+
+    final target = state.documents
+        .where((d) => d['id'].toString() == id)
+        .firstOrNull;
+    if (target != null &&
+        (target['category'] == 'image' || target['category'] == 'document')) {
+      try {
+        final f = File(target['payload'] as String);
+        if (f.existsSync()) {
+          await f.delete();
+        }
+      } catch (_) {}
+    }
+
     await db.delete('vault_documents', where: 'id = ?', whereArgs: [id]);
     await db.insert('delete_queue', {
       'table_name': 'vault_documents',
@@ -198,6 +308,33 @@ class VaultNotifier extends Notifier<VaultState> {
     });
 
     await loadDocuments();
+    SyncService.instance.syncAll();
+  }
+
+  /// Полная очистка сейфа: удаляет все файлы с диска и очищает БД
+  Future<void> wipeVault() async {
+    final db = await DatabaseService.instance.database;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final dir = Directory(appDir.path);
+      if (await dir.exists()) {
+        for (final item in dir.listSync()) {
+          if (item is File &&
+              (item.path.contains('vault_img_') ||
+                  item.path.contains('vault_doc_'))) {
+            try {
+              await item.delete();
+            } catch (_) {}
+          }
+        }
+      }
+
+      await db.delete('vault_documents');
+    } catch (e) {
+      debugPrint('Ошибка при очистке сейфа: $e');
+    }
+
+    lock();
     SyncService.instance.syncAll();
   }
 }

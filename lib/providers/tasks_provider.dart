@@ -2,10 +2,16 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../services/sync_service.dart';
+import 'gamification_provider.dart';
+
+typedef TaskMap = Map<String, dynamic>;
 
 // --- ПРОВАЙДЕР КАТЕГОРИЙ ЗАДАЧ ---
 class TaskCategoriesNotifier extends Notifier<List<String>> {
@@ -31,7 +37,7 @@ class TaskCategoriesNotifier extends Notifier<List<String>> {
 
     final db = await DatabaseService.instance.database;
     await db.insert('task_categories', {
-      'id': 'cat_${DateTime.now().millisecondsSinceEpoch}',
+      'id': const Uuid().v4(),
       'name': clean,
       'is_synced': 0,
       'updated_at': DateTime.now().toIso8601String(),
@@ -43,20 +49,25 @@ class TaskCategoriesNotifier extends Notifier<List<String>> {
 
 final taskCategoriesProvider =
     NotifierProvider<TaskCategoriesNotifier, List<String>>(
-      TaskCategoriesNotifier.new,
-    );
+  TaskCategoriesNotifier.new,
+);
 
 // --- ПРОВАЙДЕР СПИСКА ЗАДАЧ ---
-class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
+class TasksNotifier extends Notifier<List<TaskMap>> {
+  static const _uuid = Uuid();
+
   @override
-  List<Map<String, dynamic>> build() {
+  List<TaskMap> build() {
     loadTasks();
     return [];
   }
 
   Future<void> loadTasks() async {
     final db = await DatabaseService.instance.database;
-    final rows = await db.query('tasks', orderBy: 'updated_at DESC');
+    final rows = await db.query(
+      'tasks',
+      orderBy: 'done ASC, date ASC, id ASC',
+    );
 
     state = rows.map((r) {
       DateTime? d;
@@ -64,7 +75,7 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
         d = DateTime.tryParse(r['date'] as String);
       }
 
-      List<Map<String, dynamic>> subtasksList = [];
+      List<TaskMap> subtasksList = [];
       if (r['subtasks'] != null && (r['subtasks'] as String).isNotEmpty) {
         try {
           final decoded = jsonDecode(r['subtasks'] as String);
@@ -89,7 +100,7 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
       final isDone = (r['done'] as int? ?? 0) == 1;
       final status = r['status'] as String? ?? (isDone ? 'done' : 'todo');
 
-      return {
+      return <String, dynamic>{
         'id': r['id'] as String,
         'title': r['title'] as String,
         'description': r['description'] as String?,
@@ -113,7 +124,6 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
     }).toList();
   }
 
-  /// Создание или сохранение задачи
   Future<void> saveTask({
     String? id,
     required String title,
@@ -129,13 +139,12 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
     int reminderMinutes = -1,
     String recurrence = 'none',
     List<String> attachments = const [],
-    List<Map<String, dynamic>> subtasks = const [],
+    List<TaskMap> subtasks = const [],
   }) async {
     final db = await DatabaseService.instance.database;
     final nowIso = DateTime.now().toIso8601String();
-    final taskId = id ?? 'task_${DateTime.now().millisecondsSinceEpoch}';
+    final taskId = id ?? _uuid.v4();
 
-    // Если все подзадачи выполнены — статус 'done'
     final bool hasSubtasks = subtasks.isNotEmpty;
     final bool allSubtasksDone =
         hasSubtasks && subtasks.every((s) => s['done'] == true);
@@ -165,33 +174,96 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
     };
 
     await db.insert('tasks', row, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    final notifId = taskId.hashCode;
+    if (!isDone && !isNoDate && date != null && reminderMinutes >= 0) {
+      try {
+        final timeStr = time ?? (isAllDay ? '09:00' : '10:00');
+        final parts = timeStr.split(':');
+        final taskDateTime = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+        );
+        final remindTime = taskDateTime.subtract(
+          Duration(minutes: reminderMinutes),
+        );
+
+        if (remindTime.isAfter(DateTime.now())) {
+          await NotificationService.instance.scheduleNotification(
+            id: notifId,
+            title: 'Задача: $title',
+            body: reminderMinutes == 0
+                ? 'Время выполнить задачу ($timeStr)'
+                : 'Срок через $reminderMinutes мин. ($timeStr)',
+            scheduledDate: remindTime,
+            payload: 'screen_tasks',
+          );
+        }
+      } catch (e) {
+        debugPrint('Ошибка планирования уведомления задачи: $e');
+      }
+    } else {
+      await NotificationService.instance.cancelNotification(notifId);
+    }
+
     await loadTasks();
     SyncService.instance.syncAll();
   }
 
-  /// Быстрое переключение чекбокса задачи
   Future<void> toggleTask(String id, bool done) async {
     final newStatus = done ? 'done' : 'todo';
     final db = await DatabaseService.instance.database;
     final nowIso = DateTime.now().toIso8601String();
 
-    await db.update(
-      'tasks',
-      {'done': done ? 1 : 0, 'status': newStatus, 'updated_at': nowIso},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final current = state.firstWhere((t) => t['id'] == id, orElse: () => {});
+
+    final prefs = await SharedPreferences.getInstance();
+    final autoCompleteSubs =
+        prefs.getBool('task_auto_complete_subtasks_with_parent') ?? true;
+
+    final updateData = <String, dynamic>{
+      'done': done ? 1 : 0,
+      'status': newStatus,
+      'is_synced': 0,
+      'updated_at': nowIso,
+    };
+
+    if (done &&
+        autoCompleteSubs &&
+        current.isNotEmpty &&
+        current['subtasks'] != null) {
+      final subs = List<TaskMap>.from(
+        (current['subtasks'] as List).map(
+          (e) => Map<String, dynamic>.from(e as Map),
+        ),
+      );
+      for (final s in subs) {
+        s['done'] = true;
+      }
+      updateData['subtasks'] = jsonEncode(subs);
+    }
+
+    await db.update('tasks', updateData, where: 'id = ?', whereArgs: [id]);
+
+    final notifId = id.hashCode;
+    if (done) {
+      await NotificationService.instance.cancelNotification(notifId);
+      final isHigh = (current['priority'] == 'high');
+      ref
+          .read(gamificationProvider.notifier)
+          .addExp(ExpSource.task, isHigh ? 20 : 10);
+    }
 
     await loadTasks();
     SyncService.instance.syncAll();
   }
 
-  /// Переключение отдельной подзадачи с автозавершением/снятием основной задачи
   Future<void> toggleSubtask(String taskId, int subtaskIndex, bool done) async {
     final current = state.firstWhere((t) => t['id'] == taskId);
-    final List<Map<String, dynamic>> subs = List<Map<String, dynamic>>.from(
-      current['subtasks'] ?? [],
-    );
+    final subs = List<TaskMap>.from(current['subtasks'] ?? []);
 
     if (subtaskIndex >= 0 && subtaskIndex < subs.length) {
       subs[subtaskIndex]['done'] = done;
@@ -203,14 +275,14 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
     final bool newParentDone = allDone
         ? true
         : (subs.any((s) => s['done'] == false && current['done'] == true)
-              ? false
-              : (current['done'] as bool? ?? false));
+            ? false
+            : (current['done'] as bool? ?? false));
 
     final String newParentStatus = newParentDone
         ? 'done'
         : (current['status'] == 'done'
-              ? 'todo'
-              : (current['status'] as String? ?? 'todo'));
+            ? 'todo'
+            : (current['status'] as String? ?? 'todo'));
 
     final db = await DatabaseService.instance.database;
     final nowIso = DateTime.now().toIso8601String();
@@ -221,17 +293,30 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
         'subtasks': jsonEncode(subs),
         'done': newParentDone ? 1 : 0,
         'status': newParentStatus,
+        'is_synced': 0,
         'updated_at': nowIso,
       },
       where: 'id = ?',
       whereArgs: [taskId],
     );
 
+    if (newParentDone) {
+      await NotificationService.instance.cancelNotification(taskId.hashCode);
+      ref.read(gamificationProvider.notifier).addExp(ExpSource.task, 10);
+    }
+
     await loadTasks();
     SyncService.instance.syncAll();
   }
 
-  /// Удаление одной задачи
+  Future<void> reorderTasks(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final items = List<TaskMap>.from(state);
+    final moved = items.removeAt(oldIndex);
+    items.insert(newIndex, moved);
+    state = items;
+  }
+
   Future<void> deleteTask(String id) async {
     final db = await DatabaseService.instance.database;
     await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
@@ -241,64 +326,87 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
       'created_at': DateTime.now().toIso8601String(),
     });
 
+    await NotificationService.instance.cancelNotification(id.hashCode);
+
     state = state.where((t) => t['id'] != id).toList();
     SyncService.instance.syncAll();
   }
 
-  // --- МАССОВЫЕ ОПЕРАЦИИ (МУЛЬТИВЫБОР) ---
+  Future<void> deleteMultipleTasks(Iterable<String> ids) async {
+    final targetIds = Set<String>.from(ids);
+    if (targetIds.isEmpty) return;
 
-  /// Массовое удаление задач
-  Future<void> deleteMultipleTasks(Set<String> ids) async {
     final db = await DatabaseService.instance.database;
     final batch = db.batch();
     final nowIso = DateTime.now().toIso8601String();
 
-    for (final id in ids) {
+    for (final id in targetIds) {
       batch.delete('tasks', where: 'id = ?', whereArgs: [id]);
       batch.insert('delete_queue', {
         'table_name': 'tasks',
         'record_id': id,
         'created_at': nowIso,
       });
+      await NotificationService.instance.cancelNotification(id.hashCode);
     }
+
     await batch.commit(noResult: true);
-    state = state.where((t) => !ids.contains(t['id'])).toList();
+    await loadTasks();
     SyncService.instance.syncAll();
   }
 
-  /// Массовая смена статуса задач
-  Future<void> updateStatusForMultiple(Set<String> ids, String status) async {
+  Future<void> updateStatusForMultiple(
+    Iterable<String> ids,
+    String status,
+  ) async {
+    final targetIds = Set<String>.from(ids);
+    if (targetIds.isEmpty) return;
+
     final db = await DatabaseService.instance.database;
     final isDone = status == 'done';
     final nowIso = DateTime.now().toIso8601String();
 
     final batch = db.batch();
-    for (final id in ids) {
+    for (final id in targetIds) {
       batch.update(
         'tasks',
-        {'status': status, 'done': isDone ? 1 : 0, 'updated_at': nowIso},
+        {
+          'status': status,
+          'done': isDone ? 1 : 0,
+          'is_synced': 0,
+          'updated_at': nowIso,
+        },
         where: 'id = ?',
         whereArgs: [id],
       );
+      if (isDone) {
+        await NotificationService.instance.cancelNotification(id.hashCode);
+      }
     }
     await batch.commit(noResult: true);
     await loadTasks();
     SyncService.instance.syncAll();
   }
 
-  /// Массовый перенос задач в другую категорию
   Future<void> moveCategoryForMultiple(
-    Set<String> ids,
+    Iterable<String> ids,
     String newCategory,
   ) async {
+    final targetIds = Set<String>.from(ids);
+    if (targetIds.isEmpty) return;
+
     final db = await DatabaseService.instance.database;
     final nowIso = DateTime.now().toIso8601String();
 
     final batch = db.batch();
-    for (final id in ids) {
+    for (final id in targetIds) {
       batch.update(
         'tasks',
-        {'category': newCategory, 'updated_at': nowIso},
+        {
+          'category': newCategory,
+          'is_synced': 0,
+          'updated_at': nowIso,
+        },
         where: 'id = ?',
         whereArgs: [id],
       );
@@ -309,7 +417,6 @@ class TasksNotifier extends Notifier<List<Map<String, dynamic>>> {
   }
 }
 
-final tasksProvider =
-    NotifierProvider<TasksNotifier, List<Map<String, dynamic>>>(
-      TasksNotifier.new,
-    );
+final tasksProvider = NotifierProvider<TasksNotifier, List<TaskMap>>(
+  TasksNotifier.new,
+);

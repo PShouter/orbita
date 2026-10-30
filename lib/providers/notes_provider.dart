@@ -2,9 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
 import '../services/sync_service.dart';
 
 enum NotesViewMode { grid, list }
@@ -139,15 +141,13 @@ class NotesNotifier extends Notifier<List<NoteItem>> {
   @override
   List<NoteItem> build() {
     loadNotes();
-    cleanCorruptedDeleteQueue(); // Автоматически вычищаем битые ID из очереди удаления
+    cleanCorruptedDeleteQueue();
     return [];
   }
 
-  /// Единоразовая очистка старых битых идентификаторов (note_...) из delete_queue
   Future<void> cleanCorruptedDeleteQueue() async {
     try {
       final db = await DatabaseService.instance.database;
-      // Удаляем из очереди удаления любые заметки, чей id начинается с note_ вместо UUID
       await db.delete(
         'delete_queue',
         where: "table_name = 'notes' AND record_id LIKE 'note_%'",
@@ -226,10 +226,9 @@ class NotesNotifier extends Notifier<List<NoteItem>> {
     final now = DateTime.now();
     final nowIso = now.toIso8601String();
 
-    // Генерируем валидный UUIDv4, совместимый с PostgreSQL uuid
     final noteId = id ?? _uuid.v4();
-
     final finalTags = extractTags('$title $body');
+    final userId = Supabase.instance.client.auth.currentUser?.id;
 
     DateTime createdAt = now;
     if (id != null) {
@@ -241,11 +240,14 @@ class NotesNotifier extends Notifier<List<NoteItem>> {
 
     final row = {
       'id': noteId,
+      'user_id': userId,
       'title': title,
       'body': body,
+      'category': 'Общее',
       'image_path': imagePath,
       'attachments': jsonEncode(attachments),
       'tags': jsonEncode(finalTags),
+      'is_pinned': 0,
       'is_synced': 0,
       'created_at': createdAt.toIso8601String(),
       'updated_at': nowIso,
@@ -256,12 +258,32 @@ class NotesNotifier extends Notifier<List<NoteItem>> {
     SyncService.instance.syncAll();
   }
 
+  Future<void> pinNoteToNotification(NoteItem note) async {
+    await NotificationService.instance.showNotification(
+      id: note.id.hashCode,
+      title: note.title.isNotEmpty ? note.title : 'Заметка',
+      body: note.body.isNotEmpty ? note.body : 'Текст заметки',
+      payload: 'screen_notes',
+      channelId: 'orbita_pinned_notes',
+      channelName: 'Закрепленные заметки',
+    );
+  }
+
+  Future<void> unpinNoteFromNotification(String noteId) async {
+    await NotificationService.instance.cancelNotification(noteId.hashCode);
+  }
+
   Future<void> deleteNote(String id) async {
     final db = await DatabaseService.instance.database;
     await db.delete('notes', where: 'id = ?', whereArgs: [id]);
 
-    // Ставим в очередь на облачное удаление только если id — валидный UUID
-    if (!id.startsWith('note_')) {
+    await NotificationService.instance.cancelNotification(id.hashCode);
+
+    final uuidRegExp = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
+
+    if (uuidRegExp.hasMatch(id)) {
       await db.insert('delete_queue', {
         'table_name': 'notes',
         'record_id': id,
@@ -278,7 +300,6 @@ final notesProvider = NotifierProvider<NotesNotifier, List<NoteItem>>(
   NotesNotifier.new,
 );
 
-// --- СЕЛЕКТОРЫ ---
 final filteredNotesProvider = Provider<List<NoteItem>>((ref) {
   final notes = ref.watch(notesProvider);
   final query = ref.watch(notesSearchQueryProvider).trim().toLowerCase();
