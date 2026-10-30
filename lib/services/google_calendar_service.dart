@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -8,8 +10,6 @@ class GoogleCalendarService {
       GoogleCalendarService._internal();
   GoogleCalendarService._internal();
 
-  // На Android для работы с Calendar API обычно достаточно чистого вызова без serverClientId,
-  // либо с Client ID Web-приложения из Google Cloud Console.
   static const String? _kServerClientId = null;
 
   late final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -23,11 +23,18 @@ class GoogleCalendarService {
 
   Future<bool> init() async {
     try {
-      _currentUser = await _googleSignIn.signInSilently();
-      debugPrint('Google Calendar: тихий вход -> ${_currentUser?.email}');
-      return _currentUser != null;
+      _currentUser = await _googleSignIn
+          .signInSilently()
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+
+      if (_currentUser != null) {
+        debugPrint(
+            'Google Calendar: восстановлена сессия (${_currentUser!.email})');
+        return true;
+      }
+      return false;
     } catch (e) {
-      debugPrint('Ошибка тихого входа Google Calendar: $e');
+      debugPrint('Google Calendar: сессия не найдена или офлайн ($e)');
       return false;
     }
   }
@@ -36,7 +43,9 @@ class GoogleCalendarService {
     try {
       debugPrint('Google Calendar: запуск интерактивного входа...');
       _currentUser = await _googleSignIn.signIn();
-      debugPrint('Google Calendar: результат входа -> ${_currentUser?.email}');
+      if (_currentUser != null) {
+        debugPrint('Google Calendar: успешный вход -> ${_currentUser!.email}');
+      }
       return _currentUser;
     } catch (e, stack) {
       debugPrint('Критическая ошибка авторизации Google: $e');
@@ -63,7 +72,9 @@ class GoogleCalendarService {
       if (client == null) return [];
 
       final calendarApi = gcal.CalendarApi(client);
-      final calendarList = await calendarApi.calendarList.list();
+      final calendarList = await calendarApi.calendarList
+          .list()
+          .timeout(const Duration(seconds: 8));
       final items = calendarList.items ?? [];
       debugPrint(
         'Google Calendar: найдено календарей у пользователя: ${items.length}',
@@ -83,22 +94,19 @@ class GoogleCalendarService {
   }) async {
     try {
       final client = await _googleSignIn.authenticatedClient();
-      if (client == null) {
-        debugPrint(
-          'Google Calendar: authenticatedClient вернул NULL (нет токенов доступа)',
-        );
-        return [];
-      }
+      if (client == null) return [];
 
       final calendarApi = gcal.CalendarApi(client);
-      final response = await calendarApi.events.list(
-        calendarId,
-        timeMin: timeMin.toUtc(),
-        timeMax: timeMax.toUtc(),
-        singleEvents: true,
-        maxResults: 2500,
-        orderBy: 'startTime',
-      );
+      final response = await calendarApi.events
+          .list(
+            calendarId,
+            timeMin: timeMin.toUtc(),
+            timeMax: timeMax.toUtc(),
+            singleEvents: true,
+            maxResults: 2500,
+            orderBy: 'startTime',
+          )
+          .timeout(const Duration(seconds: 8));
 
       final items = response.items ?? [];
       debugPrint(
@@ -121,7 +129,6 @@ class GoogleCalendarService {
     final List<gcal.Event> allEvents = [];
     final Set<String> processedEventIds = {};
 
-    // Если список календарей не удалось получить, запрашиваем хотя бы primary
     if (calendars.isEmpty) {
       return fetchEvents(
         calendarId: 'primary',
@@ -132,10 +139,7 @@ class GoogleCalendarService {
 
     for (final cal in calendars) {
       final calId = cal.id;
-      if (calId == null) continue;
-
-      // Пропускаем календари, к которым нет прав на чтение
-      if (cal.accessRole == 'none') continue;
+      if (calId == null || cal.accessRole == 'none') continue;
 
       final events = await fetchEvents(
         calendarId: calId,
@@ -146,7 +150,6 @@ class GoogleCalendarService {
       for (final ev in events) {
         final evId =
             ev.id ?? '${ev.summary}_${ev.start?.dateTime ?? ev.start?.date}';
-        // Исключаем дубликаты, если событие числится в нескольких списках
         if (!processedEventIds.contains(evId)) {
           processedEventIds.add(evId);
           allEvents.add(ev);

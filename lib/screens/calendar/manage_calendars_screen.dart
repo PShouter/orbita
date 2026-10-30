@@ -42,15 +42,12 @@ class ManageCalendarsScreen extends ConsumerWidget {
 
     final bg = isDarkMode ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
     final cardBg = isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final textPrimary =
+        isDarkMode ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
+    final textSecondary =
+        isDarkMode ? const Color(0xFF8B949E) : const Color(0xFF57606A);
+    final borderColor =
+        isDarkMode ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
 
     return Scaffold(
       backgroundColor: bg,
@@ -87,50 +84,54 @@ class ManageCalendarsScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-
           ...calendars.map((cal) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
                 color: cardBg,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: borderColor),
-              ),
-              child: ListTile(
-                leading: CircleAvatar(backgroundColor: cal.color, radius: 10),
-                title: Text(
-                  cal.title,
-                  style: TextStyle(
-                    color: textPrimary,
-                    fontWeight: FontWeight.bold,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: borderColor),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                  leading: CircleAvatar(backgroundColor: cal.color, radius: 10),
+                  title: Text(
+                    cal.title,
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  cal.accountType == 'local' ? 'Локальный' : 'Google Календарь',
-                  style: TextStyle(color: textSecondary, fontSize: 12),
-                ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, size: 20),
-                      onPressed: () =>
-                          _openCalendarDialog(context, notifier, cal),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        size: 20,
-                        color: Colors.redAccent,
+                  subtitle: Text(
+                    cal.accountType == 'local'
+                        ? 'Локальный'
+                        : 'Google Календарь',
+                    style: TextStyle(color: textSecondary, fontSize: 12),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        onPressed: () =>
+                            _openCalendarDialog(context, notifier, cal),
                       ),
-                      onPressed: () => notifier.deleteCalendar(cal.id),
-                    ),
-                  ],
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: Colors.redAccent,
+                        ),
+                        onPressed: () => notifier.deleteCalendar(cal.id),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           }),
-
           const SizedBox(height: 24),
           Text(
             'Аккаунты Google Календаря',

@@ -1,5 +1,6 @@
 ﻿import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -40,18 +41,68 @@ class SyncService {
     _periodicTimer = null;
   }
 
+  Future<T?> _retryOperation<T>(
+    Future<T> Function() operation, {
+    int maxAttempts = 3,
+    Duration initialDelay = const Duration(seconds: 1),
+    String opName = 'Операция',
+  }) async {
+    int attempt = 0;
+    Duration delay = initialDelay;
+
+    while (attempt < maxAttempts) {
+      attempt++;
+      try {
+        return await operation();
+      } catch (e) {
+        final errStr = e.toString().toLowerCase();
+        final isNetwork = errStr.contains('socketexception') ||
+            errStr.contains('connection timed out') ||
+            errStr.contains('clientexception') ||
+            errStr.contains('timeoutexception') ||
+            e is SocketException ||
+            e is TimeoutException;
+
+        if (!isNetwork || attempt >= maxAttempts) {
+          debugPrint(
+              'SyncService: $opName завершилась ошибкой (попытка $attempt/$maxAttempts): $e');
+          return null;
+        }
+
+        debugPrint(
+            'SyncService: $opName сетевой сбой. Повтор $attempt/$maxAttempts через ${delay.inSeconds}с...');
+        await Future.delayed(delay);
+        delay *= 2;
+      }
+    }
+    return null;
+  }
+
   Future<void> syncAll() async {
     final user = _supabase.auth.currentUser;
     if (user == null || _isSyncing) return;
 
     _isSyncing = true;
     try {
+      await _cleanStaleDeleteQueue();
       await _pushChanges(user.id);
       await pullAllFromCloud();
     } catch (e) {
       debugPrint('Ошибка синхронизации: $e');
     } finally {
       _isSyncing = false;
+    }
+  }
+
+  Future<void> _cleanStaleDeleteQueue() async {
+    try {
+      final db = await DatabaseService.instance.database;
+      final sevenDaysAgo =
+          DateTime.now().subtract(const Duration(days: 7)).toIso8601String();
+      await db.delete('delete_queue',
+          where: "created_at < ?", whereArgs: [sevenDaysAgo]);
+    } catch (e) {
+      debugPrint('SyncService: Ошибка очистки старой delete_queue: $e');
     }
   }
 
@@ -90,32 +141,38 @@ class SyncService {
         final recordId = item['record_id'] as String;
 
         if (table == 'vault_documents') {
-          await db
-              .delete('delete_queue', where: 'id = ?', whereArgs: [item['id']]);
+          await db.delete(
+            'delete_queue',
+            where: 'id = ?',
+            whereArgs: [item['id']],
+          );
           continue;
         }
 
         final targetTable = (table == 'diaries') ? 'diary_entries' : table;
 
-        try {
-          await _supabase
+        final success = await _retryOperation(
+          () => _supabase
               .from(targetTable)
               .delete()
               .eq('id', recordId)
-              .timeout(const Duration(seconds: 4));
-          await db
-              .delete('delete_queue', where: 'id = ?', whereArgs: [item['id']]);
-        } catch (e) {
-          debugPrint('Ошибка удаления из облака $targetTable ($recordId): $e');
-          final errStr = e.toString();
-          if (errStr.contains('22P02') ||
-              errStr.contains('PGRST205') ||
-              errStr.contains('invalid input syntax') ||
-              errStr.contains('timed out')) {
-            // Удаляем зависшую локальную запись из очереди, чтобы не стопорить очередь вечно
-            await db.delete('delete_queue',
-                where: 'id = ?', whereArgs: [item['id']]);
-          }
+              .timeout(const Duration(seconds: 4)),
+          opName: 'Удаление из $targetTable ($recordId)',
+        );
+
+        if (success != null) {
+          await db.delete(
+            'delete_queue',
+            where: 'id = ?',
+            whereArgs: [item['id']],
+          );
+        } else {
+          // Если запись некорректна для базы Supabase, удаляем из очереди
+          await db.delete(
+            'delete_queue',
+            where: 'id = ?',
+            whereArgs: [item['id']],
+          );
         }
       }
     } catch (e) {
@@ -124,16 +181,23 @@ class SyncService {
 
     // 1. Задачи (public.tasks)
     try {
-      final unsyncedTasks =
-          await db.query('tasks', where: 'is_synced = ?', whereArgs: [0]);
+      final unsyncedTasks = await db.query(
+        'tasks',
+        where: 'is_synced = ?',
+        whereArgs: [0],
+      );
       if (unsyncedTasks.isNotEmpty) {
         final List<JsonMap> payload = [];
         for (final t in unsyncedTasks) {
           final idStr = t['id'].toString();
 
           if (!uuidRegExp.hasMatch(idStr)) {
-            await db.update('tasks', {'is_synced': 1},
-                where: 'id = ?', whereArgs: [idStr]);
+            await db.update(
+              'tasks',
+              {'is_synced': 1},
+              where: 'id = ?',
+              whereArgs: [idStr],
+            );
             continue;
           }
 
@@ -173,11 +237,16 @@ class SyncService {
         }
 
         if (payload.isNotEmpty) {
-          await _supabase
-              .from('tasks')
-              .upsert(payload)
-              .timeout(const Duration(seconds: 8));
-          await db.update('tasks', {'is_synced': 1}, where: 'is_synced = 0');
+          final res = await _retryOperation(
+            () => _supabase
+                .from('tasks')
+                .upsert(payload)
+                .timeout(const Duration(seconds: 8)),
+            opName: 'Выгрузка задач',
+          );
+          if (res != null) {
+            await db.update('tasks', {'is_synced': 1}, where: 'is_synced = 0');
+          }
         }
       }
     } catch (e) {
@@ -186,19 +255,20 @@ class SyncService {
 
     // 2. Календарь (public.calendar_events)
     try {
-      // Исключаем локальные сгенерированные смены (не UUID)
       await db.rawUpdate('''
         UPDATE calendar_events 
         SET is_synced = 1 
         WHERE is_synced = 0 AND id LIKE 'shift_ev_%'
       ''');
 
-      // Принудительно привязываем локальные события к текущему userId
-      await db.rawUpdate('''
+      await db.rawUpdate(
+        '''
         UPDATE calendar_events 
         SET user_id = ? 
         WHERE user_id IS NULL OR user_id = ''
-      ''', [userId]);
+      ''',
+        [userId],
+      );
 
       final unsyncedEvents = await db.query(
         'calendar_events',
@@ -244,13 +314,19 @@ class SyncService {
 
         if (invalidIds.isNotEmpty) {
           for (final invId in invalidIds) {
-            await db.update('calendar_events', {'is_synced': 1},
-                where: 'id = ?', whereArgs: [invId]);
+            await db.update(
+              'calendar_events',
+              {'is_synced': 1},
+              where: 'id = ?',
+              whereArgs: [invId],
+            );
           }
         }
 
         if (validEvents.isNotEmpty) {
           const batchSize = 25;
+          bool allBatchesSuccess = true;
+
           for (int i = 0; i < validEvents.length; i += batchSize) {
             final chunk = validEvents.sublist(
               i,
@@ -258,20 +334,35 @@ class SyncService {
                   ? validEvents.length
                   : i + batchSize,
             );
-            await _supabase
-                .from('calendar_events')
-                .upsert(chunk)
-                .timeout(const Duration(seconds: 8));
+            final batchRes = await _retryOperation(
+              () => _supabase
+                  .from('calendar_events')
+                  .upsert(chunk)
+                  .timeout(const Duration(seconds: 8)),
+              opName: 'Выгрузка батча календаря',
+            );
+            if (batchRes == null) {
+              allBatchesSuccess = false;
+            }
           }
-          await db.update('calendar_events', {'is_synced': 1},
-              where: 'is_synced = 0');
-          debugPrint(
-              'SyncService: Календарь успешно выгружен (${validEvents.length} событий)');
+
+          if (allBatchesSuccess) {
+            await db.update(
+                'calendar_events',
+                {
+                  'is_synced': 1,
+                },
+                where: 'is_synced = 0');
+            debugPrint(
+              'SyncService: Календарь успешно выгружен (${validEvents.length} событий)',
+            );
+          }
         }
       }
     } catch (e) {
       debugPrint(
-          'SyncService: Ошибка выгрузки событий календаря в Supabase: $e');
+        'SyncService: Ошибка выгрузки событий календаря в Supabase: $e',
+      );
     }
 
     // 3. Привычки (public.habits)
@@ -282,15 +373,22 @@ class SyncService {
         WHERE is_synced = 0 AND id LIKE 'habit_%'
       ''');
 
-      final unsyncedHabits =
-          await db.query('habits', where: 'is_synced = ?', whereArgs: [0]);
+      final unsyncedHabits = await db.query(
+        'habits',
+        where: 'is_synced = ?',
+        whereArgs: [0],
+      );
       if (unsyncedHabits.isNotEmpty) {
         final List<JsonMap> payload = [];
         for (final h in unsyncedHabits) {
           final idStr = h['id'].toString();
           if (!uuidRegExp.hasMatch(idStr)) {
-            await db.update('habits', {'is_synced': 1},
-                where: 'id = ?', whereArgs: [idStr]);
+            await db.update(
+              'habits',
+              {'is_synced': 1},
+              where: 'id = ?',
+              whereArgs: [idStr],
+            );
             continue;
           }
 
@@ -318,11 +416,16 @@ class SyncService {
         }
 
         if (payload.isNotEmpty) {
-          await _supabase
-              .from('habits')
-              .upsert(payload)
-              .timeout(const Duration(seconds: 8));
-          await db.update('habits', {'is_synced': 1}, where: 'is_synced = 0');
+          final res = await _retryOperation(
+            () => _supabase
+                .from('habits')
+                .upsert(payload)
+                .timeout(const Duration(seconds: 8)),
+            opName: 'Выгрузка привычек',
+          );
+          if (res != null) {
+            await db.update('habits', {'is_synced': 1}, where: 'is_synced = 0');
+          }
         }
       }
     } catch (e) {
@@ -331,15 +434,22 @@ class SyncService {
 
     // 4. Заметки (public.notes)
     try {
-      final unsyncedNotes =
-          await db.query('notes', where: 'is_synced = ?', whereArgs: [0]);
+      final unsyncedNotes = await db.query(
+        'notes',
+        where: 'is_synced = ?',
+        whereArgs: [0],
+      );
       if (unsyncedNotes.isNotEmpty) {
         final List<JsonMap> payload = [];
         for (final n in unsyncedNotes) {
           final idStr = n['id'].toString();
           if (!uuidRegExp.hasMatch(idStr)) {
-            await db.update('notes', {'is_synced': 1},
-                where: 'id = ?', whereArgs: [idStr]);
+            await db.update(
+              'notes',
+              {'is_synced': 1},
+              where: 'id = ?',
+              whereArgs: [idStr],
+            );
             continue;
           }
 
@@ -357,11 +467,16 @@ class SyncService {
         }
 
         if (payload.isNotEmpty) {
-          await _supabase
-              .from('notes')
-              .upsert(payload)
-              .timeout(const Duration(seconds: 8));
-          await db.update('notes', {'is_synced': 1}, where: 'is_synced = 0');
+          final res = await _retryOperation(
+            () => _supabase
+                .from('notes')
+                .upsert(payload)
+                .timeout(const Duration(seconds: 8)),
+            opName: 'Выгрузка заметок',
+          );
+          if (res != null) {
+            await db.update('notes', {'is_synced': 1}, where: 'is_synced = 0');
+          }
         }
       }
     } catch (e) {
@@ -374,14 +489,20 @@ class SyncService {
       String localTable = 'diaries';
 
       try {
-        final rows =
-            await db.query('diaries', where: 'is_synced = ?', whereArgs: [0]);
+        final rows = await db.query(
+          'diaries',
+          where: 'is_synced = ?',
+          whereArgs: [0],
+        );
         unsyncedDiary = rows.map((r) => Map<String, dynamic>.from(r)).toList();
       } catch (_) {
         localTable = 'diary_entries';
         try {
-          final rows = await db
-              .query('diary_entries', where: 'is_synced = ?', whereArgs: [0]);
+          final rows = await db.query(
+            'diary_entries',
+            where: 'is_synced = ?',
+            whereArgs: [0],
+          );
           unsyncedDiary =
               rows.map((r) => Map<String, dynamic>.from(r)).toList();
         } catch (_) {}
@@ -392,8 +513,12 @@ class SyncService {
         for (final d in unsyncedDiary) {
           final idStr = d['id'].toString();
           if (!uuidRegExp.hasMatch(idStr)) {
-            await db.update(localTable, {'is_synced': 1},
-                where: 'id = ?', whereArgs: [idStr]);
+            await db.update(
+              localTable,
+              {'is_synced': 1},
+              where: 'id = ?',
+              whereArgs: [idStr],
+            );
             continue;
           }
 
@@ -432,11 +557,17 @@ class SyncService {
         }
 
         if (payload.isNotEmpty) {
-          await _supabase
-              .from('diary_entries')
-              .upsert(payload)
-              .timeout(const Duration(seconds: 8));
-          await db.update(localTable, {'is_synced': 1}, where: 'is_synced = 0');
+          final res = await _retryOperation(
+            () => _supabase
+                .from('diary_entries')
+                .upsert(payload)
+                .timeout(const Duration(seconds: 8)),
+            opName: 'Выгрузка дневника',
+          );
+          if (res != null) {
+            await db.update(localTable, {'is_synced': 1},
+                where: 'is_synced = 0');
+          }
         }
       }
     } catch (e) {
@@ -445,8 +576,11 @@ class SyncService {
 
     // 6. График смен (public.shift_schedules)
     try {
-      final unsyncedShifts = await db
-          .query('shift_schedules', where: 'is_synced = ?', whereArgs: [0]);
+      final unsyncedShifts = await db.query(
+        'shift_schedules',
+        where: 'is_synced = ?',
+        whereArgs: [0],
+      );
       if (unsyncedShifts.isNotEmpty) {
         final payload = unsyncedShifts.map((s) {
           final m = Map<String, dynamic>.from(s);
@@ -455,12 +589,21 @@ class SyncService {
           return m;
         }).toList();
 
-        await _supabase
-            .from('shift_schedules')
-            .upsert(payload)
-            .timeout(const Duration(seconds: 8));
-        await db.update('shift_schedules', {'is_synced': 1},
-            where: 'is_synced = 0');
+        final res = await _retryOperation(
+          () => _supabase
+              .from('shift_schedules')
+              .upsert(payload)
+              .timeout(const Duration(seconds: 8)),
+          opName: 'Выгрузка смен',
+        );
+        if (res != null) {
+          await db.update(
+              'shift_schedules',
+              {
+                'is_synced': 1,
+              },
+              where: 'is_synced = 0');
+        }
       }
     } catch (e) {
       debugPrint('SyncService: Ошибка выгрузки смен в Supabase: $e');
@@ -468,18 +611,30 @@ class SyncService {
 
     // 7. Геймификация (public.user_gamification)
     try {
-      final unsyncedGamification = await db
-          .query('user_gamification', where: 'is_synced = ?', whereArgs: [0]);
+      final unsyncedGamification = await db.query(
+        'user_gamification',
+        where: 'is_synced = ?',
+        whereArgs: [0],
+      );
       if (unsyncedGamification.isNotEmpty) {
         final g = Map<String, dynamic>.from(unsyncedGamification.first);
         g.remove('is_synced');
         g['user_id'] = userId;
-        await _supabase
-            .from('user_gamification')
-            .upsert(g)
-            .timeout(const Duration(seconds: 6));
-        await db.update('user_gamification', {'is_synced': 1},
-            where: 'is_synced = 0');
+        final res = await _retryOperation(
+          () => _supabase
+              .from('user_gamification')
+              .upsert(g)
+              .timeout(const Duration(seconds: 6)),
+          opName: 'Выгрузка геймификации',
+        );
+        if (res != null) {
+          await db.update(
+              'user_gamification',
+              {
+                'is_synced': 1,
+              },
+              where: 'is_synced = 0');
+        }
       }
     } catch (e) {
       debugPrint('SyncService: Ошибка выгрузки геймификации в Supabase: $e');
@@ -487,8 +642,11 @@ class SyncService {
 
     // 8. Достижения (public.user_achievements)
     try {
-      final unsyncedAchievements = await db
-          .query('user_achievements', where: 'is_synced = ?', whereArgs: [0]);
+      final unsyncedAchievements = await db.query(
+        'user_achievements',
+        where: 'is_synced = ?',
+        whereArgs: [0],
+      );
       if (unsyncedAchievements.isNotEmpty) {
         final payload = unsyncedAchievements.map((a) {
           final isUnlockedVal =
@@ -505,12 +663,21 @@ class SyncService {
           };
         }).toList();
 
-        await _supabase
-            .from('user_achievements')
-            .upsert(payload, onConflict: 'user_id, achievement_key')
-            .timeout(const Duration(seconds: 8));
-        await db.update('user_achievements', {'is_synced': 1},
-            where: 'is_synced = 0');
+        final res = await _retryOperation(
+          () => _supabase
+              .from('user_achievements')
+              .upsert(payload, onConflict: 'user_id, achievement_key')
+              .timeout(const Duration(seconds: 8)),
+          opName: 'Выгрузка достижений',
+        );
+        if (res != null) {
+          await db.update(
+              'user_achievements',
+              {
+                'is_synced': 1,
+              },
+              where: 'is_synced = 0');
+        }
       }
     } catch (e) {
       debugPrint('SyncService: Ошибка выгрузки достижений в Supabase: $e');
@@ -525,47 +692,71 @@ class SyncService {
 
     try {
       final results = await Future.wait<dynamic>([
-        _supabase
-            .from('tasks')
-            .select()
-            .eq('user_id', user.id)
-            .timeout(const Duration(seconds: 10)),
-        _supabase
-            .from('calendar_events')
-            .select()
-            .eq('user_id', user.id)
-            .timeout(const Duration(seconds: 10)),
-        _supabase
-            .from('habits')
-            .select()
-            .eq('user_id', user.id)
-            .timeout(const Duration(seconds: 10)),
-        _supabase
-            .from('notes')
-            .select()
-            .eq('user_id', user.id)
-            .timeout(const Duration(seconds: 10)),
-        _supabase
-            .from('diary_entries')
-            .select()
-            .eq('user_id', user.id)
-            .timeout(const Duration(seconds: 10)),
-        _supabase
-            .from('shift_schedules')
-            .select()
-            .eq('user_id', user.id)
-            .timeout(const Duration(seconds: 10)),
-        _supabase
-            .from('user_gamification')
-            .select()
-            .eq('user_id', user.id)
-            .maybeSingle()
-            .timeout(const Duration(seconds: 10)),
-        _supabase
-            .from('user_achievements')
-            .select()
-            .eq('user_id', user.id)
-            .timeout(const Duration(seconds: 10)),
+        _retryOperation(
+          () => _supabase
+              .from('tasks')
+              .select()
+              .eq('user_id', user.id)
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Tasks',
+        ),
+        _retryOperation(
+          () => _supabase
+              .from('calendar_events')
+              .select()
+              .eq('user_id', user.id)
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Events',
+        ),
+        _retryOperation(
+          () => _supabase
+              .from('habits')
+              .select()
+              .eq('user_id', user.id)
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Habits',
+        ),
+        _retryOperation(
+          () => _supabase
+              .from('notes')
+              .select()
+              .eq('user_id', user.id)
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Notes',
+        ),
+        _retryOperation(
+          () => _supabase
+              .from('diary_entries')
+              .select()
+              .eq('user_id', user.id)
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Diary',
+        ),
+        _retryOperation(
+          () => _supabase
+              .from('shift_schedules')
+              .select()
+              .eq('user_id', user.id)
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Shifts',
+        ),
+        _retryOperation(
+          () => _supabase
+              .from('user_gamification')
+              .select()
+              .eq('user_id', user.id)
+              .maybeSingle()
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Gamification',
+        ),
+        _retryOperation(
+          () => _supabase
+              .from('user_achievements')
+              .select()
+              .eq('user_id', user.id)
+              .timeout(const Duration(seconds: 10)),
+          opName: 'Pull Achievements',
+        ),
       ]);
 
       final remoteTasks = results[0] as List<dynamic>? ?? [];

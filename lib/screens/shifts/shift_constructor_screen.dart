@@ -155,9 +155,7 @@ class _ShiftConstructorScreenState
   }
 
   void _save() {
-    ref
-        .read(shiftProvider.notifier)
-        .updateActiveSchedule(
+    ref.read(shiftProvider.notifier).updateActiveSchedule(
           name: _scheduleNameCtrl.text.trim().isEmpty
               ? 'График'
               : _scheduleNameCtrl.text.trim(),
@@ -174,9 +172,8 @@ class _ShiftConstructorScreenState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
     final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
+    final textPrimary =
+        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
 
     final typesMap = {for (var t in _types) t.id: t};
 
@@ -199,11 +196,10 @@ class _ShiftConstructorScreenState
         padding: const EdgeInsets.all(16),
         children: [
           // 1. Название графика
-          Card(
+          Material(
             color: cardBg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
@@ -223,11 +219,13 @@ class _ShiftConstructorScreenState
           const SizedBox(height: 12),
 
           // 2. Дата начала цикла
-          Card(
+          Material(
             color: cardBg,
+            borderRadius: BorderRadius.circular(12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
+            clipBehavior: Clip.antiAlias,
             child: ListTile(
               leading: const Icon(Icons.event, color: Color(0xFF38BDF8)),
               title: const Text('Дата начала цикла'),
@@ -355,13 +353,12 @@ class _ShiftConstructorScreenState
             final idx = entry.key;
             final item = entry.value;
 
-            return Card(
+            return Material(
               color: cardBg,
-              margin: const EdgeInsets.only(bottom: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [

@@ -19,21 +19,17 @@ class AppInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color textPrimary = isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final Color textSecondary = isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
+    final Color textPrimary =
+        isDarkMode ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
+    final Color textSecondary =
+        isDarkMode ? const Color(0xFF8B949E) : const Color(0xFF57606A);
     final Color cardBg = isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final Color borderColor = isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final Color borderColor =
+        isDarkMode ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
 
     return Scaffold(
-      backgroundColor: isDarkMode
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFF6F8FA),
+      backgroundColor:
+          isDarkMode ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
       appBar: AppBar(
         title: const Text('О приложении'),
         backgroundColor: cardBg,
@@ -78,7 +74,7 @@ class AppInfoScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Версия: Demo 0.3.7',
+                  'Версия: Demo 0.3.8',
                   style: TextStyle(fontSize: 13, color: textSecondary),
                 ),
                 const SizedBox(height: 4),

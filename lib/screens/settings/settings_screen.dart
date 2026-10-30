@@ -70,23 +70,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkMode;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
+    final textPrimary =
+        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
+    final textSecondary =
+        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
     final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final borderColor =
+        isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
 
     final currentUser = Supabase.instance.client.auth.currentUser;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFF6F8FA),
+      backgroundColor:
+          isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
       appBar: AppBar(
         title: const Text('Настройки'),
         backgroundColor: cardBg,
@@ -97,12 +93,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // 1. СИНХРОНИЗАЦИЯ
           _buildSectionHeader('Синхронизация', textSecondary),
-          Container(
-            decoration: BoxDecoration(
-              color: cardBg,
+          Material(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              side: BorderSide(color: borderColor),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 ListTile(
@@ -156,12 +154,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // 2. НАСТРОЙКИ РАЗДЕЛОВ
           _buildSectionHeader('Настройки разделов', textSecondary),
-          Container(
-            decoration: BoxDecoration(
-              color: cardBg,
+          Material(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              side: BorderSide(color: borderColor),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 _buildNavRow(
@@ -241,12 +241,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // 3. ИНТЕРФЕЙС И НАВИГАЦИЯ
           _buildSectionHeader('Интерфейс и навигация', textSecondary),
-          Container(
-            decoration: BoxDecoration(
-              color: cardBg,
+          Material(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              side: BorderSide(color: borderColor),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 _buildNavRow(
@@ -277,12 +279,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // 4. ИНФОРМАЦИЯ
           _buildSectionHeader('Информация', textSecondary),
-          Container(
-            decoration: BoxDecoration(
-              color: cardBg,
+          Material(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              side: BorderSide(color: borderColor),
             ),
+            clipBehavior: Clip.antiAlias,
             child: _buildNavRow(
               icon: Icons.info_outline,
               color: textSecondary,

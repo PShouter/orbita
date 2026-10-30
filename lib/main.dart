@@ -343,9 +343,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           onLogout: () => ref.read(profileProvider.notifier).logout(),
           onDeleteAccount: () => ref.read(profileProvider.notifier).logout(),
           onProfileUpdated: (newName, newUsername, newAvatarPath) {
-            ref
-                .read(profileProvider.notifier)
-                .updateProfile(
+            ref.read(profileProvider.notifier).updateProfile(
                   newName: newName,
                   newUsername: newUsername,
                   newAvatarPath: newAvatarPath,
@@ -407,9 +405,8 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     final isDark = profile.isDarkMode;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
+    final textPrimary =
+        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
 
     final maxValidIndex = activeTabs.length;
     if (_navIndex > maxValidIndex) {
@@ -503,8 +500,7 @@ class _MainShellState extends ConsumerState<MainShell> {
               child: SizedBox(
                 width: 32,
                 height: 32,
-                child:
-                    profile.avatarPath != null &&
+                child: profile.avatarPath != null &&
                         File(profile.avatarPath!).existsSync()
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(16),
@@ -562,13 +558,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     bool isDark,
     Color textPrimary,
   ) {
-    final Color textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
+    final Color textSecondary =
+        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
     final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final Color borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final Color borderColor =
+        isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
 
     final dynamicDrawerTabs = ref.watch(drawerTabsProvider);
     final activeBottomTabs = ref.watch(navigationTabsProvider);
@@ -585,9 +579,8 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     return Drawer(
-      backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFF6F8FA),
+      backgroundColor:
+          isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
       child: SafeArea(
         child: Column(
           children: [
@@ -612,8 +605,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                     SizedBox(
                       width: 52,
                       height: 52,
-                      child:
-                          profile.avatarPath != null &&
+                      child: profile.avatarPath != null &&
                               File(profile.avatarPath!).existsSync()
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(26),
@@ -877,7 +869,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Demo 0.3.7',
+                    'Версия: Demo 0.3.8',
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   Text(

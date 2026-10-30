@@ -70,15 +70,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     final isDark = widget.isDarkMode;
     final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
     final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final textPrimary =
+        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
+    final textSecondary =
+        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
+    final borderColor =
+        isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
 
     return Scaffold(
       backgroundColor: bg,
@@ -108,9 +105,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           IconButton(
             icon: Icon(
               Icons.filter_list,
-              color: selectedTag != null
-                  ? const Color(0xFF38BDF8)
-                  : textSecondary,
+              color:
+                  selectedTag != null ? const Color(0xFF38BDF8) : textSecondary,
             ),
             tooltip: 'Фильтр по тегам',
             onPressed: () => _showTagsFilter(
@@ -207,22 +203,22 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     ),
                   )
                 : viewMode == NotesViewMode.grid
-                ? _buildGridView(
-                    context,
-                    sortedNotes,
-                    cardBg,
-                    borderColor,
-                    textPrimary,
-                    textSecondary,
-                  )
-                : _buildListView(
-                    context,
-                    sortedNotes,
-                    cardBg,
-                    borderColor,
-                    textPrimary,
-                    textSecondary,
-                  ),
+                    ? _buildGridView(
+                        context,
+                        sortedNotes,
+                        cardBg,
+                        borderColor,
+                        textPrimary,
+                        textSecondary,
+                      )
+                    : _buildListView(
+                        context,
+                        sortedNotes,
+                        cardBg,
+                        borderColor,
+                        textPrimary,
+                        textSecondary,
+                      ),
           ),
         ],
       ),
@@ -263,62 +259,66 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         final note = notes[index];
         final preview = note.previewImage;
 
-        return InkWell(
+        return Material(
+          color: cardBg,
           borderRadius: BorderRadius.circular(12),
-          onTap: () => _openNote(context, note),
-          child: Container(
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
-            ),
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (preview != null && File(preview).existsSync())
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(preview),
-                        height: 72,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: borderColor),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _openNote(context, note),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (preview != null && File(preview).existsSync())
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(preview),
+                          height: 72,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
-                  ),
-                Text(
-                  note.title,
-                  style: TextStyle(
-                    color: textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: Text(
-                    note.body,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
-                    maxLines: 4,
+                  Text(
+                    note.title,
+                    style: TextStyle(
+                      color: textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                if (_showDateOnCard) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    DateFormat('dd.MM.yyyy').format(note.updatedAt),
-                    style: TextStyle(
-                      color: textSecondary.withValues(alpha: 0.6),
-                      fontSize: 10,
+                  Expanded(
+                    child: Text(
+                      note.body,
+                      style: TextStyle(color: textSecondary, fontSize: 12),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (_showDateOnCard) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat('dd.MM.yyyy').format(note.updatedAt),
+                      style: TextStyle(
+                        color: textSecondary.withValues(alpha: 0.6),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         );
@@ -341,62 +341,66 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         final note = notes[index];
         final preview = note.previewImage;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Material(
             color: cardBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: borderColor),
             ),
-            onTap: () => _openNote(context, note),
-            title: Text(
-              note.title,
-              style: TextStyle(
-                color: textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 6,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(
-                  note.body,
-                  style: TextStyle(color: textSecondary, fontSize: 12),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+              onTap: () => _openNote(context, note),
+              title: Text(
+                note.title,
+                style: TextStyle(
+                  color: textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
                 ),
-                if (_showDateOnCard) ...[
-                  const SizedBox(height: 6),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
                   Text(
-                    DateFormat('dd.MM.yyyy HH:mm').format(note.updatedAt),
-                    style: TextStyle(
-                      color: textSecondary.withValues(alpha: 0.5),
-                      fontSize: 10,
-                    ),
+                    note.body,
+                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ],
-            ),
-            trailing: preview != null && File(preview).existsSync()
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      File(preview),
-                      width: 56,
-                      height: 56,
-                      fit: BoxFit.cover,
+                  if (_showDateOnCard) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      DateFormat('dd.MM.yyyy HH:mm').format(note.updatedAt),
+                      style: TextStyle(
+                        color: textSecondary.withValues(alpha: 0.5),
+                        fontSize: 10,
+                      ),
                     ),
-                  )
-                : null,
+                  ],
+                ],
+              ),
+              trailing: preview != null && File(preview).existsSync()
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(preview),
+                        width: 56,
+                        height: 56,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : null,
+            ),
           ),
         );
       },

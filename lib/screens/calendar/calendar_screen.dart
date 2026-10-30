@@ -11,6 +11,8 @@ import '../settings/sections/calendar_settings_screen.dart';
 import 'create_event_screen.dart';
 import 'manage_calendars_screen.dart';
 
+typedef JsonMap = Map<String, dynamic>;
+
 enum CalendarViewType { month, day }
 
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -48,7 +50,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     _loadCalendarPreferences();
 
-    // Первичная локальная загрузка и фоновая синхронизация с Google
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(calendarProvider.notifier).loadEvents();
       ref.read(userCalendarsProvider.notifier).loadCalendars();
@@ -399,8 +400,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Widget _buildContinuousWeekList(
-    List<Map<String, dynamic>> events,
-    List<Map<String, dynamic>> tasks,
+    List<JsonMap> events,
+    List<JsonMap> tasks,
     Color cardBg,
     Color borderColor,
     Color textPrimary,
@@ -469,8 +470,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   Widget _buildDayCell(
     DateTime date,
-    List<Map<String, dynamic>> events,
-    List<Map<String, dynamic>> tasks,
+    List<JsonMap> events,
+    List<JsonMap> tasks,
     Color borderColor,
     Color textPrimary,
     Color textSecondary,
@@ -647,8 +648,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   void _showDayPopup(
     DateTime date,
-    List<Map<String, dynamic>> dayEvents,
-    List<Map<String, dynamic>> dayTasks,
+    List<JsonMap> dayEvents,
+    List<JsonMap> dayTasks,
   ) {
     showModalBottomSheet(
       context: context,
@@ -705,23 +706,26 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     ),
                   ),
                   ...dayEvents.map(
-                    (ev) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        radius: 6,
-                        backgroundColor: ev['color'] as Color? ?? Colors.blue,
-                      ),
-                      title: Text(
-                        ev['title'] ?? '',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                    (ev) => Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          radius: 6,
+                          backgroundColor: ev['color'] as Color? ?? Colors.blue,
                         ),
-                      ),
-                      subtitle: Text(
-                        ev['isAllDay'] == true
-                            ? 'Весь день (${ev['calendar']})'
-                            : '${ev['startTime'] ?? ''} - ${ev['endTime'] ?? ''} (${ev['calendar']})',
+                        title: Text(
+                          ev['title'] ?? '',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: Text(
+                          ev['isAllDay'] == true
+                              ? 'Весь день (${ev['calendar']})'
+                              : '${ev['startTime'] ?? ''} - ${ev['endTime'] ?? ''} (${ev['calendar']})',
+                        ),
                       ),
                     ),
                   ),
@@ -740,32 +744,35 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   ),
                   ...dayTasks.map((t) {
                     final isDone = t['done'] == true;
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Checkbox(
-                        value: isDone,
-                        onChanged: (v) {
-                          ref
-                              .read(tasksProvider.notifier)
-                              .toggleTask(t['id'].toString(), v ?? false);
-                          Navigator.pop(ctx);
-                        },
-                      ),
-                      title: Text(
-                        t['title'] ?? '',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          decoration:
-                              isDone ? TextDecoration.lineThrough : null,
+                    return Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Checkbox(
+                          value: isDone,
+                          onChanged: (v) {
+                            ref
+                                .read(tasksProvider.notifier)
+                                .toggleTask(t['id'].toString(), v ?? false);
+                            Navigator.pop(ctx);
+                          },
                         ),
+                        title: Text(
+                          t['title'] ?? '',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            decoration:
+                                isDone ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                        subtitle: t['time'] != null
+                            ? Text(
+                                'Время: ${t['time']}',
+                                style: const TextStyle(fontSize: 11),
+                              )
+                            : null,
                       ),
-                      subtitle: t['time'] != null
-                          ? Text(
-                              'Время: ${t['time']}',
-                              style: const TextStyle(fontSize: 11),
-                            )
-                          : null,
                     );
                   }),
                 ],
@@ -792,49 +799,55 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ListTile(
-              leading: const Icon(
-                Icons.add_circle_outline,
-                color: Color(0xFF38BDF8),
-              ),
-              title: const Text(
-                'Создать событие',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateEventScreen(
-                      isDarkMode: widget.isDarkMode,
-                      initialDate: _selectedDate,
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.bookmark_outline,
-                color: Colors.orangeAccent,
-              ),
-              title: const Text(
-                'Загрузить из шаблона',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                if (templates.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Сохраненных шаблонов пока нет'),
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: const Icon(
+                  Icons.add_circle_outline,
+                  color: Color(0xFF38BDF8),
+                ),
+                title: const Text(
+                  'Создать событие',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CreateEventScreen(
+                        isDarkMode: widget.isDarkMode,
+                        initialDate: _selectedDate,
+                      ),
                     ),
                   );
-                } else {
-                  _showSelectTemplateDialog(templates);
-                }
-              },
+                },
+              ),
+            ),
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: const Icon(
+                  Icons.bookmark_outline,
+                  color: Colors.orangeAccent,
+                ),
+                title: const Text(
+                  'Загрузить из шаблона',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  if (templates.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Сохраненных шаблонов пока нет'),
+                      ),
+                    );
+                  } else {
+                    _showSelectTemplateDialog(templates);
+                  }
+                },
+              ),
             ),
           ],
         ),
@@ -842,7 +855,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  void _showSelectTemplateDialog(List<Map<String, dynamic>> templates) {
+  void _showSelectTemplateDialog(List<JsonMap> templates) {
     showModalBottomSheet(
       context: context,
       backgroundColor:
@@ -855,26 +868,29 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         itemCount: templates.length,
         itemBuilder: (ctx, i) {
           final tpl = templates[i];
-          return ListTile(
-            leading: const Icon(Icons.bookmark, color: Color(0xFF38BDF8)),
-            title: Text(
-              tpl['title'] ?? '',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(tpl['calendar'] ?? 'Основной'),
-            onTap: () {
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CreateEventScreen(
-                    isDarkMode: widget.isDarkMode,
-                    initialDate: _selectedDate,
-                    templateData: tpl,
+          return Material(
+            color: Colors.transparent,
+            child: ListTile(
+              leading: const Icon(Icons.bookmark, color: Color(0xFF38BDF8)),
+              title: Text(
+                tpl['title'] ?? '',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(tpl['calendar'] ?? 'Основной'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateEventScreen(
+                      isDarkMode: widget.isDarkMode,
+                      initialDate: _selectedDate,
+                      templateData: tpl,
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),
@@ -907,30 +923,34 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   itemCount: invites.length,
                   itemBuilder: (ctx, i) {
                     final item = invites[i];
-                    return ListTile(
-                      title: Text(item['title'] ?? ''),
-                      subtitle: Text('От: ${item['sender'] ?? 'Друг'}'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.check, color: Colors.green),
-                            onPressed: () {
-                              notifier.acceptInvite(item['id'].toString());
-                              Navigator.pop(ctx);
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.close,
-                              color: Colors.redAccent,
+                    return Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        title: Text(item['title'] ?? ''),
+                        subtitle: Text('От: ${item['sender'] ?? 'Друг'}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon:
+                                  const Icon(Icons.check, color: Colors.green),
+                              onPressed: () {
+                                notifier.acceptInvite(item['id'].toString());
+                                Navigator.pop(ctx);
+                              },
                             ),
-                            onPressed: () {
-                              notifier.declineInvite(item['id'].toString());
-                              Navigator.pop(ctx);
-                            },
-                          ),
-                        ],
+                            IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.redAccent,
+                              ),
+                              onPressed: () {
+                                notifier.declineInvite(item['id'].toString());
+                                Navigator.pop(ctx);
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -947,8 +967,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Widget _buildDayView(
-    List<Map<String, dynamic>> events,
-    List<Map<String, dynamic>> tasks,
+    List<JsonMap> events,
+    List<JsonMap> tasks,
     Color cardBg,
     Color borderColor,
     Color textPrimary,
