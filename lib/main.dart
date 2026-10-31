@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -45,15 +47,19 @@ import 'screens/vault/vault_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/gamification/orbital_station_screen.dart';
 
-const String kSupabaseUrl = 'https://zttfujvamtcfkraotxif.supabase.co';
-const String kSupabaseAnonKey =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0dGZ1anZhbXRjZmtyYW90eGlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MDk0ODksImV4cCI6MjEwNjE4NTQ4OX0.xLzvSDMuyuYCGmzyV7EKZhpjKhOc3Sb2JCYnZvMkeVs';
-
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 1. Загрузка переменных окружения из .env
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('DotEnv load notice: $e');
+  }
+
+  // 2. Инициализация уведомлений
   try {
     await NotificationService.instance.init(
       onSelectNotification: (payload) {
@@ -64,12 +70,22 @@ Future<void> main() async {
     debugPrint('Notification init notice: $e');
   }
 
+  // 3. Инициализация Supabase через переменные окружения
+  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
   try {
-    await Supabase.initialize(url: kSupabaseUrl, anonKey: kSupabaseAnonKey);
+    if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+      await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+    } else {
+      debugPrint(
+          'Supabase init warning: SUPABASE_URL или SUPABASE_ANON_KEY не найдены в .env');
+    }
   } catch (e) {
     debugPrint('Supabase init notice: $e');
   }
 
+  // 4. Инициализация фоновой синхронизации
   try {
     SyncService.instance.initListener();
   } catch (e) {
@@ -180,6 +196,7 @@ class _OrbitaAppState extends ConsumerState<OrbitaApp> {
       supportedLocales: const [Locale('ru', 'RU')],
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'ElMessiri',
         brightness: Brightness.light,
         scaffoldBackgroundColor: const Color(0xFFF6F8FA),
         cardColor: Colors.white,
@@ -190,6 +207,7 @@ class _OrbitaAppState extends ConsumerState<OrbitaApp> {
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'ElMessiri',
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0D1117),
         cardColor: const Color(0xFF161B22),
@@ -354,6 +372,144 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
+  void _showNotificationsMenu(
+    BuildContext context,
+    Color cardBg,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final RenderBox? button = context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (button == null || overlay == null) return;
+
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(
+          button.size.bottomRight(Offset.zero),
+          ancestor: overlay,
+        ),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.right - 280,
+        position.top + 45,
+        16,
+        0,
+      ),
+      color: cardBg,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: ref.read(profileProvider).isDarkMode
+              ? const Color(0xFF30363D)
+              : const Color(0xFFD0D7DE),
+        ),
+      ),
+      items: [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Уведомления',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: textPrimary,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Орбита',
+                  style: TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'sync',
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_done, size: 18, color: Color(0xFF10B981)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Синхронизация активна',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Все модули подключены к облаку',
+                      style: TextStyle(fontSize: 10, color: textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'focus',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.auto_awesome,
+                size: 18,
+                color: Color(0xFFF59E0B),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Фокус дня обновлен',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Продуктивного дня на Орбите!',
+                      style: TextStyle(fontSize: 10, color: textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSvgNavIcon(String path, bool isSelected) {
     final Color color = isSelected ? const Color(0xFF38BDF8) : Colors.grey;
     return SvgPicture.asset(
@@ -407,6 +563,9 @@ class _MainShellState extends ConsumerState<MainShell> {
     final isDark = profile.isDarkMode;
     final textPrimary =
         isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
+    final textSecondary =
+        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
+    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
 
     final maxValidIndex = activeTabs.length;
     if (_navIndex > maxValidIndex) {
@@ -464,68 +623,76 @@ class _MainShellState extends ConsumerState<MainShell> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        title: const Row(
-          children: [
-            Icon(Icons.rocket_launch, color: Colors.orangeAccent, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'Орбита',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
-            ),
-          ],
+        title: Text(
+          'ОРБИТА',
+          style: TextStyle(
+            fontFamily: 'Ethnocentric',
+            color: textPrimary,
+            fontSize: 16,
+            letterSpacing: 1.5,
+          ),
         ),
         actions: [
+          // 3-й справа налево: Переключатель темы (Солнце / Луна)
           IconButton(
             tooltip: isDark ? 'Включить светлую тему' : 'Включить тёмную тему',
-            icon: SvgPicture.asset(
-              isDark
-                  ? 'assets/icons/light theme.svg'
-                  : 'assets/icons/dark theme.svg',
-              width: 22,
-              height: 22,
-              colorFilter: ColorFilter.mode(textPrimary, BlendMode.srcIn),
-              placeholderBuilder: (_) => Icon(
-                isDark ? Icons.light_mode : Icons.dark_mode,
-                size: 22,
-                color: textPrimary,
-              ),
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              color: textPrimary,
+              size: 22,
             ),
-            onPressed: () => profileNotifier.toggleTheme(),
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              profileNotifier.toggleTheme();
+            },
           ),
+
+          // 2-й справа налево: Уведомления (всплывающее меню справа сверху)
+          Builder(
+            builder: (btnContext) {
+              return IconButton(
+                tooltip: 'Уведомления',
+                icon: Icon(
+                  Icons.notifications_none_outlined,
+                  color: textPrimary,
+                  size: 22,
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _showNotificationsMenu(
+                    btnContext,
+                    cardBg,
+                    textPrimary,
+                    textSecondary,
+                  );
+                },
+              );
+            },
+          ),
+
+          // 1-й справа налево (крайний справа): Аватарка (открывает профиль)
           Padding(
             padding: const EdgeInsets.only(right: 16, left: 4),
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               onTap: () => _openProfileScreen(profile),
               child: SizedBox(
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 child: profile.avatarPath != null &&
                         File(profile.avatarPath!).existsSync()
                     ? ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(17),
                         child: Image.file(
                           File(profile.avatarPath!),
                           fit: BoxFit.cover,
                         ),
                       )
-                    : SvgPicture.asset(
-                        'assets/icons/avatar.svg',
-                        width: 32,
-                        height: 32,
-                        colorFilter: ColorFilter.mode(
-                          textPrimary,
-                          BlendMode.srcIn,
-                        ),
-                        placeholderBuilder: (_) => const CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Color(0xFF2C69D1),
-                          child: Icon(
-                            Icons.person,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ),
+                    : CircleAvatar(
+                        radius: 17,
+                        backgroundColor:
+                            const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                        child: Icon(Icons.person, size: 20, color: textPrimary),
                       ),
               ),
             ),
@@ -869,7 +1036,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Demo 0.3.8',
+                    'Версия: Demo 0.3.9',
                     style: TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                   Text(

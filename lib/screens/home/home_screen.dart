@@ -54,9 +54,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       path,
       width: size,
       height: size,
-      colorFilter: color != null
-          ? ColorFilter.mode(color, BlendMode.srcIn)
-          : null,
+      colorFilter:
+          color != null ? ColorFilter.mode(color, BlendMode.srcIn) : null,
       placeholderBuilder: (_) => Icon(Icons.add, size: size, color: color),
     );
   }
@@ -92,15 +91,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return false;
     }).toList();
 
-    final Color textPrimary = widget.isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final Color textSecondary = widget.isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final Color borderColor = widget.isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final Color textPrimary =
+        widget.isDarkMode ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
+    final Color textSecondary =
+        widget.isDarkMode ? const Color(0xFF8B949E) : const Color(0xFF57606A);
+    final Color borderColor =
+        widget.isDarkMode ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
