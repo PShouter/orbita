@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
@@ -23,6 +24,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   // Фильтры
   bool _filterAll = true;
+  bool _hideCompleted = false;
   String? _filterDueDate;
   String? _filterPriority;
   String? _filterStatus;
@@ -45,6 +47,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     if (mounted) {
       setState(() {
         _taskEnableDrag = prefs.getBool('task_enable_drag') ?? true;
+        _hideCompleted = prefs.getBool('tasks_hide_completed') ?? false;
+      });
+    }
+  }
+
+  Future<void> _toggleHideCompleted(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('tasks_hide_completed', value);
+    if (mounted) {
+      setState(() {
+        _hideCompleted = value;
       });
     }
   }
@@ -232,6 +245,82 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
+  void _openShoppingListDialog() {
+    final titleCtrl = TextEditingController(text: 'Список покупок');
+    final itemsCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.shopping_cart_outlined, color: Color(0xFF38BDF8)),
+            SizedBox(width: 8),
+            Text('Быстрый список'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Название задачи',
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: itemsCtrl,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'Пункты (каждый с новой строки)',
+                  hintText: 'Хлеб\nМолоко\nЯблоки',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF38BDF8),
+            ),
+            onPressed: () {
+              final title = titleCtrl.text.trim();
+              final raw = itemsCtrl.text.trim();
+              if (title.isNotEmpty) {
+                final lines = raw
+                    .split('\n')
+                    .map((e) => e.trim())
+                    .where((e) => e.isNotEmpty)
+                    .map((item) => {'title': item, 'done': false})
+                    .toList();
+
+                ref.read(tasksProvider.notifier).saveTask(
+                      title: title,
+                      category: 'Покупки',
+                      date: DateTime.now(),
+                      isNoDate: false,
+                      subtasks: lines,
+                    );
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Создать'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPriorityBadge(String priority) {
     if (priority == 'high') {
       return Container(
@@ -313,8 +402,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     final bool hasDueDate = !isNoDate && taskDate != null;
     final bool isOverdue =
         !isDone && hasDueDate && taskDate.isBefore(todayStart);
-    final bool isTodayTask =
-        !isNoDate &&
+    final bool isTodayTask = !isNoDate &&
         taskDate != null &&
         !taskDate.isBefore(todayStart) &&
         !taskDate.isAfter(todayEnd);
@@ -343,8 +431,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           color: isSelected
               ? const Color(0xFF38BDF8)
               : (isOverdue
-                    ? Colors.redAccent.withValues(alpha: 0.6)
-                    : borderColor),
+                  ? Colors.redAccent.withValues(alpha: 0.6)
+                  : borderColor),
           width: isSelected || isOverdue ? 1.5 : 1,
         ),
       ),
@@ -456,8 +544,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                         color: isOverdue
                                             ? Colors.redAccent
                                             : (isTodayTask
-                                                  ? const Color(0xFF38BDF8)
-                                                  : textSecondary),
+                                                ? const Color(0xFF38BDF8)
+                                                : textSecondary),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
@@ -472,8 +560,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                           color: isOverdue
                                               ? Colors.redAccent
                                               : (isTodayTask
-                                                    ? const Color(0xFF38BDF8)
-                                                    : textSecondary),
+                                                  ? const Color(0xFF38BDF8)
+                                                  : textSecondary),
                                         ),
                                       ),
                                     ],
@@ -578,15 +666,34 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     final todayStart = DateTime(now.year, now.month, now.day);
     final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-    final todayTasksCount = allTasks.where((t) {
+    // Подсчет активных (невыполненных) задач
+    final activeTodayTasksCount = allTasks.where((t) {
+      final isDone = t['done'] as bool? ?? false;
+      final isNoDate = t['isNoDate'] as bool? ?? false;
       final d = t['date'] as DateTime?;
-      if (d == null) return false;
+      if (isDone || isNoDate || d == null) return false;
       return !d.isBefore(todayStart) && !d.isAfter(todayEnd);
     }).length;
 
-    final totalTasksCount = allTasks.length;
+    final activeTotalTasksCount = allTasks.where((t) {
+      return (t['done'] as bool? ?? false) == false;
+    }).length;
+
+    final overdueTasks = allTasks.where((t) {
+      final isDone = t['done'] as bool? ?? false;
+      final isNoDate = t['isNoDate'] as bool? ?? false;
+      final d = t['date'] as DateTime?;
+      return !isDone && !isNoDate && d != null && d.isBefore(todayStart);
+    }).toList();
 
     final filteredTasks = allTasks.where((t) {
+      final isDone = t['done'] as bool? ?? false;
+
+      // Скрытие выполненных
+      if (_hideCompleted && isDone) {
+        return false;
+      }
+
       if (_searchQuery.isNotEmpty) {
         final title = (t['title'] as String).toLowerCase();
         final desc = ((t['description'] as String?) ?? '').toLowerCase();
@@ -714,7 +821,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              'Задачи на сегодня: $todayTasksCount',
+                              'На сегодня: $activeTodayTasksCount',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
@@ -726,7 +833,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              'Всего задач: $totalTasksCount',
+                              'Активных: $activeTotalTasksCount',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: textSecondary,
@@ -736,7 +843,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.playlist_add_check_rounded,
+                        color: Color(0xFF38BDF8),
+                        size: 24,
+                      ),
+                      tooltip: 'Быстрый список покупок',
+                      onPressed: _openShoppingListDialog,
+                    ),
                     IconButton(
                       icon: Icon(
                         Icons.settings_outlined,
@@ -755,6 +871,72 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         );
                         _loadPreferences();
                       },
+                    ),
+                  ],
+                ),
+              ),
+
+            // Баннер переноса просроченных задач
+            if (overdueTasks.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Colors.redAccent.withValues(alpha: 0.35),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Просрочено задач: ${overdueTasks.length}',
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      onPressed: () async {
+                        HapticFeedback.lightImpact();
+                        final count = await ref
+                            .read(tasksProvider.notifier)
+                            .postponeOverdueToToday();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Перенесено на сегодня: $count',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text(
+                        'На сегодня',
+                        style: TextStyle(
+                          color: Color(0xFF38BDF8),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -820,6 +1002,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     },
                   ),
                   const SizedBox(width: 8),
+                  FilterChip(
+                    label: const Text(
+                      'Скрыть выполненные',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    selected: _hideCompleted,
+                    onSelected: (val) {
+                      _toggleHideCompleted(val);
+                    },
+                  ),
+                  const SizedBox(width: 8),
                   PopupMenuButton<String>(
                     tooltip: 'Срок',
                     child: Chip(
@@ -827,10 +1020,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         _filterDueDate == 'overdue'
                             ? 'Просроченные'
                             : _filterDueDate == 'today'
-                            ? 'Сегодня'
-                            : _filterDueDate == 'upcoming'
-                            ? 'Предстоящие'
-                            : 'Срок',
+                                ? 'Сегодня'
+                                : _filterDueDate == 'upcoming'
+                                    ? 'Предстоящие'
+                                    : 'Срок',
                         style: TextStyle(
                           fontSize: 12,
                           color: _filterDueDate != null
@@ -882,10 +1075,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         _filterPriority == 'low'
                             ? 'Низкий'
                             : _filterPriority == 'normal'
-                            ? 'Обычный'
-                            : _filterPriority == 'high'
-                            ? 'Высокий'
-                            : 'Приоритет',
+                                ? 'Обычный'
+                                : _filterPriority == 'high'
+                                    ? 'Высокий'
+                                    : 'Приоритет',
                         style: TextStyle(
                           fontSize: 12,
                           color: _filterPriority != null
@@ -934,12 +1127,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         _filterStatus == 'done'
                             ? 'Выполнено'
                             : _filterStatus == 'todo'
-                            ? 'К выполнению'
-                            : _filterStatus == 'in_progress'
-                            ? 'В работе'
-                            : _filterStatus == 'canceled'
-                            ? 'Отменено'
-                            : 'Статус',
+                                ? 'К выполнению'
+                                : _filterStatus == 'in_progress'
+                                    ? 'В работе'
+                                    : _filterStatus == 'canceled'
+                                        ? 'Отменено'
+                                        : 'Статус',
                         style: TextStyle(
                           fontSize: 12,
                           color: _filterStatus != null
@@ -1041,45 +1234,45 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       ),
                     )
                   : (_taskEnableDrag && _filterAll && _searchQuery.isEmpty)
-                  ? ReorderableListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
-                      itemCount: filteredTasks.length,
-                      onReorder: (oldIndex, newIndex) {
-                        ref
-                            .read(tasksProvider.notifier)
-                            .reorderTasks(oldIndex, newIndex);
-                      },
-                      itemBuilder: (ctx, idx) {
-                        final task = filteredTasks[idx];
-                        return _buildTaskCard(
-                          task,
-                          cardBg,
-                          borderColor,
-                          textPrimary,
-                          textSecondary,
-                          todayStart,
-                          todayEnd,
-                          isDark,
-                        );
-                      },
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
-                      itemCount: filteredTasks.length,
-                      itemBuilder: (ctx, idx) {
-                        final task = filteredTasks[idx];
-                        return _buildTaskCard(
-                          task,
-                          cardBg,
-                          borderColor,
-                          textPrimary,
-                          textSecondary,
-                          todayStart,
-                          todayEnd,
-                          isDark,
-                        );
-                      },
-                    ),
+                      ? ReorderableListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+                          itemCount: filteredTasks.length,
+                          onReorder: (oldIndex, newIndex) {
+                            ref
+                                .read(tasksProvider.notifier)
+                                .reorderTasks(oldIndex, newIndex);
+                          },
+                          itemBuilder: (ctx, idx) {
+                            final task = filteredTasks[idx];
+                            return _buildTaskCard(
+                              task,
+                              cardBg,
+                              borderColor,
+                              textPrimary,
+                              textSecondary,
+                              todayStart,
+                              todayEnd,
+                              isDark,
+                            );
+                          },
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+                          itemCount: filteredTasks.length,
+                          itemBuilder: (ctx, idx) {
+                            final task = filteredTasks[idx];
+                            return _buildTaskCard(
+                              task,
+                              cardBg,
+                              borderColor,
+                              textPrimary,
+                              textSecondary,
+                              todayStart,
+                              todayEnd,
+                              isDark,
+                            );
+                          },
+                        ),
             ),
           ],
         ),

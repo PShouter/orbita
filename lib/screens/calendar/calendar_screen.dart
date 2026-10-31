@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/calendar_provider.dart';
@@ -13,7 +14,7 @@ import 'manage_calendars_screen.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
-enum CalendarViewType { month, day }
+enum CalendarViewType { month, week, day }
 
 class CalendarScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -82,9 +83,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     setState(() {
       _showWeekNumbers = prefs.getBool('cal_show_week_numbers') ?? false;
       final initialViewStr = prefs.getString('cal_initial_view') ?? 'Месяц';
-      _currentView = initialViewStr == 'День'
-          ? CalendarViewType.day
-          : CalendarViewType.month;
+      if (initialViewStr == 'День') {
+        _currentView = CalendarViewType.day;
+      } else if (initialViewStr == 'Неделя') {
+        _currentView = CalendarViewType.week;
+      } else {
+        _currentView = CalendarViewType.month;
+      }
     });
   }
 
@@ -99,11 +104,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       _selectedDate = DateTime.now();
       _visibleDate = DateTime.now();
     });
-    _scrollController.animateTo(
-      _initialWeekOffset * 68.0,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOut,
-    );
+    if (_currentView == CalendarViewType.month) {
+      _scrollController.animateTo(
+        _initialWeekOffset * 68.0,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   int _getWeekNumber(DateTime date) {
@@ -182,7 +189,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           children: [
             Column(
               children: [
-                _buildHeader(textPrimary, textSecondary),
+                _buildHeader(textPrimary, textSecondary, borderColor),
                 if (_isSyncingGoogle)
                   const LinearProgressIndicator(
                     backgroundColor: Colors.transparent,
@@ -195,23 +202,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   Divider(height: 1, color: borderColor),
                 ],
                 Expanded(
-                  child: _currentView == CalendarViewType.month
-                      ? _buildContinuousWeekList(
-                          events,
-                          datedTasks,
-                          cardBg,
-                          borderColor,
-                          textPrimary,
-                          textSecondary,
-                        )
-                      : _buildDayView(
-                          events,
-                          datedTasks,
-                          cardBg,
-                          borderColor,
-                          textPrimary,
-                          textSecondary,
-                        ),
+                  child: _buildCurrentView(
+                    events,
+                    datedTasks,
+                    cardBg,
+                    borderColor,
+                    textPrimary,
+                    textSecondary,
+                  ),
                 ),
                 _buildBottomCalendarBar(
                   calendars,
@@ -237,7 +235,50 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildHeader(Color textPrimary, Color textSecondary) {
+  Widget _buildCurrentView(
+    List<JsonMap> events,
+    List<JsonMap> tasks,
+    Color cardBg,
+    Color borderColor,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    switch (_currentView) {
+      case CalendarViewType.month:
+        return _buildContinuousWeekList(
+          events,
+          tasks,
+          cardBg,
+          borderColor,
+          textPrimary,
+          textSecondary,
+        );
+      case CalendarViewType.week:
+        return _buildWeekView(
+          events,
+          tasks,
+          cardBg,
+          borderColor,
+          textPrimary,
+          textSecondary,
+        );
+      case CalendarViewType.day:
+        return _buildDayView(
+          events,
+          tasks,
+          cardBg,
+          borderColor,
+          textPrimary,
+          textSecondary,
+        );
+    }
+  }
+
+  Widget _buildHeader(
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -262,23 +303,58 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
                 onPressed: _scrollToToday,
               ),
-              IconButton(
-                tooltip: 'Вид календаря',
+
+              // Переключатель режимов: Месяц / Неделя / День
+              PopupMenuButton<CalendarViewType>(
+                tooltip: 'Режим отображения',
                 icon: Icon(
                   _currentView == CalendarViewType.month
-                      ? Icons.calendar_view_day
-                      : Icons.calendar_view_month,
+                      ? Icons.calendar_view_month
+                      : (_currentView == CalendarViewType.week
+                          ? Icons.calendar_view_week
+                          : Icons.calendar_view_day),
                   color: textPrimary,
                   size: 22,
                 ),
-                onPressed: () {
+                onSelected: (view) {
                   setState(() {
-                    _currentView = _currentView == CalendarViewType.month
-                        ? CalendarViewType.day
-                        : CalendarViewType.month;
+                    _currentView = view;
                   });
                 },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: CalendarViewType.month,
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_view_month, size: 18),
+                        SizedBox(width: 8),
+                        Text('Месяц'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: CalendarViewType.week,
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_view_week, size: 18),
+                        SizedBox(width: 8),
+                        Text('Неделя'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: CalendarViewType.day,
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_view_day, size: 18),
+                        SizedBox(width: 8),
+                        Text('День'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: textPrimary, size: 22),
                 onSelected: (val) async {
@@ -643,6 +719,102 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // Режим недели (7 дней с расписанием событий и задач)
+  Widget _buildWeekView(
+    List<JsonMap> events,
+    List<JsonMap> tasks,
+    Color cardBg,
+    Color borderColor,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final startOfWeek = _selectedDate
+        .subtract(Duration(days: _selectedDate.weekday - 1));
+
+    return Column(
+      children: [
+        // Горизонтальный стрип 7 дней недели
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          color: cardBg,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(7, (i) {
+              final d = startOfWeek.add(Duration(days: i));
+              final isSel = d.year == _selectedDate.year &&
+                  d.month == _selectedDate.month &&
+                  d.day == _selectedDate.day;
+              final now = DateTime.now();
+              final isToday = d.year == now.year &&
+                  d.month == now.month &&
+                  d.day == now.day;
+              const wds = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+
+              return InkWell(
+                onTap: () => setState(() => _selectedDate = d),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSel
+                        ? const Color(0xFF38BDF8).withValues(alpha: 0.2)
+                        : (isToday
+                            ? Colors.blue.withValues(alpha: 0.08)
+                            : Colors.transparent),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSel
+                          ? const Color(0xFF38BDF8)
+                          : (isToday ? Colors.blueAccent : Colors.transparent),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        wds[i],
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: (i >= 5) ? Colors.redAccent : textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${d.day}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight:
+                              isSel || isToday ? FontWeight.bold : FontWeight.w500,
+                          color: isToday ? const Color(0xFF38BDF8) : textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const Divider(height: 1),
+
+        // Список событий выбранного дня недели
+        Expanded(
+          child: _buildDayView(
+            events,
+            tasks,
+            cardBg,
+            borderColor,
+            textPrimary,
+            textSecondary,
+          ),
+        ),
+      ],
     );
   }
 

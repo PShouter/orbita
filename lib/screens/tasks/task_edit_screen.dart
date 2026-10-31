@@ -33,8 +33,9 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
   String _status = 'todo';
   Color _selectedColor = const Color(0xFF38BDF8);
 
-  final List<Map<String, dynamic>> _subtasks = [];
+  final List> _subtasks = [];
   final List<String> _attachments = [];
+  final List<String> _tags = [];
   String _enterKeyBehavior = 'new_subtask';
 
   static const List<int> _allowedReminderMinutes = [
@@ -138,6 +139,9 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
       }
       if (t['attachments'] != null && t['attachments'] is Iterable) {
         _attachments.addAll(List<String>.from(t['attachments']));
+      }
+      if (t['tags'] != null && t['tags'] is Iterable) {
+        _tags.addAll(List<String>.from(t['tags']));
       }
     } else {
       _selectedDate = DateTime.now();
@@ -262,6 +266,43 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
     );
   }
 
+  void _showAddTagDialog() {
+    final tagCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Новый тег'),
+        content: TextField(
+          controller: tagCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Название тега (напр., Срочно, Дом)',
+            isDense: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = tagCtrl.text.trim();
+              if (val.isNotEmpty) {
+                final formatted = val.startsWith('#') ? val.substring(1) : val;
+                if (!_tags.contains(formatted)) {
+                  setState(() => _tags.add(formatted));
+                }
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _saveTask() {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
@@ -297,6 +338,7 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
           recurrence: _recurrence,
           attachments: _attachments,
           subtasks: cleanedSubtasks,
+          tags: _tags,
         );
 
     Navigator.pop(context);
@@ -434,6 +476,38 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // 3.1. Теги задачи
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Теги',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              TextButton.icon(
+                onPressed: _showAddTagDialog,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Добавить тег'),
+              ),
+            ],
+          ),
+          if (_tags.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: _tags.map((tag) {
+                return Chip(
+                  label: Text(
+                    '#$tag',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () => setState(() => _tags.remove(tag)),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 12),
 
           // 4. Подзадачи
           Row(

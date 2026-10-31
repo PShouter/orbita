@@ -18,16 +18,20 @@ class TaskCategoriesNotifier extends Notifier<List<String>> {
   @override
   List<String> build() {
     loadCategories();
-    return ['Личное'];
+    return ['Личное', 'Покупки', 'Работа'];
   }
 
   Future<void> loadCategories() async {
     final db = await DatabaseService.instance.database;
     final rows = await db.query('task_categories', orderBy: 'name ASC');
     if (rows.isNotEmpty) {
-      state = rows.map((r) => r['name'] as String).toList();
+      final list = rows.map((r) => r['name'] as String).toList();
+      if (!list.contains('Покупки')) {
+        list.add('Покупки');
+      }
+      state = list;
     } else {
-      state = ['Личное'];
+      state = ['Личное', 'Покупки', 'Работа'];
     }
   }
 
@@ -414,6 +418,44 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
     await batch.commit(noResult: true);
     await loadTasks();
     SyncService.instance.syncAll();
+  }
+
+  /// Пакетный перенос всех просроченных невыполненных задач на «Сегодня»
+  Future<int> postponeOverdueToToday() async {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todayIso = todayStart.toIso8601String();
+    final nowIso = now.toIso8601String();
+
+    final overdueTasks = state.where((t) {
+      final isDone = t['done'] == true;
+      final isNoDate = t['isNoDate'] == true;
+      final d = t['date'] as DateTime?;
+      return !isDone && !isNoDate && d != null && d.isBefore(todayStart);
+    }).toList();
+
+    if (overdueTasks.isEmpty) return 0;
+
+    final db = await DatabaseService.instance.database;
+    final batch = db.batch();
+
+    for (final t in overdueTasks) {
+      batch.update(
+        'tasks',
+        {
+          'date': todayIso,
+          'is_synced': 0,
+          'updated_at': nowIso,
+        },
+        where: 'id = ?',
+        whereArgs: [t['id']],
+      );
+    }
+
+    await batch.commit(noResult: true);
+    await loadTasks();
+    SyncService.instance.syncAll();
+    return overdueTasks.length;
   }
 }
 

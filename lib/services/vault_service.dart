@@ -11,9 +11,13 @@ class VaultService {
   static final VaultService instance = VaultService._init();
   VaultService._init();
 
-  static const String _prefPinHash = 'vault_pin_hash';
-  static const String _prefSalt = 'vault_pin_salt';
+  static const String _secPinHash = 'vault_sec_pin_hash';
+  static const String _secPinSalt = 'vault_sec_pin_salt';
   static const String _secBiometricKey = 'vault_bio_master_pin_secure';
+
+  // Legacy ключи из SharedPreferences для обратной совместимости
+  static const String _prefLegacyPinHash = 'vault_pin_hash';
+  static const String _prefLegacySalt = 'vault_pin_salt';
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -71,43 +75,73 @@ class VaultService {
     return derivedKey;
   }
 
+  /// Проверка наличия PIN (с фоновой миграцией из SharedPreferences)
   Future<bool> hasPin() async {
+    final hasSecure = await _secureStorage.containsKey(key: _secPinHash);
+    if (hasSecure) return true;
+
+    // Проверяем наличие в старом SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    return prefs.containsKey(_prefPinHash);
+    if (prefs.containsKey(_prefLegacyPinHash)) {
+      final legacyHash = prefs.getString(_prefLegacyPinHash);
+      final legacySalt = prefs.getString(_prefLegacySalt);
+      if (legacyHash != null && legacySalt != null) {
+        // Мигрируем в SecureStorage
+        await _secureStorage.write(key: _secPinHash, value: legacyHash);
+        await _secureStorage.write(key: _secPinSalt, value: legacySalt);
+        await prefs.remove(_prefLegacyPinHash);
+        await prefs.remove(_prefLegacySalt);
+        return true;
+      }
+    }
+    return false;
   }
 
+  /// Установка нового мастер-PIN
   Future<void> setPin(String pin) async {
-    final prefs = await SharedPreferences.getInstance();
     final salt = _generateSalt();
     final key = _pbkdf2DeriveKey(pin, salt);
     final hash = sha256.convert(key).toString();
 
-    await prefs.setString(_prefSalt, salt);
-    await prefs.setString(_prefPinHash, hash);
-
-    // Сохраняем PIN для биометрии строго в защищенном аппаратном хранилище
+    // Сохраняем соль, хэш и мастер-PIN строго в защищенном хранилище
+    await _secureStorage.write(key: _secPinSalt, value: salt);
+    await _secureStorage.write(key: _secPinHash, value: hash);
     await _secureStorage.write(key: _secBiometricKey, value: pin);
 
-    // Удаляем старый небезопасный ключ из SharedPreferences, если он был
+    // Очищаем legacy-записи в SharedPreferences при их наличии
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefLegacyPinHash);
+    await prefs.remove(_prefLegacySalt);
     await prefs.remove('vault_bio_master_pin');
   }
 
+  /// Получение сохраненного PIN для биометрии
   Future<String?> getSavedPinForBiometrics() async {
     return await _secureStorage.read(key: _secBiometricKey);
   }
 
+  /// Проверка введенного PIN
   Future<bool> verifyPin(String pin) async {
-    final prefs = await SharedPreferences.getInstance();
-    final salt = prefs.getString(_prefSalt);
-    final savedHash = prefs.getString(_prefPinHash);
+    String? salt = await _secureStorage.read(key: _secPinSalt);
+    String? savedHash = await _secureStorage.read(key: _secPinHash);
+
+    // Если в SecureStorage пусто, проверяем legacy SharedPreferences
+    if (salt == null || savedHash == null) {
+      final prefs = await SharedPreferences.getInstance();
+      salt = prefs.getString(_prefLegacySalt);
+      savedHash = prefs.getString(_prefLegacyPinHash);
+    }
 
     if (salt == null || savedHash == null) return false;
 
-    // 1. Проверяем по новому PBKDF2
+    // 1. Проверяем по PBKDF2
     final key = _pbkdf2DeriveKey(pin, salt);
     final inputHash = sha256.convert(key).toString();
 
     if (inputHash == savedHash) {
+      // Сохраняем в SecureStorage актуальное состояние
+      await _secureStorage.write(key: _secPinHash, value: savedHash);
+      await _secureStorage.write(key: _secPinSalt, value: salt);
       await _secureStorage.write(key: _secBiometricKey, value: pin);
       return true;
     }
@@ -119,7 +153,7 @@ class VaultService {
     final legacyHash = sha256.convert(legacyKey).toString();
 
     if (legacyHash == savedHash) {
-      // Автоматически мигрируем хэш на PBKDF2
+      // Автоматически обновляем хэш до PBKDF2 в SecureStorage
       await setPin(pin);
       return true;
     }
@@ -127,11 +161,15 @@ class VaultService {
     return false;
   }
 
+  /// Полный сброс параметров сейфа
   Future<void> resetVault() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_prefPinHash);
-    await prefs.remove(_prefSalt);
+    await prefs.remove(_prefLegacyPinHash);
+    await prefs.remove(_prefLegacySalt);
     await prefs.remove('vault_bio_master_pin');
+
+    await _secureStorage.delete(key: _secPinHash);
+    await _secureStorage.delete(key: _secPinSalt);
     await _secureStorage.delete(key: _secBiometricKey);
   }
 
@@ -139,7 +177,6 @@ class VaultService {
   Map<String, String> encryptString(String plainText, String pin) {
     final keyBytes = _pbkdf2DeriveKey(pin, 'orbita_vault_static_salt_v2');
     final key = enc.Key(keyBytes);
-    // Для GCM стандартный размер IV/nonce — 12 байт (96 бит)
     final iv = enc.IV.fromSecureRandom(12);
 
     final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
@@ -150,7 +187,7 @@ class VaultService {
 
   /// Расшифровка текста с поддержкой обратной совместимости с legacy CBC
   String decryptString(String cipherBase64, String ivBase64, String pin) {
-    // 1. Попытка расшифровать новым методом AES-GCM
+    // 1. Попытка расшифровать методом AES-GCM
     try {
       final keyBytes = _pbkdf2DeriveKey(pin, 'orbita_vault_static_salt_v2');
       final key = enc.Key(keyBytes);
