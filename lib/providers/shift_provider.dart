@@ -51,24 +51,38 @@ class ShiftType {
   }
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'name': name,
-    'shortName': shortName,
-    'color': color,
-    'isWork': isWork ? 1 : 0,
-    'startTime': startTime,
-    'endTime': endTime,
-  };
+        'id': id,
+        'name': name,
+        'shortName': shortName,
+        'color': color,
+        'isWork': isWork ? 1 : 0,
+        'startTime': startTime,
+        'endTime': endTime,
+      };
 
   factory ShiftType.fromMap(Map<String, dynamic> map) => ShiftType(
-    id: map['id'] as String,
-    name: map['name'] as String,
-    shortName: map['shortName'] as String,
-    color: map['color'] as int,
-    isWork: (map['isWork'] as int) == 1,
-    startTime: map['startTime'] as String? ?? '08:00',
-    endTime: map['endTime'] as String? ?? '20:00',
-  );
+        id: map['id'] as String,
+        name: map['name'] as String,
+        shortName: map['shortName'] as String,
+        color: map['color'] as int,
+        isWork: (map['isWork'] as int) == 1,
+        startTime: map['startTime'] as String? ?? '08:00',
+        endTime: map['endTime'] as String? ?? '20:00',
+      );
+
+  bool get isNightShift {
+    if (!isWork || !startTime.contains(':') || !endTime.contains(':'))
+      return false;
+    try {
+      final s = startTime.split(':').map(int.parse).toList();
+      final e = endTime.split(':').map(int.parse).toList();
+      final startMin = s[0] * 60 + s[1];
+      final endMin = e[0] * 60 + e[1];
+      return endMin <= startMin; // смена переходит через полночь
+    } catch (_) {
+      return false;
+    }
+  }
 
   double get durationHours {
     if (!isWork) return 0.0;
@@ -116,10 +130,10 @@ class ShiftOverride {
   });
 
   Map<String, dynamic> toMap() => {
-    'shiftId': shiftId,
-    'customStartTime': customStartTime,
-    'customEndTime': customEndTime,
-  };
+        'shiftId': shiftId,
+        'customStartTime': customStartTime,
+        'customEndTime': customEndTime,
+      };
 
   factory ShiftOverride.fromDynamic(dynamic val) {
     if (val is String) {
@@ -201,6 +215,11 @@ class ShiftScheduleState {
     final shiftId = cycleShiftIds[cycleIndex];
 
     return allTypes[shiftId];
+  }
+
+  bool isWorkDay(DateTime date) {
+    final shift = getShiftForDate(date);
+    return shift?.isWork ?? false;
   }
 }
 
@@ -308,8 +327,7 @@ class ShiftNotifier extends Notifier<ShiftState> {
           return ShiftScheduleState(
             id: schedId,
             name: r['name'] as String? ?? 'График',
-            startDate:
-                DateTime.tryParse(r['start_date'] as String? ?? '') ??
+            startDate: DateTime.tryParse(r['start_date'] as String? ?? '') ??
                 DateTime.now(),
             cycleShiftIds: cycle,
             overrides: over,
@@ -615,7 +633,6 @@ class ShiftNotifier extends Notifier<ShiftState> {
         whereArgs: [startIso, endIso],
       );
 
-      // Если синхронизация отключена в настройках — очищаем и выходим
       if (!isSyncEnabled) {
         try {
           SyncService.instance.syncAll();
@@ -635,23 +652,25 @@ class ShiftNotifier extends Notifier<ShiftState> {
             final eventId = _uuid.v4();
             final nowIso = DateTime.now().toIso8601String();
 
-            await db.insert('calendar_events', {
-              'id': eventId,
-              'title': '${schedule.name}: ${shift.name}',
-              'date': dateStr,
-              'end_date': dateStr,
-              'start_time': shift.startTime,
-              'end_time': shift.endTime,
-              'is_all_day': 0,
-              'calendar': 'Смены',
-              'color': shift.color,
-              'description':
-                  'График: ${schedule.name} [${schedule.id}]\nВремя: ${shift.startTime} - ${shift.endTime}',
-              'is_synced': 0,
-              'updated_at': nowIso,
-            }, conflictAlgorithm: ConflictAlgorithm.replace);
+            await db.insert(
+                'calendar_events',
+                {
+                  'id': eventId,
+                  'title': '${schedule.name}: ${shift.name}',
+                  'date': dateStr,
+                  'end_date': dateStr,
+                  'start_time': shift.startTime,
+                  'end_time': shift.endTime,
+                  'is_all_day': 0,
+                  'calendar': 'Смены',
+                  'color': shift.color,
+                  'description':
+                      'График: ${schedule.name} [${schedule.id}]\nВремя: ${shift.startTime} - ${shift.endTime}',
+                  'is_synced': 0,
+                  'updated_at': nowIso,
+                },
+                conflictAlgorithm: ConflictAlgorithm.replace);
 
-            // Напоминание накануне вечером
             if (remindEve) {
               final eveParts = eveTimeStr.split(':');
               final eveH = int.tryParse(eveParts[0]) ?? 20;
@@ -678,7 +697,6 @@ class ShiftNotifier extends Notifier<ShiftState> {
               }
             }
 
-            // Напоминание перед началом смены
             if (remindBefore) {
               try {
                 final startParts = shift.startTime.split(':');

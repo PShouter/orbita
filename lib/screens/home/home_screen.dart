@@ -9,6 +9,7 @@ import '../../providers/budget_provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/habits_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../providers/shift_provider.dart';
 import '../../providers/tasks_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -60,6 +61,256 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildShiftBadge(ShiftType? todayShift, Color borderColor) {
+    if (todayShift == null) return const SizedBox.shrink();
+
+    final shiftColor = Color(todayShift.color);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: shiftColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: shiftColor.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            todayShift.isWork
+                ? (todayShift.isNightShift
+                    ? Icons.nights_stay
+                    : Icons.work_outline)
+                : Icons.beach_access,
+            size: 13,
+            color: shiftColor,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            todayShift.isWork && todayShift.startTime.isNotEmpty
+                ? '${todayShift.name} (${todayShift.startTime}-${todayShift.endTime})'
+                : todayShift.name,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: shiftColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyFocusCard({
+    required List focusTasks,
+    required ShiftType? todayShift,
+    required Color cardBg,
+    required Color borderColor,
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
+    if (focusTasks.isEmpty) return const SizedBox.shrink();
+
+    final Map<String, dynamic> mainTask =
+        Map<String, dynamic>.from(focusTasks.first as Map);
+    final isDone = mainTask['done'] == true;
+    final priority =
+        (mainTask['priority'] as String? ?? 'normal').toLowerCase();
+    final time = mainTask['time'] as String?;
+    final isShiftOverlap = todayShift != null && todayShift.isWork && !isDone;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF38BDF8).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.gps_fixed,
+                  size: 16,
+                  color: Color(0xFF38BDF8),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'ФОКУС ДНЯ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: Color(0xFF38BDF8),
+                  ),
+                ),
+                const Spacer(),
+                if (priority == 'high')
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Высокий приоритет',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Transform.scale(
+                      scale: 1.15,
+                      child: Checkbox(
+                        value: isDone,
+                        activeColor: const Color(0xFF38BDF8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        onChanged: (v) {
+                          HapticFeedback.lightImpact();
+                          ref.read(tasksProvider.notifier).toggleTask(
+                                mainTask['id'].toString(),
+                                v ?? false,
+                              );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            mainTask['title'] ?? '',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: isDone ? textSecondary : textPrimary,
+                              decoration:
+                                  isDone ? TextDecoration.lineThrough : null,
+                            ),
+                          ),
+                          if (mainTask['description'] != null &&
+                              (mainTask['description'] as String)
+                                  .isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              mainTask['description'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ],
+                          if (time != null) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time,
+                                  size: 11,
+                                  color: Color(0xFF38BDF8),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  time,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF38BDF8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (isShiftOverlap) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline,
+                          size: 13,
+                          color: Colors.amber,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Сегодня смена: ${todayShift.name} (${todayShift.startTime}-${todayShift.endTime})',
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              color: Colors.amber,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
@@ -69,6 +320,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final allEvents = ref.watch(calendarProvider);
     final habits = ref.watch(habitsProvider);
     final budgetState = ref.watch(budgetProvider);
+    final shiftState = ref.watch(shiftProvider);
+
+    final activeSchedule = shiftState.activeSchedule;
+    final todayShift = activeSchedule?.getShiftForDate(today);
 
     final todayTasks = allTasks.where((t) {
       if (t['isNoDate'] == true || t['date'] == null) return false;
@@ -81,6 +336,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return false;
     }).toList();
 
+    final activeTodayTasks =
+        todayTasks.where((t) => t['done'] != true).toList();
+    activeTodayTasks.sort((a, b) {
+      final aHigh = (a['priority'] == 'high') ? 1 : 0;
+      final bHigh = (b['priority'] == 'high') ? 1 : 0;
+      if (aHigh != bHigh) return bHigh.compareTo(aHigh);
+
+      final aTime = a['time'] as String? ?? '99:99';
+      final bTime = b['time'] as String? ?? '99:99';
+      return aTime.compareTo(bTime);
+    });
+
     final todayEvents = allEvents.where((e) {
       final d = e['date'];
       if (d is DateTime) {
@@ -91,6 +358,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return false;
     }).toList();
 
+    final Color cardBg =
+        widget.isDarkMode ? const Color(0xFF161B22) : Colors.white;
     final Color textPrimary =
         widget.isDarkMode ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
     final Color textSecondary =
@@ -101,32 +370,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
-        // 1. Приветствие и дни
-        Column(
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Привет, ${profile.userName}',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: textPrimary,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Привет, ${profile.userName}',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Дней с Орбитой: ${profile.daysWithOrbita}',
+                  style: TextStyle(fontSize: 13, color: textSecondary),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Дней с Орбитой: ${profile.daysWithOrbita}',
-              style: TextStyle(fontSize: 13, color: textSecondary),
-            ),
+            _buildShiftBadge(todayShift, borderColor),
           ],
         ),
         const SizedBox(height: 14),
-
-        // 2. Блок цитаты
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: borderColor),
           ),
@@ -151,13 +424,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-
-        // 3. Блок "Календарь и Задачи"
+        const SizedBox(height: 14),
+        _buildDailyFocusCard(
+          focusTasks: activeTodayTasks,
+          todayShift: todayShift,
+          cardBg: cardBg,
+          borderColor: borderColor,
+          textPrimary: textPrimary,
+          textSecondary: textSecondary,
+        ),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor),
           ),
@@ -165,7 +444,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Левая колонка: Календарь
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,15 +518,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                 ),
-
-                // Разделитель
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 10),
                   width: 1,
                   color: borderColor,
                 ),
-
-                // Правая колонка: Задачи
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,12 +636,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // 4. Блок "Привычки"
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor),
           ),
@@ -487,12 +759,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // 5. Блок "Финансы"
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
+            color: cardBg,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor),
           ),

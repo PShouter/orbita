@@ -19,7 +19,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 17, // Повышено до 17 для миграции колонки history
+      version: 18, // Повышено до 18 для оптимизации индексов и очистки
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -309,9 +309,7 @@ class DatabaseService {
   }
 
   Future<void> _createIndexes(Database db) async {
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(habit_id, date);',
-    );
+    // Индексы связей по user_id
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);',
     );
@@ -322,6 +320,9 @@ class DatabaseService {
       'CREATE INDEX IF NOT EXISTS idx_habits_user_id ON habits(user_id);',
     );
     await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_habit_logs_date ON habit_logs(habit_id, date);',
+    );
+    await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);',
     );
     await db.execute(
@@ -329,6 +330,26 @@ class DatabaseService {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_shifts_user_id ON shift_schedules(user_id);',
+    );
+
+    // Оптимизированные индексы по датам и выборкам (версия 18)
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tasks_date_done ON tasks(date, done);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_tasks_updated_sync ON tasks(updated_at, is_synced);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_calendar_dates ON calendar_events(date, end_date);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_calendar_name ON calendar_events(calendar);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_budget_trans_date ON budget_transactions(date, is_completed);',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_delete_queue_table_record ON delete_queue(table_name, record_id);',
     );
   }
 
@@ -347,7 +368,7 @@ class DatabaseService {
           is_synced INTEGER DEFAULT 0,
           updated_at TEXT NOT NULL
         )
-      ''');
+      '''); //[cite: 17]
     }
     if (oldVersion < 15) {
       await db.execute('''
@@ -362,7 +383,7 @@ class DatabaseService {
           is_synced INTEGER DEFAULT 0,
           updated_at TEXT NOT NULL
         )
-      ''');
+      '''); //[cite: 17]
     }
     if (oldVersion < 16) {
       final shiftCols = await db.rawQuery('PRAGMA table_info(shift_schedules)');
@@ -370,7 +391,7 @@ class DatabaseService {
       if (!colNames.contains('custom_types')) {
         await db.execute(
           'ALTER TABLE shift_schedules ADD COLUMN custom_types TEXT',
-        );
+        ); //[cite: 17]
       }
 
       await db.execute('''
@@ -387,46 +408,68 @@ class DatabaseService {
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         )
-      ''');
-
-      await _createIndexes(db);
+      '''); //[cite: 17]
     }
     if (oldVersion < 17) {
-      // Добавляем недостающую колонку history в таблицу habits
       final habitCols = await db.rawQuery('PRAGMA table_info(habits)');
       final colNames = habitCols.map((c) => c['name'] as String).toSet();
       if (!colNames.contains('history')) {
-        await db.execute('ALTER TABLE habits ADD COLUMN history TEXT;');
+        await db.execute(
+            'ALTER TABLE habits ADD COLUMN history TEXT;'); //[cite: 17]
       }
     }
+    if (oldVersion < 18) {
+      // Накатываем новые оптимизированные индексы
+      await _createIndexes(db);
+    }
+  }
+
+  /// Очистка устаревших записей из очереди удаления (по умолчанию старше 30 дней)
+  Future<int> cleanupDeleteQueue({int olderThanDays = 30}) async {
+    final db = await database;
+    final threshold = DateTime.now()
+        .subtract(Duration(days: olderThanDays))
+        .toIso8601String();
+    return await db.delete(
+      'delete_queue',
+      where: 'created_at < ?',
+      whereArgs: [threshold],
+    );
+  }
+
+  /// Оптимизация дискового пространства и планов выполнения SQLite
+  Future<void> optimizeDatabase() async {
+    final db = await database;
+    await db.execute('VACUUM;');
+    await db.execute('ANALYZE;');
   }
 
   Future<void> clearAllData() async {
     final db = await database;
     await db.transaction((txn) async {
-      await txn.delete('task_categories');
-      await txn.delete('tasks');
-      await txn.delete('calendar_events');
-      await txn.delete('habits');
-      await txn.delete('habit_logs');
-      await txn.delete('notes');
-      await txn.delete('budget_accounts');
-      await txn.delete('budget_categories');
-      await txn.delete('budget_transactions');
-      await txn.delete('diary_entries');
-      await txn.delete('diaries');
-      await txn.delete('shift_schedules');
-      await txn.delete('vault_documents');
-      await txn.delete('user_calendars');
-      await txn.delete('delete_queue');
-      await txn.delete('app_settings');
-      await txn.delete('user_gamification');
-      await txn.delete('user_achievements');
+      await txn.delete('task_categories'); //[cite: 17]
+      await txn.delete('tasks'); //[cite: 17]
+      await txn.delete('calendar_events'); //[cite: 17]
+      await txn.delete('habits'); //[cite: 17]
+      await txn.delete('habit_logs'); //[cite: 17]
+      await txn.delete('notes'); //[cite: 17]
+      await txn.delete('budget_accounts'); //[cite: 17]
+      await txn.delete('budget_categories'); //[cite: 17]
+      await txn.delete('budget_transactions'); //[cite: 17]
+      await txn.delete('diary_entries'); //[cite: 17]
+      await txn.delete('diaries'); //[cite: 17]
+      await txn.delete('shift_schedules'); //[cite: 17]
+      await txn.delete('vault_documents'); //[cite: 17]
+      await txn.delete('user_calendars'); //[cite: 17]
+      await txn.delete('delete_queue'); //[cite: 17]
+      await txn.delete('app_settings'); //[cite: 17]
+      await txn.delete('user_gamification'); //[cite: 17]
+      await txn.delete('user_achievements'); //[cite: 17]
     });
   }
 
   Future<void> close() async {
     final db = _database;
-    if (db != null) await db.close();
+    if (db != null) await db.close(); //[cite: 17]
   }
 }

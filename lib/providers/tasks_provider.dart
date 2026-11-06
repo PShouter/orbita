@@ -68,10 +68,7 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
 
   Future<void> loadTasks() async {
     final db = await DatabaseService.instance.database;
-    final rows = await db.query(
-      'tasks',
-      orderBy: 'done ASC, date ASC, id ASC',
-    );
+    final rows = await db.query('tasks', orderBy: 'done ASC, date ASC, id ASC');
 
     state = rows.map((r) {
       DateTime? d;
@@ -101,6 +98,16 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
         } catch (_) {}
       }
 
+      List<String> tagsList = [];
+      if (r['tags'] != null && (r['tags'] as String).isNotEmpty) {
+        try {
+          final decoded = jsonDecode(r['tags'] as String);
+          if (decoded is List) {
+            tagsList = List<String>.from(decoded);
+          }
+        } catch (_) {}
+      }
+
       final isDone = (r['done'] as int? ?? 0) == 1;
       final status = r['status'] as String? ?? (isDone ? 'done' : 'todo');
 
@@ -123,6 +130,7 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
         'recurrence': r['recurrence'] as String? ?? 'none',
         'attachments': attachmentsList,
         'subtasks': subtasksList,
+        'tags': tagsList,
         'updated_at': r['updated_at'] as String,
       };
     }).toList();
@@ -144,6 +152,7 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
     String recurrence = 'none',
     List<String> attachments = const [],
     List<TaskMap> subtasks = const [],
+    List<String> tags = const [],
   }) async {
     final db = await DatabaseService.instance.database;
     final nowIso = DateTime.now().toIso8601String();
@@ -173,6 +182,7 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
       'recurrence': recurrence,
       'attachments': jsonEncode(attachments),
       'subtasks': jsonEncode(subtasks),
+      'tags': jsonEncode(tags),
       'is_synced': 0,
       'updated_at': nowIso,
     };
@@ -406,11 +416,7 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
     for (final id in targetIds) {
       batch.update(
         'tasks',
-        {
-          'category': newCategory,
-          'is_synced': 0,
-          'updated_at': nowIso,
-        },
+        {'category': newCategory, 'is_synced': 0, 'updated_at': nowIso},
         where: 'id = ?',
         whereArgs: [id],
       );
@@ -442,11 +448,7 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
     for (final t in overdueTasks) {
       batch.update(
         'tasks',
-        {
-          'date': todayIso,
-          'is_synced': 0,
-          'updated_at': nowIso,
-        },
+        {'date': todayIso, 'is_synced': 0, 'updated_at': nowIso},
         where: 'id = ?',
         whereArgs: [t['id']],
       );

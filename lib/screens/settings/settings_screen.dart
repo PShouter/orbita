@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../services/sync_service.dart';
-import 'sections/habit_settings_screen.dart';
 import '../info/app_info_screen.dart';
 import 'bottom_bar_settings_screen.dart';
 import 'sections/budget_settings_screen.dart';
 import 'sections/calendar_settings_screen.dart';
 import 'sections/diary_settings_screen.dart';
+import 'sections/habit_settings_screen.dart';
 import 'sections/notes_settings_screen.dart';
 import 'sections/shifts_settings_screen.dart';
 import 'sections/tasks_settings_screen.dart';
@@ -95,7 +95,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSectionHeader('Синхронизация', textSecondary),
           Material(
             color: cardBg,
-            borderRadius: BorderRadius.circular(16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: borderColor),
@@ -156,7 +155,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSectionHeader('Настройки разделов', textSecondary),
           Material(
             color: cardBg,
-            borderRadius: BorderRadius.circular(16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: borderColor),
@@ -243,7 +241,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSectionHeader('Интерфейс и навигация', textSecondary),
           Material(
             color: cardBg,
-            borderRadius: BorderRadius.circular(16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: borderColor),
@@ -281,7 +278,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSectionHeader('Информация', textSecondary),
           Material(
             color: cardBg,
-            borderRadius: BorderRadius.circular(16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: borderColor),

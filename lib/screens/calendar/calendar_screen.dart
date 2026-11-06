@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/calendar_provider.dart';
@@ -731,8 +730,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     Color textPrimary,
     Color textSecondary,
   ) {
-    final startOfWeek = _selectedDate
-        .subtract(Duration(days: _selectedDate.weekday - 1));
+    final startOfWeek =
+        _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
 
     return Column(
       children: [
@@ -789,9 +788,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         '${d.day}',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight:
-                              isSel || isToday ? FontWeight.bold : FontWeight.w500,
-                          color: isToday ? const Color(0xFF38BDF8) : textPrimary,
+                          fontWeight: isSel || isToday
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          color:
+                              isToday ? const Color(0xFF38BDF8) : textPrimary,
                         ),
                       ),
                     ],

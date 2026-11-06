@@ -12,13 +12,32 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 
-    // Принудительно задаем compileSdk = 36 для всех модулей и плагинов
-    afterEvaluate {
-        if (plugins.hasPlugin("com.android.library") || plugins.hasPlugin("com.android.application")) {
-            val android = extensions.findByName("android")
-            if (android is com.android.build.gradle.BaseExtension) {
-                android.compileSdkVersion(36)
+    // Принудительно выравниваем все библиотеки на Java 17
+    pluginManager.withPlugin("com.android.library") {
+        configure<com.android.build.gradle.LibraryExtension> {
+            compileSdk = 36
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
             }
+        }
+    }
+
+    pluginManager.withPlugin("com.android.application") {
+        configure<com.android.build.gradle.AppExtension> {
+            compileSdkVersion(36)
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+        }
+    }
+
+    // Выравниваем Kotlin на JVM 17 для всех модулей и отключаем строгую валидацию
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            freeCompilerArgs.add("-Xjvm-default=all")
         }
     }
 }

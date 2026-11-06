@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -13,17 +15,39 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> init({Function(String payload)? onSelectNotification}) async {
+    // 1. Инициализация базы часовых поясов
     tz.initializeTimeZones();
+
+    // 2. Определение и установка точного локального часового пояса устройства
+    try {
+      final dynamic currentTimeZone = await FlutterTimezone.getLocalTimezone();
+      final String timeZoneName = currentTimeZone.toString();
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      debugPrint(
+          'NotificationService: установлен локальный часовой пояс $timeZoneName');
+    } catch (e) {
+      debugPrint(
+          'NotificationService: ошибка определения часового пояса ($e), fallback to local offset');
+      try {
+        final offset = DateTime.now().timeZoneOffset;
+        final hours = offset.inHours;
+        final sign = hours >= 0 ? '+' : '-';
+        final locationName = 'Etc/GMT$sign${hours.abs()}';
+        tz.setLocalLocation(tz.getLocation(locationName));
+      } catch (_) {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+      }
+    }
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
-        );
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
 
     final InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
@@ -39,26 +63,21 @@ class NotificationService {
       },
     );
 
-    // Запрашиваем только стандартное разрешение на показ уведомлений в шторке
     if (Platform.isAndroid) {
-      final androidImplementation = _notificationsPlugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
+      final androidImplementation =
+          _notificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
 
       await androidImplementation?.requestNotificationsPermission();
-      // Вызов requestExactAlarmsPermission намеренно исключен,
-      // чтобы система не перенаправляла в настройки при старте.
     }
   }
 
-  /// Ручной переход в системные настройки (только по желанию пользователя из меню Настройки)
+  /// Ручной переход в настройки точных будильников
   Future<void> openExactAlarmSettings() async {
     if (!Platform.isAndroid) return;
-    final androidPlugin = _notificationsPlugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final androidPlugin =
+        _notificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.requestExactAlarmsPermission();
   }
 
@@ -104,11 +123,14 @@ class NotificationService {
   }) async {
     if (scheduledDate.isBefore(DateTime.now())) return;
 
+    // Конвертация в локальное TZDateTime
+    final tzScheduledDate = tz.TZDateTime.from(scheduledDate, tz.local);
+
     await _notificationsPlugin.zonedSchedule(
       id,
       title,
       body,
-      tz.TZDateTime.from(scheduledDate, tz.local),
+      tzScheduledDate,
       NotificationDetails(
         android: AndroidNotificationDetails(
           channelId,

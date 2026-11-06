@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/tasks_provider.dart';
 
+typedef TaskItem = Map<String, dynamic>;
+
 class TaskEditScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? initialTask;
 
@@ -33,7 +35,7 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
   String _status = 'todo';
   Color _selectedColor = const Color(0xFF38BDF8);
 
-  final List> _subtasks = [];
+  final List<TaskItem> _subtasks = [];
   final List<String> _attachments = [];
   final List<String> _tags = [];
   String _enterKeyBehavior = 'new_subtask';
@@ -138,10 +140,14 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
         }
       }
       if (t['attachments'] != null && t['attachments'] is Iterable) {
-        _attachments.addAll(List<String>.from(t['attachments']));
+        for (final item in t['attachments']) {
+          _attachments.add(item.toString());
+        }
       }
       if (t['tags'] != null && t['tags'] is Iterable) {
-        _tags.addAll(List<String>.from(t['tags']));
+        for (final item in t['tags']) {
+          _tags.add(item.toString());
+        }
       }
     } else {
       _selectedDate = DateTime.now();
@@ -316,9 +322,13 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
         ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
         : null;
 
-    final cleanedSubtasks = _subtasks
-        .where((s) => (s['title'] as String).trim().isNotEmpty)
-        .toList();
+    final List<TaskItem> cleanedSubtasks = [];
+    for (final s in _subtasks) {
+      final tStr = s['title'] as String? ?? '';
+      if (tStr.trim().isNotEmpty) {
+        cleanedSubtasks.add(Map<String, dynamic>.from(s));
+      }
+    }
 
     ref.read(tasksProvider.notifier).saveTask(
           id: widget.initialTask?['id'],
@@ -384,7 +394,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // 1. Выбор категории
           Row(
             children: [
               const Text(
@@ -431,8 +440,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             ],
           ),
           const SizedBox(height: 8),
-
-          // 2. Выбор цвета полоски
           SizedBox(
             height: 36,
             child: ListView.separated(
@@ -464,8 +471,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             ),
           ),
           const SizedBox(height: 12),
-
-          // 3. Заголовок
           TextField(
             controller: _titleController,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -476,8 +481,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // 3.1. Теги задачи
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -508,8 +511,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
               }).toList(),
             ),
           const SizedBox(height: 12),
-
-          // 4. Подзадачи
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -582,8 +583,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             }),
           ],
           const SizedBox(height: 12),
-
-          // 5. Дата и "Без срока"
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -607,8 +606,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             value: _isNoDate,
             onChanged: (val) => setState(() => _isNoDate = val),
           ),
-
-          // 6. Время и "Весь день"
           if (!_isNoDate) ...[
             ListTile(
               dense: true,
@@ -635,8 +632,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             ),
           ],
           const Divider(height: 24),
-
-          // 7. Напоминание
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -662,8 +657,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
               },
             ),
           ),
-
-          // 8. Повтор
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -699,8 +692,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
               },
             ),
           ),
-
-          // 9. Приоритет
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -720,8 +711,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
               },
             ),
           ),
-
-          // 10. Статус
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
@@ -742,8 +731,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             ),
           ),
           const Divider(height: 24),
-
-          // 11. Описание / Заметка
           TextField(
             controller: _descController,
             maxLines: 4,
@@ -754,8 +741,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // 12. Вложения
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -813,8 +798,6 @@ class _TaskEditScreenState extends ConsumerState<TaskEditScreen> {
             }),
           ],
           const SizedBox(height: 32),
-
-          // 13. Удаление
           if (isEdit)
             Align(
               alignment: Alignment.centerRight,
