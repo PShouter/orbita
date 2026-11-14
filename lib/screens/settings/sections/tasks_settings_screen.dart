@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../providers/tasks_provider.dart';
+import '../../../theme/app_theme.dart';
 
 class TasksSettingsScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -25,7 +26,7 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
   int _snoozeDurationMinutes = 15;
 
   // Подзадачи
-  String _enterKeyBehavior = 'new_subtask'; // 'new_subtask' | 'newline'
+  String _enterKeyBehavior = 'new_subtask';
   bool _autoCompleteSubtasksWithParent = true;
 
   @override
@@ -40,8 +41,7 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
       _defaultCategory = prefs.getString('task_default_category') ?? 'Личное';
       _taskEnableDrag = prefs.getBool('task_enable_drag') ?? true;
 
-      _notificationSoundTitle =
-          prefs.getString('task_notif_sound_title') ??
+      _notificationSoundTitle = prefs.getString('task_notif_sound_title') ??
           'По умолчанию (системный)';
       _snoozeReminderEnabled =
           prefs.getBool('task_snooze_reminder_enabled') ?? true;
@@ -91,7 +91,7 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
     setState(() => _autoCompleteSubtasksWithParent = val);
   }
 
-  Future<void> _pickNotificationSound() async {
+  Future<void> _pickNotificationSound(AppColorsExtension colors) async {
     final options = [
       'По умолчанию (системный)',
       'Сигнал задачи (Орбита)',
@@ -103,18 +103,28 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
     final selected = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: widget.isDarkMode
-            ? const Color(0xFF161B22)
-            : Colors.white,
-        title: const Text('Сигнал напоминания'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Сигнал напоминания',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: options.map((sound) {
             return RadioListTile<String>(
-              title: Text(sound),
+              title: Text(
+                sound,
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               value: sound,
               groupValue: _notificationSoundTitle,
-              activeColor: const Color(0xFF38BDF8),
+              activeColor: colors.accent,
               onChanged: (val) => Navigator.pop(ctx, val),
             );
           }).toList(),
@@ -132,30 +142,32 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final categories = ref.watch(taskCategoriesProvider);
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     final effectiveCategory = categories.contains(_defaultCategory)
         ? _defaultCategory
         : (categories.isNotEmpty ? categories.first : 'Личное');
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Настройки задач'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Настройки задач',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -165,32 +177,37 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.folder_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Категория по умолчанию',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Назначается при создании новой задачи: $effectiveCategory',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
                   trailing: DropdownButton<String>(
                     value: effectiveCategory,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -204,22 +221,29 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.drag_indicator,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Перетаскивание задач',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Позволяет менять порядок задач вручную в списке',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _taskEnableDrag,
                   onChanged: (v) => _setTaskEnableDrag(v ?? true),
                 ),
@@ -233,45 +257,57 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.music_note_outlined,
-                    color: Colors.purpleAccent,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Сигнал уведомления',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _notificationSoundTitle,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: _pickNotificationSound,
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
+                  onTap: () => _pickNotificationSound(colors),
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(Icons.snooze, color: Colors.amber),
+                  secondary: Icon(Icons.snooze, color: colors.warning),
                   title: Text(
                     'Отложить напоминание о задаче',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Отображать действие «Отложить» в системном уведомлении',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _snoozeReminderEnabled,
                   onChanged: (v) => _setSnoozeReminderEnabled(v ?? false),
                 ),
@@ -282,6 +318,7 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
                     title: Text(
                       'Продолжительность откладывания',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontWeight: FontWeight.w500,
                         color: textPrimary,
                         fontSize: 14,
@@ -292,6 +329,7 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
                       underline: const SizedBox(),
                       dropdownColor: cardBg,
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         color: textPrimary,
                         fontWeight: FontWeight.bold,
                       ),
@@ -317,19 +355,20 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.keyboard_return,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Клавиша Enter в подзадачах',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
@@ -338,13 +377,17 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
                     _enterKeyBehavior == 'new_subtask'
                         ? 'Создать новую подзадачу'
                         : 'Вставить перенос строки',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
                   trailing: DropdownButton<String>(
                     value: _enterKeyBehavior,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -365,28 +408,36 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.done_all,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Автоматическое завершение подзадач',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Выполнять все подзадачи вместе с основной задачей',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _autoCompleteSubtasksWithParent,
                   onChanged: (v) => _setAutoCompleteSubtasks(v ?? true),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -398,6 +449,7 @@ class _TasksSettingsScreenState extends ConsumerState<TasksSettingsScreen> {
       child: Text(
         title,
         style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,

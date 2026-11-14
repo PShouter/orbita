@@ -71,8 +71,9 @@ class ShiftType {
       );
 
   bool get isNightShift {
-    if (!isWork || !startTime.contains(':') || !endTime.contains(':'))
+    if (!isWork || !startTime.contains(':') || !endTime.contains(':')) {
       return false;
+    }
     try {
       final s = startTime.split(':').map(int.parse).toList();
       final e = endTime.split(':').map(int.parse).toList();

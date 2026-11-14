@@ -11,6 +11,7 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../providers/budget_provider.dart';
+import '../../../theme/app_theme.dart';
 
 class BudgetSettingsScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -22,23 +23,19 @@ class BudgetSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
-  // 1. Основные параметры
   String _currency = '₽';
   int _salaryDay = 1;
   bool _includeDebtsInFreeMoney = true;
 
-  // 2. Лимиты и контроль трат
   bool _showDailySafeLimit = true;
   bool _warnOnOverspend = true;
 
-  // 3. Напоминания
   bool _remindPlannedOps = true;
   TimeOfDay _plannedRemindTime = const TimeOfDay(hour: 9, minute: 0);
   bool _eveningExpenseCheck = true;
   TimeOfDay _eveningCheckTime = const TimeOfDay(hour: 21, minute: 0);
   String _soundTitle = 'По умолчанию (системный)';
 
-  // 4. Приватность
   bool _hideBalancesOnHome = false;
 
   @override
@@ -73,8 +70,7 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
         minute: int.tryParse(eveParts[1]) ?? 0,
       );
 
-      _soundTitle =
-          prefs.getString('budget_notif_sound_title') ??
+      _soundTitle = prefs.getString('budget_notif_sound_title') ??
           'По умолчанию (системный)';
       _hideBalancesOnHome = prefs.getBool('budget_hide_balances') ?? false;
     });
@@ -135,7 +131,7 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
     }
   }
 
-  Future<void> _pickNotificationSound() async {
+  Future<void> _pickNotificationSound(AppColorsExtension colors) async {
     final options = [
       'По умолчанию (системный)',
       'Звон монет (Орбита)',
@@ -147,18 +143,28 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
     final selected = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: widget.isDarkMode
-            ? const Color(0xFF161B22)
-            : Colors.white,
-        title: const Text('Сигнал напоминания'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Сигнал напоминания',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: options.map((sound) {
             return RadioListTile<String>(
-              title: Text(sound),
+              title: Text(
+                sound,
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               value: sound,
               groupValue: _soundTitle,
-              activeColor: const Color(0xFF8B5CF6),
+              activeColor: colors.accent,
               onChanged: (val) => Navigator.pop(ctx, val),
             );
           }).toList(),
@@ -240,7 +246,7 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
     );
   }
 
-  Future<void> _exportMonthlyReportCsv() async {
+  Future<void> _exportMonthlyReportCsv(AppColorsExtension colors) async {
     final budget = ref.read(budgetProvider);
     final now = DateTime.now();
 
@@ -269,9 +275,12 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Отчет CSV успешно сохранен'),
-          backgroundColor: Color(0xFF10B981),
+        SnackBar(
+          content: const Text(
+            'Отчет CSV успешно сохранен',
+            style: TextStyle(fontFamily: 'Onest'),
+          ),
+          backgroundColor: colors.success,
         ),
       );
     }
@@ -279,60 +288,67 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Настройки бюджета'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Настройки бюджета',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
-          // 1. ОСНОВНЫЕ ПАРАМЕТРЫ
           _buildSectionHeader('ОСНОВНЫЕ ПАРАМЕТРЫ', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.currency_ruble,
-                    color: Color(0xFF8B5CF6),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Основная валюта',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Используется для расчетов и балансов',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<String>(
                     value: _currency,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -352,26 +368,32 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.calendar_month_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'День начала фин. месяца',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'День зарплаты: $_salaryDay число каждого месяца',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<int>(
                     value: _salaryDay,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -394,22 +416,28 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.account_balance_wallet_outlined,
-                    color: Colors.amber,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Вычитать долги и кредиты',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Учитывать задолженности при расчете «Свободных денег»',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF8B5CF6),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _includeDebtsInFreeMoney,
                   onChanged: (v) => _updateBool(
                     'budget_include_debts',
@@ -421,31 +449,35 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // 2. ЛИМИТЫ И КОНТРОЛЬ ТРАТ
           _buildSectionHeader('ЛИМИТЫ И КОНТРОЛЬ ТРАТ', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(Icons.speed, color: Color(0xFF10B981)),
+                  secondary: Icon(Icons.speed, color: colors.success),
                   title: Text(
                     'Показывать «Безопасно в день»',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Рекомендуемый дневной бюджет до конца периода',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF8B5CF6),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _showDailySafeLimit,
                   onChanged: (v) => _updateBool(
                     'budget_show_daily_limit',
@@ -455,22 +487,28 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.notification_important_outlined,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
                   title: Text(
                     'Предупреждать о перерасходе',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Оповещать, если дневные траты превысили норму',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF8B5CF6),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _warnOnOverspend,
                   onChanged: (v) => _updateBool(
                     'budget_warn_overspend',
@@ -482,34 +520,38 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // 3. НАПОМИНАНИЯ
           _buildSectionHeader('НАПОМИНАНИЯ', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.event_note_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Напоминание о запланированных платежах',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Уведомлять в день оплаты счетов и поступлений',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF8B5CF6),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _remindPlannedOps,
                   onChanged: (v) => _updateBool(
                     'budget_remind_planned',
@@ -523,13 +565,19 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                     leading: const SizedBox(width: 24),
                     title: Text(
                       'Время утреннего напоминания',
-                      style: TextStyle(color: textPrimary, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textPrimary,
+                        fontSize: 14,
+                      ),
                     ),
                     trailing: Text(
                       '${_plannedRemindTime.hour.toString().padLeft(2, '0')}:${_plannedRemindTime.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        color: Color(0xFF8B5CF6),
-                        fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                        fontFamily: 'Unbounded',
+                        color: colors.accent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
                     ),
                     onTap: () => _pickTime(
@@ -541,22 +589,28 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                 ],
                 Divider(height: 1, color: borderColor),
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.nights_stay_outlined,
-                    color: Colors.purpleAccent,
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Вечерний запрос внесения трат',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Напоминать записать расходы за прошедший день',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF8B5CF6),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _eveningExpenseCheck,
                   onChanged: (v) => _updateBool(
                     'budget_evening_check',
@@ -570,13 +624,19 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                     leading: const SizedBox(width: 24),
                     title: Text(
                       'Время вечернего напоминания',
-                      style: TextStyle(color: textPrimary, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textPrimary,
+                        fontSize: 14,
+                      ),
                     ),
                     trailing: Text(
                       '${_eveningCheckTime.hour.toString().padLeft(2, '0')}:${_eveningCheckTime.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        color: Color(0xFF8B5CF6),
-                        fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                        fontFamily: 'Unbounded',
+                        color: colors.accent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
                     ),
                     onTap: () => _pickTime(
@@ -588,56 +648,66 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                 ],
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.music_note_outlined,
-                    color: Colors.amber,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Сигнал уведомления',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _soundTitle,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: _pickNotificationSound,
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
+                  onTap: () => _pickNotificationSound(colors),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
-
-          // 4. ПРИВАТНОСТЬ И ЭКСПОРТ
           _buildSectionHeader('ПРИВАТНОСТЬ И ЭКСПОРТ', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.visibility_off_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Скрывать балансы («Режим приватности»)',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Маскировать суммы на главном экране звездочками ••••',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF8B5CF6),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _hideBalancesOnHome,
                   onChanged: (v) => _updateBool(
                     'budget_hide_balances',
@@ -647,48 +717,60 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.picture_as_pdf_outlined,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
                   title: Text(
                     'Экспорт отчета в PDF',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Финансовая выписка за текущий месяц для печати',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.download_outlined, size: 22),
+                  trailing: Icon(Icons.download_outlined,
+                      size: 22, color: colors.accent),
                   onTap: _exportMonthlyReportPdf,
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.table_chart_outlined,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Экспорт в Excel / CSV',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Таблица всех операций за текущий месяц',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.file_download_outlined, size: 22),
-                  onTap: _exportMonthlyReportCsv,
+                  trailing: Icon(Icons.file_download_outlined,
+                      size: 22, color: colors.accent),
+                  onTap: () => _exportMonthlyReportCsv(colors),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -700,6 +782,7 @@ class _BudgetSettingsScreenState extends ConsumerState<BudgetSettingsScreen> {
       child: Text(
         title,
         style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,

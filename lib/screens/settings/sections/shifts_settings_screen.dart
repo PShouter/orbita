@@ -11,6 +11,7 @@ import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../providers/shift_provider.dart';
+import '../../../theme/app_theme.dart';
 
 class ShiftsSettingsScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -61,8 +62,7 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
 
       _remindBeforeShift = prefs.getBool('shifts_remind_before') ?? true;
       _remindBeforeMinutes = prefs.getInt('shifts_remind_before_minutes') ?? 90;
-      _soundTitle =
-          prefs.getString('shifts_notif_sound_title') ??
+      _soundTitle = prefs.getString('shifts_notif_sound_title') ??
           'По умолчанию (системный)';
 
       _highlightWeekends = prefs.getBool('shifts_highlight_weekends') ?? true;
@@ -108,7 +108,7 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
     }
   }
 
-  Future<void> _pickNotificationSound() async {
+  Future<void> _pickNotificationSound(AppColorsExtension colors) async {
     final options = [
       'По умолчанию (системный)',
       'Космическая вахта (Орбита)',
@@ -120,18 +120,28 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
     final selected = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: widget.isDarkMode
-            ? const Color(0xFF161B22)
-            : Colors.white,
-        title: const Text('Сигнал напоминания'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Сигнал напоминания',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: options.map((sound) {
             return RadioListTile<String>(
-              title: Text(sound),
+              title: Text(
+                sound,
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               value: sound,
               groupValue: _soundTitle,
-              activeColor: const Color(0xFF38BDF8),
+              activeColor: colors.accent,
               onChanged: (val) => Navigator.pop(ctx, val),
             );
           }).toList(),
@@ -208,7 +218,7 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
     );
   }
 
-  Future<void> _exportScheduleCsv() async {
+  Future<void> _exportScheduleCsv(AppColorsExtension colors) async {
     final schedule = ref.read(shiftProvider).activeSchedule;
     if (schedule == null) return;
 
@@ -241,9 +251,12 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Табель в формате CSV успешно выгружен'),
-          backgroundColor: Color(0xFF10B981),
+        SnackBar(
+          content: const Text(
+            'Табель в формате CSV успешно выгружен',
+            style: TextStyle(fontFamily: 'Onest'),
+          ),
+          backgroundColor: colors.success,
         ),
       );
     }
@@ -251,25 +264,27 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Настройки графика смен'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Настройки графика смен',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -279,28 +294,34 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.sync_alt,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Дублировать смены в календарь',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Рабочие смены автоматически появятся в календаре Орбиты',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF38BDF8),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _syncWithMainCalendar,
                   onChanged: (v) => _updateBool(
                     'shifts_sync_main_calendar',
@@ -315,6 +336,7 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                     title: Text(
                       'Горизонт синхронизации',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontWeight: FontWeight.w500,
                         color: textPrimary,
                         fontSize: 14,
@@ -322,13 +344,18 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                     ),
                     subtitle: Text(
                       'На сколько вперед переносить график',
-                      style: TextStyle(color: textSecondary, fontSize: 12),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                     trailing: DropdownButton<int>(
                       value: _syncHorizonMonths,
                       underline: const SizedBox(),
                       dropdownColor: cardBg,
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         color: textPrimary,
                         fontWeight: FontWeight.bold,
                       ),
@@ -363,28 +390,34 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.nightlight_outlined,
-                    color: Colors.indigoAccent,
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Напоминание накануне вечером',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Напомнить о завтрашней рабочей смене',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF38BDF8),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _remindEveningBefore,
                   onChanged: (v) => _updateBool(
                     'shifts_remind_evening',
@@ -398,13 +431,19 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                     leading: const SizedBox(width: 24),
                     title: Text(
                       'Время вечернего напоминания',
-                      style: TextStyle(color: textPrimary, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textPrimary,
+                        fontSize: 14,
+                      ),
                     ),
                     trailing: Text(
                       '${_eveningReminderTime.hour.toString().padLeft(2, '0')}:${_eveningReminderTime.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        color: Color(0xFF38BDF8),
-                        fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                        fontFamily: 'Unbounded',
+                        color: colors.accent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
                     ),
                     onTap: _pickEveningTime,
@@ -412,19 +451,25 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                 ],
                 Divider(height: 1, color: borderColor),
                 SwitchListTile(
-                  secondary: const Icon(Icons.alarm, color: Colors.amber),
+                  secondary: Icon(Icons.alarm, color: colors.warning),
                   title: Text(
                     'Напоминание перед началом смены',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Заблаговременный сигнал перед выходом на работу',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF38BDF8),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _remindBeforeShift,
                   onChanged: (v) => _updateBool(
                     'shifts_remind_before',
@@ -438,13 +483,18 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                     leading: const SizedBox(width: 24),
                     title: Text(
                       'За сколько предупреждать',
-                      style: TextStyle(color: textPrimary, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textPrimary,
+                        fontSize: 14,
+                      ),
                     ),
                     trailing: DropdownButton<int>(
                       value: _remindBeforeMinutes,
                       underline: const SizedBox(),
                       dropdownColor: cardBg,
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         color: textPrimary,
                         fontWeight: FontWeight.bold,
                       ),
@@ -468,23 +518,29 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                 ],
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.music_note_outlined,
-                    color: Colors.purpleAccent,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Сигнал уведомления',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _soundTitle,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: _pickNotificationSound,
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
+                  onTap: () => _pickNotificationSound(colors),
                 ),
               ],
             ),
@@ -496,28 +552,36 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.weekend_outlined,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
                   title: Text(
                     'Выделять календарные выходные',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Подсвечивать субботы и воскресенья в шапке календаря',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _highlightWeekends,
                   onChanged: (v) => _updateBool(
                     'shifts_highlight_weekends',
@@ -527,22 +591,30 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.access_time_outlined,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Показывать время смены в ячейке',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Отображать часы (например, 08:00) внутри блока дня',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _showTimeInDayCell,
                   onChanged: (v) => _updateBool(
                     'shifts_show_time_in_cell',
@@ -552,22 +624,30 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.query_stats,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Нижняя панель статистики',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Показывать число рабочих/выходных дней и сумму часов за месяц',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _showMonthlyStats,
                   onChanged: (v) => _updateBool(
                     'shifts_show_monthly_stats',
@@ -585,54 +665,66 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.picture_as_pdf_outlined,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
                   title: Text(
                     'Экспорт графика в PDF',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Создать табель для печати на текущий месяц',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.download_outlined, size: 22),
+                  trailing: Icon(Icons.download_outlined,
+                      size: 22, color: colors.accent),
                   onTap: _exportSchedulePdf,
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.table_chart_outlined,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Экспорт в Excel / CSV',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Выгрузка таблицы рабочих часов в файл',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.file_download_outlined, size: 22),
-                  onTap: _exportScheduleCsv,
+                  trailing: Icon(Icons.file_download_outlined,
+                      size: 22, color: colors.accent),
+                  onTap: () => _exportScheduleCsv(colors),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -644,6 +736,7 @@ class _ShiftsSettingsScreenState extends ConsumerState<ShiftsSettingsScreen> {
       child: Text(
         title,
         style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,

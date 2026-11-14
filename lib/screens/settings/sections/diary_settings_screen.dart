@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../theme/app_theme.dart';
 import 'diary_lock_settings_screen.dart';
 
 class DiarySettingsScreen extends StatefulWidget {
@@ -40,8 +41,7 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
         minute: int.parse(parts[1]),
       );
 
-      _soundTitle =
-          prefs.getString('diary_notif_sound_title') ??
+      _soundTitle = prefs.getString('diary_notif_sound_title') ??
           'По умолчанию (системный)';
     });
   }
@@ -69,7 +69,7 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
     }
   }
 
-  Future<void> _pickNotificationSound() async {
+  Future<void> _pickNotificationSound(AppColorsExtension colors) async {
     final options = [
       'По умолчанию (системный)',
       'Звездная пыль (Орбита)',
@@ -81,18 +81,28 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
     final selected = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: widget.isDarkMode
-            ? const Color(0xFF161B22)
-            : Colors.white,
-        title: const Text('Сигнал напоминания'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Сигнал напоминания',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: options.map((sound) {
             return RadioListTile<String>(
-              title: Text(sound),
+              title: Text(
+                sound,
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               value: sound,
               groupValue: _soundTitle,
-              activeColor: const Color(0xFF38BDF8),
+              activeColor: colors.accent,
               onChanged: (val) => Navigator.pop(ctx, val),
             );
           }).toList(),
@@ -110,25 +120,27 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Настройки дневника'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Настройки дневника',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -138,30 +150,37 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.mood, color: Colors.amber),
+                  leading: Icon(Icons.mood, color: colors.warning),
                   title: Text(
                     'Стиль настроения',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Выбор набора смайлов и эмоций',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
                           'Выбор стиля настроения будет доступен в следующем обновлении',
+                          style: TextStyle(fontFamily: 'Onest'),
                         ),
                       ),
                     );
@@ -169,10 +188,11 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(Icons.security, color: Color(0xFF38BDF8)),
+                  leading: Icon(Icons.security, color: colors.accent),
                   title: Text(
                     'Блокировка дневника',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
@@ -180,22 +200,21 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
                   subtitle: Text(
                     _isLockEnabled ? 'Включена (код / биометрия)' : 'Выключена',
                     style: TextStyle(
-                      color: _isLockEnabled
-                          ? const Color(0xFF10B981)
-                          : textSecondary,
+                      fontFamily: 'Onest',
+                      color: _isLockEnabled ? colors.success : textSecondary,
                       fontSize: 12,
-                      fontWeight: _isLockEnabled
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                          _isLockEnabled ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
                   onTap: () async {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => DiaryLockSettingsScreen(
-                          isDarkMode: widget.isDarkMode,
+                          isDarkMode: colors.isDark,
                         ),
                       ),
                     );
@@ -204,22 +223,30 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.blur_on,
-                    color: Colors.purpleAccent,
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Скрывать превью текста',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Размывать текст в списке записей для приватности',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _hidePreviewInList,
                   onChanged: (v) async {
                     final prefs = await SharedPreferences.getInstance();
@@ -237,28 +264,34 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.notifications_active_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Напоминание о записи',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Ежедневное напоминание подвести итоги дня',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeThumbColor: const Color(0xFF38BDF8),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _eveningReminder,
                   onChanged: (v) async {
                     final prefs = await SharedPreferences.getInstance();
@@ -269,49 +302,59 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
                 if (_eveningReminder) ...[
                   Divider(height: 1, color: borderColor),
                   ListTile(
-                    leading: const Icon(Icons.access_time, color: Colors.amber),
+                    leading: Icon(Icons.access_time, color: colors.warning),
                     title: Text(
                       'Время напоминания',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontWeight: FontWeight.w600,
                         color: textPrimary,
                       ),
                     ),
                     subtitle: Text(
                       '${_reminderTime.hour.toString().padLeft(2, '0')}:${_reminderTime.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        color: Color(0xFF38BDF8),
-                        fontWeight: FontWeight.bold,
+                      style: TextStyle(
+                        fontFamily: 'Unbounded',
+                        color: colors.accent,
+                        fontWeight: FontWeight.w600,
                         fontSize: 13,
                       ),
                     ),
-                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    trailing: Icon(Icons.chevron_right,
+                        size: 20, color: textSecondary),
                     onTap: _pickReminderTime,
                   ),
                   Divider(height: 1, color: borderColor),
                   ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.music_note_outlined,
-                      color: Colors.purpleAccent,
+                      color: colors.accent,
                     ),
                     title: Text(
                       'Сигнал уведомления',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontWeight: FontWeight.w600,
                         color: textPrimary,
                       ),
                     ),
                     subtitle: Text(
                       _soundTitle,
-                      style: TextStyle(color: textSecondary, fontSize: 12),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
-                    trailing: const Icon(Icons.chevron_right, size: 20),
-                    onTap: _pickNotificationSound,
+                    trailing: Icon(Icons.chevron_right,
+                        size: 20, color: textSecondary),
+                    onTap: () => _pickNotificationSound(colors),
                   ),
                 ],
               ],
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -323,6 +366,7 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
       child: Text(
         title,
         style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,

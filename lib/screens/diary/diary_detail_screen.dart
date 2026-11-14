@@ -9,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import '../../providers/diary_provider.dart';
+import '../../theme/app_theme.dart';
 
 class DiaryDetailScreen extends ConsumerStatefulWidget {
   final String? diaryId;
@@ -129,13 +130,17 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
     }
   }
 
-  Future<void> _saveManually() async {
+  Future<void> _saveManually(AppColorsExtension colors) async {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
 
     if (title.isEmpty && content.isEmpty && _images.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Заполните заголовок или текст дневника')),
+        SnackBar(
+          content: const Text('Заполните заголовок или текст дневника',
+              style: TextStyle(fontFamily: 'Onest')),
+          backgroundColor: colors.error,
+        ),
       );
       return;
     }
@@ -161,15 +166,16 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка сохранения: $e'),
-            backgroundColor: Colors.red,
+            content: Text('Ошибка сохранения: $e',
+                style: const TextStyle(fontFamily: 'Onest')),
+            backgroundColor: colors.error,
           ),
         );
       }
     }
   }
 
-  void _showWordAndCharCount() {
+  void _showWordAndCharCount(AppColorsExtension colors) {
     final text = '${_titleController.text} ${_contentController.text}'.trim();
     final chars = text.length;
     final charsWithoutSpaces = text.replaceAll(RegExp(r'\s+'), '').length;
@@ -178,31 +184,50 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Статистика текста'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Статистика текста',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Количество слов: $words',
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(
+                  fontFamily: 'Onest', color: colors.text, fontSize: 14),
             ),
             const SizedBox(height: 8),
             Text(
               'Символов (с пробелами): $chars',
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(
+                  fontFamily: 'Onest', color: colors.text, fontSize: 14),
             ),
             const SizedBox(height: 8),
             Text(
               'Символов (без пробелов): $charsWithoutSpaces',
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(
+                  fontFamily: 'Onest', color: colors.text, fontSize: 14),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Закрыть'),
+            child: Text(
+              'Закрыть',
+              style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.accent,
+                  fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -268,39 +293,39 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
     );
   }
 
-  void _showMoreMenu(BuildContext context, Color cardBg, Color textPrimary) {
+  void _showMoreMenu(BuildContext context, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardBg,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.analytics_outlined,
-                color: Color(0xFF38BDF8),
+                color: colors.accent,
               ),
               title: Text(
                 'Подсчет слов и знаков',
-                style: TextStyle(color: textPrimary),
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
               ),
               onTap: () {
                 Navigator.pop(ctx);
-                _showWordAndCharCount();
+                _showWordAndCharCount(colors);
               },
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.picture_as_pdf_outlined,
-                color: Colors.orangeAccent,
+                color: colors.warning,
               ),
               title: Text(
                 'Экспорт в PDF',
-                style: TextStyle(color: textPrimary),
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -309,13 +334,17 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
             ),
             if (_currentDiaryId != null)
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.delete_outline,
-                  color: Colors.redAccent,
+                  color: colors.error,
                 ),
-                title: const Text(
+                title: Text(
                   'Удалить дневник',
-                  style: TextStyle(color: Colors.redAccent),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -325,6 +354,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                   Navigator.pop(context);
                 },
               ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -333,18 +363,8 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final diaries = ref.watch(diaryProvider);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary =
-        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
-    final textSecondary =
-        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final borderColor =
-        isDark ? const Color(0xFF30363D) : const Color(0xFFE1E4E8);
 
     final currentIndex = diaries.indexWhere((d) => d.id == _currentDiaryId);
     final hasPrevious = currentIndex != -1 && currentIndex < diaries.length - 1;
@@ -357,32 +377,37 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
         await _handleBack();
       },
       child: Scaffold(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         appBar: AppBar(
-          backgroundColor: bg,
+          backgroundColor: colors.bg,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: textPrimary),
+            icon: Icon(Icons.arrow_back, color: colors.text),
             onPressed: _handleBack,
           ),
           actions: [
             if (_isViewMode)
               IconButton(
-                icon: const Icon(Icons.edit_outlined, color: Color(0xFF38BDF8)),
+                icon: Icon(Icons.edit_outlined, color: colors.accent),
                 tooltip: 'Редактировать',
                 onPressed: () => setState(() => _isViewMode = false),
               ),
             IconButton(
-              icon: Icon(Icons.more_vert, color: textPrimary),
+              icon: Icon(Icons.more_vert, color: colors.text),
               tooltip: 'Дополнительно',
-              onPressed: () => _showMoreMenu(context, cardBg, textPrimary),
+              onPressed: () => _showMoreMenu(context, colors),
             ),
             if (!_isViewMode)
               TextButton(
-                onPressed: _saveManually,
-                child: const Text(
+                onPressed: () => _saveManually(colors),
+                child: Text(
                   'Сохранить',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.accent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
           ],
@@ -400,37 +425,36 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       InkWell(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(13),
                         onTap: _isViewMode ? null : _pickDate,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                            vertical: 4,
-                            horizontal: 2,
+                            vertical: 6,
+                            horizontal: 4,
                           ),
                           child: Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.calendar_today,
                                 size: 18,
-                                color: Color(0xFF38BDF8),
+                                color: colors.accent,
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                DateFormat(
-                                  'd MMMM yyyy',
-                                  'ru',
-                                ).format(_selectedDate),
+                                DateFormat('d MMMM yyyy', 'ru')
+                                    .format(_selectedDate),
                                 style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: textPrimary,
+                                  fontFamily: 'Unbounded',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.text,
                                 ),
                               ),
                               if (!_isViewMode)
-                                const Icon(
+                                Icon(
                                   Icons.arrow_drop_down,
                                   size: 20,
-                                  color: Colors.grey,
+                                  color: colors.text.withValues(alpha: 0.5),
                                 ),
                             ],
                           ),
@@ -444,34 +468,35 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                                 orElse: () => defaultMoods.first,
                               )
                               .emoji,
-                          style: const TextStyle(fontSize: 26),
+                          style: const TextStyle(fontSize: 28),
                         )
                       else
                         InkWell(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                           onTap: () {
                             showModalBottomSheet(
                               context: context,
-                              backgroundColor: cardBg,
+                              backgroundColor: colors.card,
                               shape: const RoundedRectangleBorder(
                                 borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(16),
+                                  top: Radius.circular(22),
                                 ),
                               ),
                               builder: (ctx) => Padding(
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(20),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
                                       'Как ваше настроение?',
                                       style: TextStyle(
-                                        color: textPrimary,
-                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Unbounded',
+                                        color: colors.text,
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 16,
                                       ),
                                     ),
-                                    const SizedBox(height: 16),
+                                    const SizedBox(height: 18),
                                     Wrap(
                                       spacing: 16,
                                       runSpacing: 16,
@@ -481,28 +506,26 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                                         return GestureDetector(
                                           onTap: () {
                                             setState(
-                                              () => _selectedMood = m.id,
-                                            );
+                                                () => _selectedMood = m.id);
                                             Navigator.pop(ctx);
                                           },
                                           child: Column(
                                             children: [
                                               Container(
-                                                padding: const EdgeInsets.all(
-                                                  8,
-                                                ),
+                                                padding:
+                                                    const EdgeInsets.all(10),
                                                 decoration: BoxDecoration(
                                                   color: isSel
-                                                      ? const Color(
-                                                          0xFF38BDF8,
-                                                        ).withValues(alpha: 0.2)
-                                                      : Colors.transparent,
+                                                      ? colors.accent
+                                                          .withValues(
+                                                              alpha: 0.2)
+                                                      : colors.nested
+                                                          .withValues(
+                                                              alpha: 0.3),
                                                   shape: BoxShape.circle,
                                                   border: Border.all(
                                                     color: isSel
-                                                        ? const Color(
-                                                            0xFF38BDF8,
-                                                          )
+                                                        ? colors.accent
                                                         : Colors.transparent,
                                                     width: 2,
                                                   ),
@@ -514,14 +537,19 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                                                   ),
                                                 ),
                                               ),
-                                              const SizedBox(height: 4),
+                                              const SizedBox(height: 6),
                                               Text(
                                                 m.label,
                                                 style: TextStyle(
+                                                  fontFamily: 'Onest',
                                                   fontSize: 11,
+                                                  fontWeight: isSel
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
                                                   color: isSel
-                                                      ? const Color(0xFF38BDF8)
-                                                      : textSecondary,
+                                                      ? colors.accent
+                                                      : colors.text.withValues(
+                                                          alpha: 0.6),
                                                 ),
                                               ),
                                             ],
@@ -529,7 +557,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                                         );
                                       }).toList(),
                                     ),
-                                    const SizedBox(height: 12),
+                                    const SizedBox(height: 16),
                                   ],
                                 ),
                               ),
@@ -538,11 +566,12 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
-                              vertical: 4,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              border: Border.all(color: borderColor),
-                              borderRadius: BorderRadius.circular(20),
+                              color: colors.card,
+                              border: Border.all(color: colors.nested),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
                               children: [
@@ -556,10 +585,10 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                                   style: const TextStyle(fontSize: 22),
                                 ),
                                 const SizedBox(width: 4),
-                                const Icon(
+                                Icon(
                                   Icons.arrow_drop_down,
                                   size: 18,
-                                  color: Colors.grey,
+                                  color: colors.text.withValues(alpha: 0.5),
                                 ),
                               ],
                             ),
@@ -567,31 +596,34 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                         ),
                     ],
                   ),
-                  const Divider(height: 24),
+                  Divider(height: 24, color: colors.nested),
                   if (_isViewMode)
                     Text(
                       _titleController.text.isEmpty
                           ? 'Без заголовка'
                           : _titleController.text,
                       style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
+                        fontFamily: 'Unbounded',
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
                       ),
                     )
                   else
                     TextField(
                       controller: _titleController,
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
+                        fontFamily: 'Unbounded',
+                        fontSize: 19,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
                       ),
                       decoration: InputDecoration(
                         hintText: 'Заголовок дня...',
                         hintStyle: TextStyle(
-                          color: textSecondary.withValues(alpha: 0.5),
-                          fontSize: 20,
+                          fontFamily: 'Unbounded',
+                          color: colors.text.withValues(alpha: 0.35),
+                          fontSize: 19,
                         ),
                         border: InputBorder.none,
                       ),
@@ -609,7 +641,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                           return Stack(
                             children: [
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(16),
                                 child: Image.file(
                                   file,
                                   width: 110,
@@ -619,8 +651,8 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                               ),
                               if (!_isViewMode)
                                 Positioned(
-                                  top: 4,
-                                  right: 4,
+                                  top: 6,
+                                  right: 6,
                                   child: InkWell(
                                     onTap: () =>
                                         setState(() => _images.removeAt(i)),
@@ -651,9 +683,10 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                           ? 'Текст отсутствует'
                           : _contentController.text,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontFamily: 'Onest',
+                        fontSize: 15,
                         height: 1.6,
-                        color: textPrimary,
+                        color: colors.text,
                       ),
                     )
                   else
@@ -661,15 +694,17 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                       controller: _contentController,
                       maxLines: null,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontFamily: 'Onest',
+                        fontSize: 15,
                         height: 1.6,
-                        color: textPrimary,
+                        color: colors.text,
                       ),
                       decoration: InputDecoration(
                         hintText: 'Напишите, как прошел ваш день...',
                         hintStyle: TextStyle(
-                          color: textSecondary.withValues(alpha: 0.4),
-                          fontSize: 16,
+                          fontFamily: 'Onest',
+                          color: colors.text.withValues(alpha: 0.35),
+                          fontSize: 15,
                         ),
                         border: InputBorder.none,
                       ),
@@ -680,8 +715,8 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: cardBg,
-                border: Border(top: BorderSide(color: borderColor)),
+                color: colors.card,
+                border: Border(top: BorderSide(color: colors.nested)),
               ),
               child: _isViewMode
                   ? Row(
@@ -691,22 +726,26 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                           icon: const Icon(Icons.chevron_left, size: 28),
                           tooltip: 'Предыдущая запись',
                           color: hasPrevious
-                              ? textPrimary
-                              : textSecondary.withValues(alpha: 0.3),
+                              ? colors.text
+                              : colors.text.withValues(alpha: 0.25),
                           onPressed: hasPrevious
                               ? () => _loadDiary(diaries[currentIndex + 1])
                               : null,
                         ),
                         Text(
                           '${currentIndex + 1} из ${diaries.length}',
-                          style: TextStyle(fontSize: 13, color: textSecondary),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontSize: 13,
+                            color: colors.text.withValues(alpha: 0.6),
+                          ),
                         ),
                         IconButton(
                           icon: const Icon(Icons.chevron_right, size: 28),
                           tooltip: 'Следующая запись',
                           color: hasNext
-                              ? textPrimary
-                              : textSecondary.withValues(alpha: 0.3),
+                              ? colors.text
+                              : colors.text.withValues(alpha: 0.25),
                           onPressed: hasNext
                               ? () => _loadDiary(diaries[currentIndex - 1])
                               : null,
@@ -716,9 +755,9 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                   : Row(
                       children: [
                         IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.add_photo_alternate_outlined,
-                            color: Color(0xFF38BDF8),
+                            color: colors.accent,
                           ),
                           tooltip: 'Прикрепить фото',
                           onPressed: _pickImage,
@@ -726,7 +765,11 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                         const Spacer(),
                         Text(
                           'Черновик сохранится при выходе',
-                          style: TextStyle(fontSize: 11, color: textSecondary),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontSize: 11,
+                            color: colors.text.withValues(alpha: 0.5),
+                          ),
                         ),
                       ],
                     ),

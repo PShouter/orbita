@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../theme/app_theme.dart';
+
 class CalendarSettingsScreen extends StatefulWidget {
   final bool isDarkMode;
 
@@ -12,14 +14,11 @@ class CalendarSettingsScreen extends StatefulWidget {
 }
 
 class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
-  // Внешний вид
-  String _initialView = 'Месяц'; // 'Месяц' | 'День'
+  String _initialView = 'Месяц';
   bool _showWeekNumbers = false;
 
-  // Напоминания
   String _notificationSoundTitle = 'По умолчанию (системный)';
-  String _vibrationMode =
-      'Всегда'; // 'Всегда' | 'Только в беззвучном режиме' | 'Никогда'
+  String _vibrationMode = 'Всегда';
   bool _enableLedIndicator = true;
 
   @override
@@ -34,8 +33,7 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
       _initialView = prefs.getString('cal_initial_view') ?? 'Месяц';
       _showWeekNumbers = prefs.getBool('cal_show_week_numbers') ?? false;
 
-      _notificationSoundTitle =
-          prefs.getString('cal_notif_sound_title') ??
+      _notificationSoundTitle = prefs.getString('cal_notif_sound_title') ??
           'По умолчанию (системный)';
       _vibrationMode = prefs.getString('cal_vibration_mode') ?? 'Всегда';
       _enableLedIndicator = prefs.getBool('cal_enable_led') ?? true;
@@ -66,8 +64,7 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
     setState(() => _enableLedIndicator = val);
   }
 
-  // Диалог выбора системного звука напоминания
-  Future<void> _pickNotificationSound() async {
+  Future<void> _pickNotificationSound(AppColorsExtension colors) async {
     final options = [
       'По умолчанию (системный)',
       'Космический сигнал (Орбита)',
@@ -80,18 +77,29 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: widget.isDarkMode
-              ? const Color(0xFF161B22)
-              : Colors.white,
-          title: const Text('Сигнал уведомления'),
+          backgroundColor: colors.card,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Text(
+            'Сигнал уведомления',
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: colors.text,
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: options.map((sound) {
               return RadioListTile<String>(
-                title: Text(sound),
+                title: Text(
+                  sound,
+                  style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                ),
                 value: sound,
                 groupValue: _notificationSoundTitle,
-                activeColor: const Color(0xFF38BDF8),
+                activeColor: colors.accent,
                 onChanged: (val) => Navigator.pop(ctx, val),
               );
             }).toList(),
@@ -110,60 +118,67 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Настройки календаря'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Настройки календаря',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
-          // 1. ВНЕШНИЙ ВИД
           _buildSectionHeader('ВНЕШНИЙ ВИД', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.calendar_view_month,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Начальный вид',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Вид календаря при открытии: $_initialView',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<String>(
                     value: _initialView,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -177,22 +192,30 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.format_list_numbered,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Номера недель',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Отображать порядковый номер недели в сетке года',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _showWeekNumbers,
                   onChanged: (v) => _setShowWeekNumbers(v ?? false),
                 ),
@@ -200,68 +223,77 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
-          // 2. НАПОМИНАНИЯ
           _buildSectionHeader('НАПОМИНАНИЯ', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.music_note_outlined,
-                    color: Colors.purpleAccent,
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Сигнал уведомления',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _notificationSoundTitle,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: _pickNotificationSound,
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
+                  onTap: () => _pickNotificationSound(colors),
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(Icons.vibration, color: Colors.amber),
+                  leading: Icon(Icons.vibration, color: colors.warning),
                   title: Text(
                     'Вибрация',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _vibrationMode,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<String>(
                     value: _vibrationMode,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
-                    items:
-                        const [
-                              'Всегда',
-                              'Только в беззвучном режиме',
-                              'Никогда',
-                            ]
-                            .map(
-                              (e) => DropdownMenuItem(value: e, child: Text(e)),
-                            )
-                            .toList(),
+                    items: const [
+                      'Всегда',
+                      'Только в беззвучном режиме',
+                      'Никогда',
+                    ]
+                        .map(
+                          (e) => DropdownMenuItem(value: e, child: Text(e)),
+                        )
+                        .toList(),
                     onChanged: (v) {
                       if (v != null) _setVibrationMode(v);
                     },
@@ -269,28 +301,37 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.lightbulb_outline,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Светодиодный индикатор',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Мигать светодиодом телефона при поступлении напоминания',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _enableLedIndicator,
                   onChanged: (v) => _setEnableLed(v ?? false),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -302,6 +343,7 @@ class _CalendarSettingsScreenState extends State<CalendarSettingsScreen> {
       child: Text(
         title,
         style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,

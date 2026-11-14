@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/budget_provider.dart';
+import '../../theme/app_theme.dart';
 import '../settings/sections/budget_settings_screen.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
@@ -49,65 +50,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF07090E) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF131826) : Colors.white;
-    final textPrimary =
-        isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
-    final textSecondary =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.08);
-
+    final colors = context.colors;
     final budget = ref.watch(budgetProvider);
     final notifier = ref.read(budgetProvider.notifier);
 
     final pages = [
-      _buildHomePage(
-        budget,
-        notifier,
-        bg,
-        cardBg,
-        textPrimary,
-        textSecondary,
-        borderColor,
-      ),
-      _buildAccountsPage(
-        budget,
-        notifier,
-        bg,
-        cardBg,
-        textPrimary,
-        textSecondary,
-        borderColor,
-      ),
-      _buildOperationsPage(
-        budget,
-        notifier,
-        bg,
-        cardBg,
-        textPrimary,
-        textSecondary,
-        borderColor,
-      ),
-      _buildAnalyticsPage(
-        budget,
-        bg,
-        cardBg,
-        textPrimary,
-        textSecondary,
-        borderColor,
-      ),
-      _buildMorePage(
-        budget,
-        notifier,
-        bg,
-        cardBg,
-        textPrimary,
-        textSecondary,
-        borderColor,
-      ),
+      _buildHomePage(budget, notifier, colors),
+      _buildAccountsPage(budget, notifier, colors),
+      _buildOperationsPage(budget, notifier, colors),
+      _buildAnalyticsPage(budget, colors),
+      _buildMorePage(budget, notifier, colors),
     ];
 
     return PopScope(
@@ -118,12 +70,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         body: SafeArea(child: pages[_currentNavIndex]),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0C0F1A) : Colors.white,
-            border: Border(top: BorderSide(color: borderColor)),
+            color: colors.card,
+            border: Border(top: BorderSide(color: colors.nested)),
           ),
           child: BottomNavigationBar(
             currentIndex: _currentNavIndex,
@@ -131,11 +83,18 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             type: BottomNavigationBarType.fixed,
             backgroundColor: Colors.transparent,
             elevation: 0,
-            selectedItemColor: const Color(0xFF8B5CF6),
-            unselectedItemColor: textSecondary,
+            selectedItemColor: colors.accent,
+            unselectedItemColor: colors.text.withValues(alpha: 0.5),
             selectedFontSize: 11,
             unselectedFontSize: 10,
-            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+            selectedLabelStyle: const TextStyle(
+              fontFamily: 'Onest',
+              fontWeight: FontWeight.bold,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontFamily: 'Onest',
+              fontWeight: FontWeight.w500,
+            ),
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.account_balance_wallet_outlined),
@@ -170,11 +129,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget _buildHomePage(
     BudgetState budget,
     BudgetNotifier notifier,
-    Color bg,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
+    AppColorsExtension colors,
   ) {
     final now = DateTime.now();
     final monthYear = DateFormat('LLLL yyyy', 'ru').format(now);
@@ -198,16 +153,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                             icon: Icon(
                               Icons.arrow_back_ios_new,
                               size: 18,
-                              color: textPrimary,
+                              color: colors.text,
                             ),
                             onPressed: widget.onExitBudget,
                           ),
                           Text(
                             formattedMonthYear,
                             style: TextStyle(
+                              fontFamily: 'Unbounded',
                               fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: textPrimary,
+                              fontWeight: FontWeight.w600,
+                              color: colors.text,
                             ),
                           ),
                           const Spacer(),
@@ -217,7 +173,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                   ? Icons.visibility_off
                                   : Icons.visibility,
                               size: 20,
-                              color: textSecondary,
+                              color: colors.text.withValues(alpha: 0.6),
                             ),
                             tooltip: _hideBalances
                                 ? 'Показать баланс'
@@ -228,21 +184,20 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 10,
-                              vertical: 4,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF8B5CF6)
-                                  .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
+                              color: colors.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(13),
                               border: Border.all(
-                                color: const Color(0xFF8B5CF6)
-                                    .withValues(alpha: 0.3),
+                                color: colors.accent.withValues(alpha: 0.35),
                               ),
                             ),
                             child: Text(
                               '${budget.daysLeftInMonth} дн. до конца',
-                              style: const TextStyle(
-                                color: Color(0xFFC4B5FD),
+                              style: TextStyle(
+                                fontFamily: 'Onest',
+                                color: colors.accent,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -251,18 +206,25 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      _buildFreeMoneyCard(budget, cardBg, borderColor),
+                      _buildFreeMoneyCard(budget, colors),
                       const SizedBox(height: 14),
                       TabBar(
-                        indicatorColor: const Color(0xFF8B5CF6),
+                        indicatorColor: colors.accent,
                         indicatorWeight: 3,
-                        labelColor: const Color(0xFF8B5CF6),
-                        unselectedLabelColor: textSecondary,
+                        labelColor: colors.accent,
+                        unselectedLabelColor:
+                            colors.text.withValues(alpha: 0.5),
                         isScrollable: true,
                         tabAlignment: TabAlignment.start,
                         labelStyle: const TextStyle(
+                          fontFamily: 'Onest',
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontFamily: 'Onest',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                         tabs: const [
                           Tab(text: 'Расходы'),
@@ -281,10 +243,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 _buildTransactionsSubList(
                   budget.recentExpenses,
                   notifier,
-                  cardBg,
-                  borderColor,
-                  textPrimary,
-                  textSecondary,
+                  colors,
                   currency: budget.currency,
                   isExpense: true,
                   emptyText: 'Нет последних расходов',
@@ -292,10 +251,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 _buildTransactionsSubList(
                   budget.recentIncomes,
                   notifier,
-                  cardBg,
-                  borderColor,
-                  textPrimary,
-                  textSecondary,
+                  colors,
                   currency: budget.currency,
                   isExpense: false,
                   emptyText: 'Нет последних доходов',
@@ -303,10 +259,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 _buildTransactionsSubList(
                   budget.plannedExpenseList,
                   notifier,
-                  cardBg,
-                  borderColor,
-                  textPrimary,
-                  textSecondary,
+                  colors,
                   currency: budget.currency,
                   isExpense: true,
                   emptyText: 'План расходов пуст',
@@ -314,10 +267,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 _buildTransactionsSubList(
                   budget.plannedIncomeList,
                   notifier,
-                  cardBg,
-                  borderColor,
-                  textPrimary,
-                  textSecondary,
+                  colors,
                   currency: budget.currency,
                   isExpense: false,
                   emptyText: 'План доходов пуст',
@@ -329,14 +279,15 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             right: 16,
             bottom: 16,
             child: FloatingActionButton(
-              backgroundColor: const Color(0xFF7C3AED),
-              foregroundColor: Colors.white,
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              elevation: 3,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(Icons.add, size: 28),
               onPressed: () =>
-                  _openTransactionDialog(context, notifier, budget),
+                  _openTransactionDialog(context, notifier, budget, colors),
             ),
           ),
         ],
@@ -346,8 +297,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
   Widget _buildFreeMoneyCard(
     BudgetState budget,
-    Color cardBg,
-    Color borderColor,
+    AppColorsExtension colors,
   ) {
     final now = DateTime.now();
     final lastDay = DateTime(now.year, now.month + 1, 0);
@@ -362,14 +312,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B141C),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFF1E293B)),
-        boxShadow: const [
+        color: colors.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.nested),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black45,
+            color: colors.nested.withValues(alpha: 0.15),
             blurRadius: 18,
-            offset: Offset(0, 6),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -379,15 +329,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Text('🧘 ', style: TextStyle(fontSize: 16)),
+                  const Text('🧘 ', style: TextStyle(fontSize: 16)),
                   Text(
                     'СВОБОДНЫЕ ДЕНЬГИ',
                     style: TextStyle(
-                      color: Color(0xFF10B981),
+                      fontFamily: 'Onest',
+                      color: colors.success,
                       fontSize: 11,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -397,10 +348,18 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 children: [
                   Text(
                     'Прогноз на ${lastDay.day} $monthShort',
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.5),
+                      fontSize: 11,
+                    ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                  Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: colors.text.withValues(alpha: 0.5),
+                  ),
                 ],
               ),
             ],
@@ -416,18 +375,20 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 children: [
                   Text(
                     _formatAmount(budget.freeMoney, cur),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                    style: TextStyle(
+                      fontFamily: 'Unbounded',
+                      color: colors.text,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  const Text(
+                  const SizedBox(height: 4),
+                  Text(
                     'Свободно до конца периода',
                     style: TextStyle(
-                      color: Color(0xFF10B981),
+                      fontFamily: 'Onest',
+                      color: colors.success,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -442,16 +403,21 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       _hideBalances
                           ? '•••• $cur/дн'
                           : '${budget.dailySafeLimit.toInt()} $cur/день',
-                      style: const TextStyle(
-                        color: Color(0xFFFBBF24),
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
+                      style: TextStyle(
+                        fontFamily: 'Unbounded',
+                        color: colors.warning,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    const Text(
+                    const SizedBox(height: 4),
+                    Text(
                       'Безопасно в день',
-                      style: TextStyle(color: Colors.grey, fontSize: 11),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.5),
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -459,24 +425,27 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           ),
           const SizedBox(height: 18),
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(13),
             child: Row(
               children: [
                 Expanded(
                   flex: fAcc,
-                  child: Container(height: 6, color: const Color(0xFF38BDF8)),
+                  child: Container(height: 6, color: colors.accent),
                 ),
                 Expanded(
                   flex: fInc,
-                  child: Container(height: 6, color: const Color(0xFF10B981)),
+                  child: Container(height: 6, color: colors.success),
                 ),
                 Expanded(
                   flex: fDeb,
-                  child: Container(height: 6, color: const Color(0xFFF59E0B)),
+                  child: Container(height: 6, color: colors.warning),
                 ),
                 Expanded(
                   flex: fPlan,
-                  child: Container(height: 6, color: const Color(0xFF8B5CF6)),
+                  child: Container(
+                    height: 6,
+                    color: const Color(0xFF8B5CF6),
+                  ),
                 ),
               ],
             ),
@@ -488,8 +457,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 child: _buildBalanceRow(
                   'Остаток на счетах:',
                   _formatAmount(budget.totalAccountsBalance, cur),
-                  const Color(0xFF38BDF8),
-                  Colors.white,
+                  colors.accent,
+                  colors.text,
+                  colors,
                 ),
               ),
               const SizedBox(width: 8),
@@ -497,8 +467,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 child: _buildBalanceRow(
                   'Ожидаемый доход:',
                   '+${_formatAmount(budget.expectedIncome, cur)}',
-                  const Color(0xFF10B981),
-                  const Color(0xFF10B981),
+                  colors.success,
+                  colors.success,
+                  colors,
                 ),
               ),
             ],
@@ -510,8 +481,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 child: _buildBalanceRow(
                   'Счета и кредиты:',
                   '-${_formatAmount(budget.totalDebtsAndCredits, cur)}',
-                  const Color(0xFFFBBF24),
-                  const Color(0xFFFBBF24),
+                  colors.warning,
+                  colors.warning,
+                  colors,
                 ),
               ),
               const SizedBox(width: 8),
@@ -520,7 +492,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   'План расходов:',
                   '-${_formatAmount(budget.plannedExpenses, cur)}',
                   const Color(0xFF8B5CF6),
-                  const Color(0xFFC4B5FD),
+                  colors.text.withValues(alpha: 0.9),
+                  colors,
                 ),
               ),
             ],
@@ -535,6 +508,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     String value,
     Color dotColor,
     Color valueColor,
+    AppColorsExtension colors,
   ) {
     return Row(
       children: [
@@ -543,7 +517,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(color: Colors.grey, fontSize: 11),
+            style: TextStyle(
+              fontFamily: 'Onest',
+              color: colors.text.withValues(alpha: 0.5),
+              fontSize: 11,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -551,6 +529,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         Text(
           value,
           style: TextStyle(
+            fontFamily: 'Onest',
             color: valueColor,
             fontSize: 11,
             fontWeight: FontWeight.bold,
@@ -563,10 +542,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget _buildTransactionsSubList(
     List<Map<String, dynamic>> items,
     BudgetNotifier notifier,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary, {
+    AppColorsExtension colors, {
     required String currency,
     required bool isExpense,
     required String emptyText,
@@ -577,7 +553,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           padding: const EdgeInsets.all(24),
           child: Text(
             emptyText,
-            style: TextStyle(fontSize: 13, color: textSecondary),
+            style: TextStyle(
+              fontFamily: 'Onest',
+              fontSize: 13,
+              color: colors.text.withValues(alpha: 0.5),
+            ),
           ),
         ),
       );
@@ -597,9 +577,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.nested),
           ),
           child: Row(
             children: [
@@ -610,15 +590,20 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     Text(
                       title,
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Onest',
+                        fontWeight: FontWeight.w600,
                         fontSize: 13,
-                        color: textPrimary,
+                        color: colors.text,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '$cat • ${DateFormat('d MMM', 'ru').format(date)}',
-                      style: TextStyle(color: textSecondary, fontSize: 11),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.5),
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -628,11 +613,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     ? '•••• $currency'
                     : '${isExpense ? '-' : '+'}${amount.toInt()} $currency',
                 style: TextStyle(
+                  fontFamily: 'Onest',
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: isExpense
-                      ? const Color(0xFFF87171)
-                      : const Color(0xFF34D399),
+                  color: isExpense ? colors.error : colors.success,
                 ),
               ),
             ],
@@ -648,11 +632,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget _buildAccountsPage(
     BudgetState budget,
     BudgetNotifier notifier,
-    Color bg,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
+    AppColorsExtension colors,
   ) {
     final cards = budget.accounts.where((a) => a['type'] == 'card').toList();
     final savings =
@@ -670,9 +650,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             child: Text(
               'Мои Счета',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: textPrimary,
+                fontFamily: 'Unbounded',
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: colors.text,
               ),
             ),
           ),
@@ -687,10 +668,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 'card',
                 budget.currency,
                 notifier,
-                cardBg,
-                borderColor,
-                textPrimary,
-                textSecondary,
+                colors,
               ),
               const SizedBox(height: 14),
               _buildAccountSection(
@@ -699,10 +677,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 'saving',
                 budget.currency,
                 notifier,
-                cardBg,
-                borderColor,
-                textPrimary,
-                textSecondary,
+                colors,
               ),
               const SizedBox(height: 14),
               _buildAccountSection(
@@ -711,10 +686,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 'debt',
                 budget.currency,
                 notifier,
-                cardBg,
-                borderColor,
-                textPrimary,
-                textSecondary,
+                colors,
               ),
               const SizedBox(height: 14),
               _buildAccountSection(
@@ -723,10 +695,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 'credit',
                 budget.currency,
                 notifier,
-                cardBg,
-                borderColor,
-                textPrimary,
-                textSecondary,
+                colors,
               ),
               const SizedBox(height: 24),
             ],
@@ -738,8 +707,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             width: double.infinity,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF8B5CF6),
-                side: const BorderSide(color: Color(0xFF8B5CF6)),
+                foregroundColor: colors.accent,
+                side: BorderSide(color: colors.accent),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -748,9 +717,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
               icon: const Icon(Icons.add, size: 20),
               label: const Text(
                 'добавить карту, вклад, кредит',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
               ),
-              onPressed: () => _openCreateAccountDialog(context, notifier),
+              onPressed: () => _openCreateAccountDialog(context, notifier, colors),
             ),
           ),
         ),
@@ -764,17 +737,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     String defaultType,
     String currency,
     BudgetNotifier notifier,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: borderColor),
+        color: colors.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.nested),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -782,34 +752,38 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           Text(
             title,
             style: TextStyle(
-              fontSize: 13,
+              fontFamily: 'Onest',
+              fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: textPrimary,
+              color: colors.text,
             ),
           ),
           const SizedBox(height: 10),
           if (items.isEmpty)
             InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: () => _openCreateAccountDialog(
                 context,
                 notifier,
+                colors,
                 initialType: defaultType,
               ),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
                     Icon(
                       Icons.add_circle_outline,
-                      color: Color(0xFF8B5CF6),
+                      color: colors.accent,
                       size: 18,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       'Создать в этом разделе',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 12,
-                        color: Color(0xFF8B5CF6),
+                        color: colors.accent,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -828,7 +802,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     Text(
                       acc['name'] ?? '',
                       style: TextStyle(
-                        color: textPrimary,
+                        fontFamily: 'Onest',
+                        color: colors.text,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -837,8 +812,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       _hideBalances
                           ? '•••• $currency'
                           : '${bal.toInt()} $currency',
-                      style: const TextStyle(
-                        color: Color(0xFF38BDF8),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.accent,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -858,11 +834,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget _buildOperationsPage(
     BudgetState budget,
     BudgetNotifier notifier,
-    Color bg,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
+    AppColorsExtension colors,
   ) {
     return DefaultTabController(
       length: 3,
@@ -875,10 +847,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+                    color: colors.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: const Color(0xFF7C3AED).withValues(alpha: 0.4),
+                      color: colors.accent.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Row(
@@ -887,8 +859,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       Expanded(
                         child: Text(
                           'У вас есть запланированные задачи на сегодня (${budget.todayTasks.length})',
-                          style: const TextStyle(
-                            color: Color(0xFFDDD6FE),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.accent,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -898,9 +871,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   ),
                 ),
               TabBar(
-                indicatorColor: const Color(0xFF8B5CF6),
-                labelColor: const Color(0xFF8B5CF6),
-                unselectedLabelColor: textSecondary,
+                indicatorColor: colors.accent,
+                labelColor: colors.accent,
+                unselectedLabelColor: colors.text.withValues(alpha: 0.5),
+                labelStyle: const TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.bold,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.w500,
+                ),
                 tabs: const [
                   Tab(text: 'Все'),
                   Tab(text: 'Пропущенные'),
@@ -914,28 +895,19 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       budget.transactions,
                       notifier,
                       budget.currency,
-                      cardBg,
-                      borderColor,
-                      textPrimary,
-                      textSecondary,
+                      colors,
                     ),
                     _buildEditableTxList(
                       budget.missedOperations,
                       notifier,
                       budget.currency,
-                      cardBg,
-                      borderColor,
-                      textPrimary,
-                      textSecondary,
+                      colors,
                     ),
                     _buildEditableTxList(
                       budget.futureOperations,
                       notifier,
                       budget.currency,
-                      cardBg,
-                      borderColor,
-                      textPrimary,
-                      textSecondary,
+                      colors,
                     ),
                   ],
                 ),
@@ -946,14 +918,15 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             right: 16,
             bottom: 16,
             child: FloatingActionButton(
-              backgroundColor: const Color(0xFF7C3AED),
-              foregroundColor: Colors.white,
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              elevation: 3,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(Icons.add, size: 28),
               onPressed: () =>
-                  _openTransactionDialog(context, notifier, budget),
+                  _openTransactionDialog(context, notifier, budget, colors),
             ),
           ),
         ],
@@ -965,16 +938,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     List<Map<String, dynamic>> list,
     BudgetNotifier notifier,
     String currency,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     if (list.isEmpty) {
       return Center(
         child: Text(
           'Операций нет',
-          style: TextStyle(color: textSecondary, fontSize: 13),
+          style: TextStyle(
+            fontFamily: 'Onest',
+            color: colors.text.withValues(alpha: 0.5),
+            fontSize: 13,
+          ),
         ),
       );
     }
@@ -990,16 +964,21 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         final budget = ref.read(budgetProvider);
 
         return InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () =>
-              _openTransactionDialog(context, notifier, budget, existingTx: tx),
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _openTransactionDialog(
+            context,
+            notifier,
+            budget,
+            colors,
+            existingTx: tx,
+          ),
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.nested),
             ),
             child: Row(
               children: [
@@ -1010,15 +989,20 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       Text(
                         tx['title'] ?? '',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Onest',
+                          fontWeight: FontWeight.w600,
                           fontSize: 13,
-                          color: textPrimary,
+                          color: colors.text,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${tx['category']} • ${DateFormat('d MMM yyyy', 'ru').format(date)}',
-                        style: TextStyle(color: textSecondary, fontSize: 11),
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          color: colors.text.withValues(alpha: 0.5),
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -1028,18 +1012,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       ? '•••• $currency'
                       : '${isExp ? '-' : '+'}${amt.toInt()} $currency',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: isExp
-                        ? const Color(0xFFF87171)
-                        : const Color(0xFF34D399),
+                    color: isExp ? colors.error : colors.success,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.delete_outline,
                     size: 18,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
                   onPressed: () => notifier.deleteTransaction(tx['id']),
                 ),
@@ -1056,11 +1039,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   // ==========================================
   Widget _buildAnalyticsPage(
     BudgetState budget,
-    Color bg,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
+    AppColorsExtension colors,
   ) {
     final Map<String, double> expensesByCategory = {};
     double totalExp = 0;
@@ -1083,24 +1062,29 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         Text(
           'Аналитика трат',
           style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: textPrimary,
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
           ),
         ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           child: Column(
             children: [
               Text(
                 'Всего потрачено',
-                style: TextStyle(color: textSecondary, fontSize: 12),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 6),
               Text(
@@ -1108,16 +1092,21 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     ? '•••• ${budget.currency}'
                     : '${totalExp.toInt()} ${budget.currency}',
                 style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  color: textPrimary,
+                  fontFamily: 'Unbounded',
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
                 ),
               ),
               const SizedBox(height: 16),
               if (sortedCats.isEmpty)
                 Text(
                   'Недостаточно данных для графика',
-                  style: TextStyle(color: textSecondary, fontSize: 12),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.5),
+                    fontSize: 12,
+                  ),
                 )
               else
                 ...sortedCats.map((e) {
@@ -1132,9 +1121,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                             Text(
                               e.key,
                               style: TextStyle(
+                                fontFamily: 'Onest',
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
-                                color: textPrimary,
+                                color: colors.text,
                               ),
                             ),
                             Text(
@@ -1142,7 +1132,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                   ? '•••• ${budget.currency}'
                                   : '${e.value.toInt()} ${budget.currency} (${(pct * 100).toInt()}%)',
                               style: TextStyle(
-                                color: textSecondary,
+                                fontFamily: 'Onest',
+                                color: colors.text.withValues(alpha: 0.6),
                                 fontSize: 12,
                               ),
                             ),
@@ -1150,11 +1141,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                         ),
                         const SizedBox(height: 4),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(13),
                           child: LinearProgressIndicator(
                             value: pct,
-                            backgroundColor: borderColor,
-                            color: const Color(0xFF8B5CF6),
+                            backgroundColor: colors.nested,
+                            color: colors.accent,
                             minHeight: 6,
                           ),
                         ),
@@ -1175,11 +1166,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget _buildMorePage(
     BudgetState budget,
     BudgetNotifier notifier,
-    Color bg,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
+    AppColorsExtension colors,
   ) {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1187,67 +1174,84 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         Text(
           'Управление Бюджетом',
           style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: textPrimary,
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
           ),
         ),
         const SizedBox(height: 16),
         Container(
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.settings_outlined,
-                  color: Color(0xFF8B5CF6),
+                  color: colors.accent,
                 ),
                 title: Text(
                   'Настройки бюджета',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                    color: colors.text,
                   ),
                 ),
                 subtitle: Text(
                   'Валюта, зарплатный день, лимиты и напоминания',
-                  style: TextStyle(color: textSecondary, fontSize: 11),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.5),
+                    fontSize: 11,
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: colors.text.withValues(alpha: 0.4),
+                ),
                 onTap: () async {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          BudgetSettingsScreen(isDarkMode: widget.isDarkMode),
+                          BudgetSettingsScreen(isDarkMode: colors.isDark),
                     ),
                   );
                   _loadPreferences();
                 },
               ),
-              Divider(height: 1, color: borderColor),
+              Divider(height: 1, color: colors.nested),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.category_outlined,
-                  color: Color(0xFF38BDF8),
+                  color: colors.accent,
                 ),
                 title: Text(
                   'Категории',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                    color: colors.text,
                   ),
                 ),
                 subtitle: Text(
                   'Настроить категории расходов и доходов',
-                  style: TextStyle(color: textSecondary, fontSize: 11),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.5),
+                    fontSize: 11,
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                onTap: () => _openCategoriesSheet(context, budget, notifier),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: colors.text.withValues(alpha: 0.4),
+                ),
+                onTap: () => _openCategoriesSheet(context, budget, notifier, colors),
               ),
             ],
           ),
@@ -1263,7 +1267,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   void _openTransactionDialog(
     BuildContext context,
     BudgetNotifier notifier,
-    BudgetState budget, {
+    BudgetState budget,
+    AppColorsExtension colors, {
     Map<String, dynamic>? existingTx,
   }) {
     final titleCtrl = TextEditingController(text: existingTx?['title'] ?? '');
@@ -1274,28 +1279,31 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     );
     String type = existingTx?['type'] ?? 'expense';
     String? accountId = existingTx?['account_id'];
-    bool isPlanned =
-        existingTx != null ? (existingTx['is_planned'] == 1) : false;
-    DateTime selectedDate =
-        existingTx != null ? (existingTx['date'] as DateTime) : DateTime.now();
+    bool isPlanned = existingTx != null
+        ? (existingTx['is_planned'] == 1)
+        : false;
+    DateTime selectedDate = existingTx != null
+        ? (existingTx['date'] as DateTime)
+        : DateTime.now();
 
-    List<Map<String, dynamic>> availableCats =
-        budget.categories.where((c) => c['type'] == type).toList();
+    List<Map<String, dynamic>> availableCats = budget.categories
+        .where((c) => c['type'] == type)
+        .toList();
     String category = existingTx?['category'] ??
         (availableCats.isNotEmpty ? availableCats.first['name'] : 'Другое');
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor:
-          widget.isDarkMode ? const Color(0xFF131826) : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setMState) {
-          availableCats =
-              budget.categories.where((c) => c['type'] == type).toList();
+          availableCats = budget.categories
+              .where((c) => c['type'] == type)
+              .toList();
 
           return Padding(
             padding: EdgeInsets.only(
@@ -1313,9 +1321,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     existingTx != null
                         ? 'Редактировать операцию'
                         : 'Новая операция',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    style: TextStyle(
+                      fontFamily: 'Unbounded',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colors.text,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1323,35 +1333,62 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     children: [
                       Expanded(
                         child: ChoiceChip(
-                          label: const Center(child: Text('Расход')),
+                          label: const Center(
+                            child: Text(
+                              'Расход',
+                              style: TextStyle(fontFamily: 'Onest'),
+                            ),
+                          ),
                           selected: type == 'expense',
-                          selectedColor: Colors.redAccent.withValues(
-                            alpha: 0.25,
+                          selectedColor: colors.error.withValues(alpha: 0.2),
+                          backgroundColor: colors.nested.withValues(alpha: 0.4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(13),
+                            side: BorderSide(
+                              color: type == 'expense'
+                                  ? colors.error
+                                  : colors.nested,
+                            ),
                           ),
                           onSelected: (v) => setMState(() {
                             type = 'expense';
                             final cats = budget.categories
                                 .where((c) => c['type'] == 'expense')
                                 .toList();
-                            category =
-                                cats.isNotEmpty ? cats.first['name'] : 'Другое';
+                            category = cats.isNotEmpty
+                                ? cats.first['name']
+                                : 'Другое';
                           }),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: ChoiceChip(
-                          label: const Center(child: Text('Доход')),
+                          label: const Center(
+                            child: Text(
+                              'Доход',
+                              style: TextStyle(fontFamily: 'Onest'),
+                            ),
+                          ),
                           selected: type == 'income',
-                          selectedColor:
-                              const Color(0xFF10B981).withValues(alpha: 0.25),
+                          selectedColor: colors.success.withValues(alpha: 0.2),
+                          backgroundColor: colors.nested.withValues(alpha: 0.4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(13),
+                            side: BorderSide(
+                              color: type == 'income'
+                                  ? colors.success
+                                  : colors.nested,
+                            ),
+                          ),
                           onSelected: (v) => setMState(() {
                             type = 'income';
                             final cats = budget.categories
                                 .where((c) => c['type'] == 'income')
                                 .toList();
-                            category =
-                                cats.isNotEmpty ? cats.first['name'] : 'Другое';
+                            category = cats.isNotEmpty
+                                ? cats.first['name']
+                                : 'Другое';
                           }),
                         ),
                       ),
@@ -1360,22 +1397,29 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   const SizedBox(height: 12),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
+                    activeThumbColor: colors.accent,
+                    title: Text(
                       'Запланировать операцию',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
+                        color: colors.text,
                       ),
                     ),
-                    subtitle: const Text(
+                    subtitle: Text(
                       'Операция попадет в будущий план на выбранную дату',
-                      style: TextStyle(fontSize: 11),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        fontSize: 11,
+                        color: colors.text.withValues(alpha: 0.5),
+                      ),
                     ),
                     value: isPlanned,
                     onChanged: (v) => setMState(() => isPlanned = v),
                   ),
                   InkWell(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
@@ -1393,37 +1437,38 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.withValues(alpha: 0.3),
-                        ),
-                        borderRadius: BorderRadius.circular(12),
+                        color: colors.nested.withValues(alpha: 0.3),
+                        border: Border.all(color: colors.nested),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.calendar_month,
                                 size: 18,
-                                color: Color(0xFF8B5CF6),
+                                color: colors.accent,
                               ),
                               const SizedBox(width: 10),
                               Text(
                                 isPlanned ? 'Дата плана:' : 'Дата операции:',
-                                style: const TextStyle(fontSize: 13),
+                                style: TextStyle(
+                                  fontFamily: 'Onest',
+                                  fontSize: 13,
+                                  color: colors.text,
+                                ),
                               ),
                             ],
                           ),
                           Text(
-                            DateFormat(
-                              'd MMMM yyyy',
-                              'ru',
-                            ).format(selectedDate),
-                            style: const TextStyle(
+                            DateFormat('d MMMM yyyy', 'ru').format(selectedDate),
+                            style: TextStyle(
+                              fontFamily: 'Onest',
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
-                              color: Color(0xFF8B5CF6),
+                              color: colors.accent,
                             ),
                           ),
                         ],
@@ -1434,30 +1479,85 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   TextField(
                     controller: amountCtrl,
                     keyboardType: TextInputType.number,
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text),
                     decoration: InputDecoration(
                       labelText: 'Сумма (${budget.currency})',
-                      border: const OutlineInputBorder(),
+                      labelStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
+                      filled: true,
+                      fillColor: colors.nested.withValues(alpha: 0.3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.accent, width: 1.5),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: titleCtrl,
-                    decoration: const InputDecoration(
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                    decoration: InputDecoration(
                       labelText: 'Название (например: Кофе / Зарплата)',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
+                      filled: true,
+                      fillColor: colors.nested.withValues(alpha: 0.3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.accent, width: 1.5),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
+                    dropdownColor: colors.card,
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text),
                     initialValue:
                         availableCats.any((c) => c['name'] == category)
                             ? category
                             : (availableCats.isNotEmpty
                                 ? availableCats.first['name']
                                 : null),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Категория',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
+                      filled: true,
+                      fillColor: colors.nested.withValues(alpha: 0.3),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.accent, width: 1.5),
+                      ),
                     ),
                     items: availableCats
                         .map(
@@ -1475,9 +1575,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     height: 48,
                     child: FilledButton(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C3AED),
+                        backgroundColor: colors.accent,
+                        foregroundColor:
+                            colors.isDark ? Colors.black : Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       onPressed: () {
@@ -1504,6 +1606,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       child: const Text(
                         'Сохранить',
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
@@ -1522,7 +1625,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
   void _openCreateAccountDialog(
     BuildContext context,
-    BudgetNotifier notifier, {
+    BudgetNotifier notifier,
+    AppColorsExtension colors, {
     String initialType = 'card',
   }) {
     final nameCtrl = TextEditingController();
@@ -1533,31 +1637,77 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDState) => AlertDialog(
-          backgroundColor:
-              widget.isDarkMode ? const Color(0xFF131826) : Colors.white,
-          title: const Text('Новый счет'),
+          backgroundColor: colors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: Text(
+            'Новый счет',
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: colors.text,
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(
+                  style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                  decoration: InputDecoration(
                     labelText: 'Название счета / карты',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                    ),
+                    filled: true,
+                    fillColor: colors.nested.withValues(alpha: 0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 TextField(
                   controller: balCtrl,
                   keyboardType: TextInputType.number,
+                  style: TextStyle(fontFamily: 'Onest', color: colors.text),
                   decoration: InputDecoration(
                     labelText: 'Баланс (${ref.read(budgetProvider).currency})',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                    ),
+                    filled: true,
+                    fillColor: colors.nested.withValues(alpha: 0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
                   initialValue: type,
-                  decoration: const InputDecoration(labelText: 'Тип'),
+                  dropdownColor: colors.card,
+                  style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                  decoration: InputDecoration(
+                    labelText: 'Тип',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                    ),
+                    filled: true,
+                    fillColor: colors.nested.withValues(alpha: 0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
+                  ),
                   items: const [
                     DropdownMenuItem(
                       value: 'card',
@@ -1578,11 +1728,21 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Отмена'),
+              child: Text(
+                'Отмена',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.6),
+                ),
+              ),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF7C3AED),
+                backgroundColor: colors.accent,
+                foregroundColor: colors.isDark ? Colors.black : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
               onPressed: () {
                 final name = nameCtrl.text.trim();
@@ -1592,7 +1752,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   Navigator.pop(ctx);
                 }
               },
-              child: const Text('Создать'),
+              child: const Text(
+                'Создать',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -1604,6 +1770,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     BuildContext context,
     BudgetState budget,
     BudgetNotifier notifier,
+    AppColorsExtension colors,
   ) {
     final nameCtrl = TextEditingController();
     String activeType = 'expense';
@@ -1611,10 +1778,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor:
-          widget.isDarkMode ? const Color(0xFF131826) : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => Consumer(
         builder: (ctx, ref, _) {
@@ -1637,11 +1803,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
+                      Text(
                         'Управление категориями',
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 17,
+                          fontFamily: 'Unbounded',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: colors.text,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1653,8 +1821,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                 child: Text('Категории расходов'),
                               ),
                               selected: activeType == 'expense',
-                              selectedColor: Colors.redAccent.withValues(
-                                alpha: 0.25,
+                              selectedColor:
+                                  colors.error.withValues(alpha: 0.2),
+                              backgroundColor:
+                                  colors.nested.withValues(alpha: 0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13),
+                                side: BorderSide(
+                                  color: activeType == 'expense'
+                                      ? colors.error
+                                      : colors.nested,
+                                ),
                               ),
                               onSelected: (v) =>
                                   setCState(() => activeType = 'expense'),
@@ -1667,8 +1844,18 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                 child: Text('Категории доходов'),
                               ),
                               selected: activeType == 'income',
-                              selectedColor: const Color(0xFF10B981)
-                                  .withValues(alpha: 0.25),
+                              selectedColor:
+                                  colors.success.withValues(alpha: 0.2),
+                              backgroundColor:
+                                  colors.nested.withValues(alpha: 0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13),
+                                side: BorderSide(
+                                  color: activeType == 'income'
+                                      ? colors.success
+                                      : colors.nested,
+                                ),
+                              ),
                               onSelected: (v) =>
                                   setCState(() => activeType = 'income'),
                             ),
@@ -1681,20 +1868,34 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                           Expanded(
                             child: TextField(
                               controller: nameCtrl,
+                              style: TextStyle(
+                                fontFamily: 'Onest',
+                                color: colors.text,
+                              ),
                               decoration: InputDecoration(
                                 labelText: activeType == 'expense'
                                     ? 'Новая категория расхода'
                                     : 'Новая категория дохода',
+                                labelStyle: TextStyle(
+                                  fontFamily: 'Onest',
+                                  color: colors.text.withValues(alpha: 0.6),
+                                ),
                                 isDense: true,
-                                border: const OutlineInputBorder(),
+                                filled: true,
+                                fillColor:
+                                    colors.nested.withValues(alpha: 0.3),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide(color: colors.nested),
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           IconButton(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.add_circle,
-                              color: Color(0xFF8B5CF6),
+                              color: colors.accent,
                               size: 34,
                             ),
                             onPressed: () async {
@@ -1715,13 +1916,14 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 280),
                         child: cats.isEmpty
-                            ? const Padding(
-                                padding: EdgeInsets.all(24.0),
+                            ? Padding(
+                                padding: const EdgeInsets.all(24.0),
                                 child: Center(
                                   child: Text(
                                     'Нет категорий в этом разделе',
                                     style: TextStyle(
-                                      color: Colors.grey,
+                                      fontFamily: 'Onest',
+                                      color: colors.text.withValues(alpha: 0.5),
                                       fontSize: 12,
                                     ),
                                   ),
@@ -1731,25 +1933,27 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                 shrinkWrap: true,
                                 itemCount: cats.length,
                                 separatorBuilder: (_, __) =>
-                                    const Divider(height: 1),
+                                    Divider(height: 1, color: colors.nested),
                                 itemBuilder: (ctx, i) {
                                   final c = cats[i];
                                   return ListTile(
                                     dense: true,
                                     title: Text(
                                       c['name'],
-                                      style: const TextStyle(
+                                      style: TextStyle(
+                                        fontFamily: 'Onest',
                                         fontWeight: FontWeight.w600,
+                                        color: colors.text,
                                       ),
                                     ),
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
-                                          icon: const Icon(
+                                          icon: Icon(
                                             Icons.edit_outlined,
                                             size: 18,
-                                            color: Color(0xFF38BDF8),
+                                            color: colors.accent,
                                           ),
                                           onPressed: () async {
                                             await _showEditCategoryDialog(
@@ -1757,15 +1961,16 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                               notifier,
                                               c['id'],
                                               c['name'],
+                                              colors,
                                             );
                                             setCState(() {});
                                           },
                                         ),
                                         IconButton(
-                                          icon: const Icon(
+                                          icon: Icon(
                                             Icons.delete_outline,
                                             size: 18,
-                                            color: Colors.redAccent,
+                                            color: colors.error,
                                           ),
                                           onPressed: () async {
                                             await notifier.deleteCategory(
@@ -1797,28 +2002,62 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     BudgetNotifier notifier,
     String id,
     String currentName,
+    AppColorsExtension colors,
   ) async {
     final editCtrl = TextEditingController(text: currentName);
 
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            widget.isDarkMode ? const Color(0xFF131826) : Colors.white,
-        title: const Text('Редактировать категорию'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+        ),
+        title: Text(
+          'Редактировать категорию',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: TextField(
           controller: editCtrl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Название категории'),
+          style: TextStyle(fontFamily: 'Onest', color: colors.text),
+          decoration: InputDecoration(
+            labelText: 'Название категории',
+            labelStyle: TextStyle(
+              fontFamily: 'Onest',
+              color: colors.text.withValues(alpha: 0.6),
+            ),
+            filled: true,
+            fillColor: colors.nested.withValues(alpha: 0.3),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: colors.nested),
+            ),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.6),
+              ),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             onPressed: () async {
               final newName = editCtrl.text.trim();
@@ -1827,7 +2066,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 if (ctx.mounted) Navigator.pop(ctx);
               }
             },
-            child: const Text('Сохранить'),
+            child: const Text(
+              'Сохранить',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),

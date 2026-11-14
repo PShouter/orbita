@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/tasks_provider.dart';
+import '../../theme/app_theme.dart';
 import '../settings/sections/tasks_settings_screen.dart';
 import 'task_edit_screen.dart';
 
@@ -105,53 +106,101 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     });
   }
 
-  void _deleteSelectedTasks() {
+  void _deleteSelectedTasks(AppColorsExtension colors) {
     final count = _selectedTaskIds.length;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удаление задач'),
-        content: Text('Удалить выбранные задачи ($count)?'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Удаление задач',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
+        content: Text(
+          'Удалить выбранные задачи ($count)?',
+          style: TextStyle(
+            fontFamily: 'Onest',
+            fontSize: 14,
+            color: colors.text.withValues(alpha: 0.8),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.w600,
+                color: colors.text.withValues(alpha: 0.6),
+              ),
+            ),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
             onPressed: () {
               final idsToDelete = Set<String>.from(_selectedTaskIds);
               Navigator.pop(ctx);
               _exitSelectionMode();
               ref.read(tasksProvider.notifier).deleteMultipleTasks(idsToDelete);
             },
-            child: const Text('Удалить'),
+            child: const Text(
+              'Удалить',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _changeStatusForSelected() {
+  void _changeStatusForSelected(AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: colors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
                 'Отметить как...',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: colors.text,
+                ),
               ),
             ),
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.radio_button_unchecked,
-                color: Colors.blue,
+                color: colors.accent,
               ),
-              title: const Text('К выполнению'),
+              title: Text(
+                'К выполнению',
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               onTap: () {
                 final ids = Set<String>.from(_selectedTaskIds);
                 Navigator.pop(ctx);
@@ -162,8 +211,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.timelapse, color: Colors.orange),
-              title: const Text('В работе'),
+              leading: Icon(Icons.timelapse, color: colors.warning),
+              title: Text(
+                'В работе',
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               onTap: () {
                 final ids = Set<String>.from(_selectedTaskIds);
                 Navigator.pop(ctx);
@@ -174,8 +226,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.check_circle, color: Colors.green),
-              title: const Text('Выполнено'),
+              leading: Icon(Icons.check_circle, color: colors.success),
+              title: Text(
+                'Выполнено',
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               onTap: () {
                 final ids = Set<String>.from(_selectedTaskIds);
                 Navigator.pop(ctx);
@@ -186,8 +241,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.cancel, color: Colors.grey),
-              title: const Text('Отменено'),
+              leading: Icon(
+                Icons.cancel,
+                color: colors.text.withValues(alpha: 0.4),
+              ),
+              title: Text(
+                'Отменено',
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               onTap: () {
                 final ids = Set<String>.from(_selectedTaskIds);
                 Navigator.pop(ctx);
@@ -203,30 +264,42 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  void _moveCategoryForSelected() {
+  void _moveCategoryForSelected(AppColorsExtension colors) {
     final categories = ref.read(taskCategoriesProvider);
     showModalBottomSheet(
       context: context,
+      backgroundColor: colors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
                 'Перенести в категорию',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: colors.text,
+                ),
               ),
             ),
             Expanded(
               child: ListView(
                 children: categories.map((cat) {
                   return ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.folder_outlined,
-                      color: Color(0xFF38BDF8),
+                      color: colors.accent,
                     ),
-                    title: Text(cat),
+                    title: Text(
+                      cat,
+                      style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                    ),
                     onTap: () {
                       final ids = Set<String>.from(_selectedTaskIds);
                       Navigator.pop(ctx);
@@ -245,18 +318,28 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  void _openShoppingListDialog() {
+  void _openShoppingListDialog(AppColorsExtension colors) {
     final titleCtrl = TextEditingController(text: 'Список покупок');
     final itemsCtrl = TextEditingController();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Row(
           children: [
-            Icon(Icons.shopping_cart_outlined, color: Color(0xFF38BDF8)),
-            SizedBox(width: 8),
-            Text('Быстрый список'),
+            Icon(Icons.shopping_cart_outlined, color: colors.accent),
+            const SizedBox(width: 8),
+            Text(
+              'Быстрый список',
+              style: TextStyle(
+                fontFamily: 'Unbounded',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: colors.text,
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -265,8 +348,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             children: [
               TextField(
                 controller: titleCtrl,
-                decoration: const InputDecoration(
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                decoration: InputDecoration(
                   labelText: 'Название задачи',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
                   isDense: true,
                 ),
               ),
@@ -274,11 +362,23 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               TextField(
                 controller: itemsCtrl,
                 maxLines: 5,
-                decoration: const InputDecoration(
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                decoration: InputDecoration(
                   labelText: 'Пункты (каждый с новой строки)',
                   hintText: 'Хлеб\nМолоко\nЯблоки',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
+                  hintStyle: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.3),
+                  ),
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.nested),
+                  ),
                 ),
               ),
             ],
@@ -287,11 +387,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.6),
+              ),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF38BDF8),
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             onPressed: () {
               final title = titleCtrl.text.trim();
@@ -314,36 +424,43 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Создать'),
+            child: const Text(
+              'Создать',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPriorityBadge(String priority) {
+  Widget _buildPriorityBadge(String priority, AppColorsExtension colors) {
     if (priority == 'high') {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.redAccent.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
+          color: colors.error.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(13),
           border: Border.all(
-            color: Colors.redAccent.withValues(alpha: 0.4),
+            color: colors.error.withValues(alpha: 0.4),
             width: 0.8,
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.flag, size: 11, color: Colors.redAccent),
-            SizedBox(width: 3),
+            Icon(Icons.flag, size: 11, color: colors.error),
+            const SizedBox(width: 4),
             Text(
               'Высокий',
               style: TextStyle(
+                fontFamily: 'Onest',
                 fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.redAccent,
+                fontWeight: FontWeight.w600,
+                color: colors.error,
               ),
             ),
           ],
@@ -351,23 +468,31 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       );
     } else if (priority == 'low') {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: Colors.blueGrey.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
+          color: colors.text.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(13),
           border: Border.all(
-            color: Colors.blueGrey.withValues(alpha: 0.4),
+            color: colors.nested,
             width: 0.8,
           ),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.flag_outlined, size: 11, color: Colors.blueGrey),
-            SizedBox(width: 3),
+            Icon(
+              Icons.flag_outlined,
+              size: 11,
+              color: colors.text.withValues(alpha: 0.6),
+            ),
+            const SizedBox(width: 4),
             Text(
               'Низкий',
-              style: TextStyle(fontSize: 10, color: Colors.blueGrey),
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontSize: 10,
+                color: colors.text.withValues(alpha: 0.6),
+              ),
             ),
           ],
         ),
@@ -378,17 +503,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   Widget _buildTaskCard(
     Map<String, dynamic> task,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
     DateTime todayStart,
     DateTime todayEnd,
-    bool isDark,
   ) {
     final taskId = task['id'] as String;
     final isSelected = _selectedTaskIds.contains(taskId);
-    final taskColor = task['color'] as Color? ?? const Color(0xFF38BDF8);
+    final taskColor = task['color'] as Color? ?? colors.accent;
     final isDone = task['done'] as bool? ?? false;
     final isNoDate = task['isNoDate'] as bool? ?? false;
     final taskDate = task['date'] as DateTime?;
@@ -423,23 +544,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       key: ValueKey('task_$taskId'),
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: isSelected
-            ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
-            : cardBg,
-        borderRadius: BorderRadius.circular(12),
+        color: isSelected ? colors.accent.withValues(alpha: 0.15) : colors.card,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: isSelected
-              ? const Color(0xFF38BDF8)
+              ? colors.accent
               : (isOverdue
-                  ? Colors.redAccent.withValues(alpha: 0.6)
-                  : borderColor),
+                  ? colors.error.withValues(alpha: 0.6)
+                  : colors.nested),
           width: isSelected || isOverdue ? 1.5 : 1,
         ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(22),
           onLongPress: () {
             if (!_isSelectionMode) {
               _enterSelectionMode(taskId);
@@ -469,10 +588,10 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     Container(
                       width: 5,
                       decoration: BoxDecoration(
-                        color: isOverdue ? Colors.redAccent : taskColor,
+                        color: isOverdue ? colors.error : taskColor,
                         borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(12),
-                          bottomLeft: Radius.circular(12),
+                          topLeft: Radius.circular(21),
+                          bottomLeft: Radius.circular(21),
                         ),
                       ),
                     ),
@@ -481,11 +600,25 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       child: _isSelectionMode
                           ? Checkbox(
                               value: isSelected,
+                              activeColor: colors.accent,
+                              checkColor:
+                                  colors.isDark ? Colors.black : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
                               onChanged: (_) => _toggleTaskSelection(taskId),
                             )
                           : Checkbox(
                               value: isDone,
                               activeColor: taskColor,
+                              checkColor:
+                                  colors.isDark ? Colors.black : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              side: BorderSide(
+                                color: colors.text.withValues(alpha: 0.4),
+                              ),
                               onChanged: (val) {
                                 ref
                                     .read(tasksProvider.notifier)
@@ -496,8 +629,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 6,
+                          vertical: 12,
+                          horizontal: 8,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -505,12 +638,14 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             Text(
                               task['title'] as String,
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Onest',
+                                fontWeight: FontWeight.w600,
                                 fontSize: 15,
-                                color: isDone ? textSecondary : textPrimary,
-                                decoration: isDone
-                                    ? TextDecoration.lineThrough
-                                    : null,
+                                color: isDone
+                                    ? colors.text.withValues(alpha: 0.45)
+                                    : colors.text,
+                                decoration:
+                                    isDone ? TextDecoration.lineThrough : null,
                               ),
                             ),
                             if (task['description'] != null &&
@@ -521,12 +656,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
+                                  fontFamily: 'Onest',
                                   fontSize: 12,
-                                  color: textSecondary,
+                                  color: colors.text.withValues(alpha: 0.6),
                                 ),
                               ),
                             ],
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 8),
                             Wrap(
                               spacing: 8,
                               runSpacing: 4,
@@ -542,10 +678,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                             : Icons.event,
                                         size: 13,
                                         color: isOverdue
-                                            ? Colors.redAccent
+                                            ? colors.error
                                             : (isTodayTask
-                                                ? const Color(0xFF38BDF8)
-                                                : textSecondary),
+                                                ? colors.accent
+                                                : colors.text
+                                                    .withValues(alpha: 0.6)),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
@@ -553,20 +690,22 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                             ? 'Просрочено ($dateBadgeText)'
                                             : dateBadgeText,
                                         style: TextStyle(
+                                          fontFamily: 'Onest',
                                           fontSize: 11,
                                           fontWeight: isOverdue || isTodayTask
                                               ? FontWeight.w600
                                               : FontWeight.normal,
                                           color: isOverdue
-                                              ? Colors.redAccent
+                                              ? colors.error
                                               : (isTodayTask
-                                                  ? const Color(0xFF38BDF8)
-                                                  : textSecondary),
+                                                  ? colors.accent
+                                                  : colors.text
+                                                      .withValues(alpha: 0.6)),
                                         ),
                                       ),
                                     ],
                                   ),
-                                _buildPriorityBadge(priority),
+                                _buildPriorityBadge(priority, colors),
                               ],
                             ),
                           ],
@@ -574,10 +713,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(top: 10, right: 12),
+                      padding: const EdgeInsets.only(top: 12, right: 14),
                       child: Text(
                         task['category'] as String? ?? '',
-                        style: TextStyle(fontSize: 11, color: textSecondary),
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: colors.text.withValues(alpha: 0.5),
+                        ),
                       ),
                     ),
                   ],
@@ -585,18 +729,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               ),
               if (subtasks.isNotEmpty) ...[
                 Container(
-                  margin: const EdgeInsets.fromLTRB(16, 0, 12, 10),
+                  margin: const EdgeInsets.fromLTRB(16, 0, 14, 12),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
-                    vertical: 6,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? Colors.black.withValues(alpha: 0.25)
-                        : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
+                    color: colors.nested.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: borderColor.withValues(alpha: 0.5),
+                      color: colors.nested,
                     ),
                   ),
                   child: Column(
@@ -611,6 +753,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             child: Checkbox(
                               value: subDone,
                               activeColor: taskColor,
+                              checkColor:
+                                  colors.isDark ? Colors.black : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
                               onChanged: (val) {
                                 ref
                                     .read(tasksProvider.notifier)
@@ -623,11 +770,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             child: Text(
                               sub['title'] as String? ?? '',
                               style: TextStyle(
-                                fontSize: 12,
-                                color: subDone ? textSecondary : textPrimary,
-                                decoration: subDone
-                                    ? TextDecoration.lineThrough
-                                    : null,
+                                fontFamily: 'Onest',
+                                fontSize: 13,
+                                color: subDone
+                                    ? colors.text.withValues(alpha: 0.45)
+                                    : colors.text,
+                                decoration:
+                                    subDone ? TextDecoration.lineThrough : null,
                               ),
                             ),
                           ),
@@ -646,21 +795,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final allTasks = ref.watch(tasksProvider);
     final categories = ref.watch(taskCategoriesProvider);
-
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
 
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
@@ -700,8 +837,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         final subtasks = (t['subtasks'] as List<dynamic>? ?? []);
         final matchSubtasks = subtasks.any(
           (s) => ((s as Map)['title'] as String? ?? '').toLowerCase().contains(
-            _searchQuery,
-          ),
+                _searchQuery,
+              ),
         );
 
         if (!title.contains(_searchQuery) &&
@@ -740,7 +877,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       body: SafeArea(
         child: Column(
           children: [
@@ -751,47 +888,65 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: cardBg,
-                  border: Border(bottom: BorderSide(color: borderColor)),
+                  color: colors.card,
+                  border: Border(bottom: BorderSide(color: colors.nested)),
                 ),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: Icon(Icons.close, color: colors.text),
                       onPressed: _exitSelectionMode,
                     ),
                     Text(
                       'Выбрано: ${_selectedTaskIds.length}',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Onest',
+                        fontWeight: FontWeight.w600,
                         fontSize: 16,
-                        color: textPrimary,
+                        color: colors.text,
                       ),
                     ),
                     const Spacer(),
                     PopupMenuButton<String>(
                       tooltip: 'Действия',
-                      icon: const Icon(Icons.more_vert),
+                      color: colors.card,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: colors.nested),
+                      ),
+                      icon: Icon(Icons.more_vert, color: colors.text),
                       onSelected: (val) {
-                        if (val == 'status') _changeStatusForSelected();
-                        if (val == 'category') _moveCategoryForSelected();
-                        if (val == 'delete') _deleteSelectedTasks();
+                        if (val == 'status') _changeStatusForSelected(colors);
+                        if (val == 'category') _moveCategoryForSelected(colors);
+                        if (val == 'delete') _deleteSelectedTasks(colors);
                       },
                       itemBuilder: (ctx) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'status',
-                          child: Text('Отметить как...'),
+                          child: Text(
+                            'Отметить как...',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text),
+                          ),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'category',
-                          child: Text('Перенести в др. категорию...'),
+                          child: Text(
+                            'Перенести в др. категорию...',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text),
+                          ),
                         ),
                         const PopupMenuDivider(),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
                           child: Text(
                             'Удалить выбранные',
-                            style: TextStyle(color: Colors.redAccent),
+                            style: TextStyle(
+                              fontFamily: 'Onest',
+                              color: colors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -808,12 +963,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     Text(
                       'Задачи',
                       style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
+                        fontFamily: 'Unbounded',
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -822,10 +978,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             fit: BoxFit.scaleDown,
                             child: Text(
                               'На сегодня: $activeTodayTasksCount',
-                              style: const TextStyle(
+                              style: TextStyle(
+                                fontFamily: 'Onest',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF38BDF8),
+                                color: colors.accent,
                               ),
                             ),
                           ),
@@ -835,28 +992,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             child: Text(
                               'Активных: $activeTotalTasksCount',
                               style: TextStyle(
+                                fontFamily: 'Onest',
                                 fontSize: 12,
-                                color: textSecondary,
+                                color: colors.text.withValues(alpha: 0.6),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.playlist_add_check_rounded,
-                        color: Color(0xFF38BDF8),
+                        color: colors.accent,
                         size: 24,
                       ),
                       tooltip: 'Быстрый список покупок',
-                      onPressed: _openShoppingListDialog,
+                      onPressed: () => _openShoppingListDialog(colors),
                     ),
                     IconButton(
                       icon: Icon(
                         Icons.settings_outlined,
-                        color: textSecondary,
+                        color: colors.text.withValues(alpha: 0.6),
                         size: 22,
                       ),
                       tooltip: 'Настройки задач',
@@ -865,7 +1023,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => TasksSettingsScreen(
-                              isDarkMode: widget.isDarkMode,
+                              isDarkMode: colors.isDark,
                             ),
                           ),
                         );
@@ -879,31 +1037,32 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             // Баннер переноса просроченных задач
             if (overdueTasks.isNotEmpty)
               Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
+                  horizontal: 14,
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  color: colors.error.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.redAccent.withValues(alpha: 0.35),
+                    color: colors.error.withValues(alpha: 0.35),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.warning_amber_rounded,
-                      color: Colors.redAccent,
+                      color: colors.error,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Просрочено задач: ${overdueTasks.length}',
-                        style: const TextStyle(
-                          color: Colors.redAccent,
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          color: colors.error,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -911,7 +1070,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     ),
                     TextButton(
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         visualDensity: VisualDensity.compact,
                       ),
                       onPressed: () async {
@@ -922,19 +1081,18 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                'Перенесено на сегодня: $count',
-                              ),
+                              content: Text('Перенесено на сегодня: $count'),
                             ),
                           );
                         }
                       },
-                      child: const Text(
+                      child: Text(
                         'На сегодня',
                         style: TextStyle(
-                          color: Color(0xFF38BDF8),
+                          fontFamily: 'Onest',
+                          color: colors.accent,
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -942,32 +1100,41 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 ),
               ),
 
+            // Поле поиска
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Container(
-                height: 42,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderColor),
+                  color: colors.card,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: colors.nested),
                 ),
                 child: TextField(
                   controller: _searchController,
-                  style: TextStyle(color: textPrimary, fontSize: 14),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text,
+                    fontSize: 14,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Поиск по заголовку, заметке, подзадачам...',
-                    hintStyle: TextStyle(color: textSecondary, fontSize: 13),
-                    prefixIcon: const Icon(
+                    hintStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.4),
+                      fontSize: 13,
+                    ),
+                    prefixIcon: Icon(
                       Icons.search,
                       size: 20,
-                      color: Colors.grey,
+                      color: colors.text.withValues(alpha: 0.4),
                     ),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.close,
                               size: 18,
-                              color: Colors.grey,
+                              color: colors.text.withValues(alpha: 0.5),
                             ),
                             onPressed: () {
                               _searchController.clear();
@@ -985,8 +1152,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               ),
             ),
 
+            // Горизонтальная лента фильтров
             SizedBox(
-              height: 46,
+              height: 48,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(
@@ -995,8 +1163,19 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 ),
                 children: [
                   FilterChip(
-                    label: const Text('Все', style: TextStyle(fontSize: 12)),
+                    label: const Text(
+                      'Все',
+                      style: TextStyle(fontFamily: 'Onest', fontSize: 12),
+                    ),
                     selected: _filterAll,
+                    selectedColor: colors.nested,
+                    checkmarkColor: colors.accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                      side: BorderSide(
+                        color: _filterAll ? colors.accent : colors.nested,
+                      ),
+                    ),
                     onSelected: (val) {
                       if (val) _clearFilters();
                     },
@@ -1005,9 +1184,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   FilterChip(
                     label: const Text(
                       'Скрыть выполненные',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontFamily: 'Onest', fontSize: 12),
                     ),
                     selected: _hideCompleted,
+                    selectedColor: colors.nested,
+                    checkmarkColor: colors.accent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                      side: BorderSide(
+                        color: _hideCompleted ? colors.accent : colors.nested,
+                      ),
+                    ),
                     onSelected: (val) {
                       _toggleHideCompleted(val);
                     },
@@ -1015,6 +1202,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   const SizedBox(width: 8),
                   PopupMenuButton<String>(
                     tooltip: 'Срок',
+                    color: colors.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: colors.nested),
+                    ),
                     child: Chip(
                       label: Text(
                         _filterDueDate == 'overdue'
@@ -1025,19 +1217,20 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                     ? 'Предстоящие'
                                     : 'Срок',
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           fontSize: 12,
                           color: _filterDueDate != null
-                              ? const Color(0xFF38BDF8)
-                              : textPrimary,
+                              ? colors.accent
+                              : colors.text,
                         ),
                       ),
-                      backgroundColor: cardBg,
+                      backgroundColor: colors.card,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(13),
                         side: BorderSide(
                           color: _filterDueDate != null
-                              ? const Color(0xFF38BDF8)
-                              : borderColor,
+                              ? colors.accent
+                              : colors.nested,
                         ),
                       ),
                     ),
@@ -1048,28 +1241,51 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       });
                     },
                     itemBuilder: (ctx) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'overdue',
-                        child: Text('Просроченные'),
+                        child: Text(
+                          'Просроченные',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'today',
-                        child: Text('Сегодня'),
+                        child: Text(
+                          'Сегодня',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'upcoming',
-                        child: Text('Предстоящие'),
+                        child: Text(
+                          'Предстоящие',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
                       const PopupMenuDivider(),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'clear',
-                        child: Text('Сбросить'),
+                        child: Text(
+                          'Сбросить',
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.5),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(width: 8),
                   PopupMenuButton<String>(
                     tooltip: 'Приоритет',
+                    color: colors.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: colors.nested),
+                    ),
                     child: Chip(
                       label: Text(
                         _filterPriority == 'low'
@@ -1080,19 +1296,20 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                     ? 'Высокий'
                                     : 'Приоритет',
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           fontSize: 12,
                           color: _filterPriority != null
-                              ? const Color(0xFF38BDF8)
-                              : textPrimary,
+                              ? colors.accent
+                              : colors.text,
                         ),
                       ),
-                      backgroundColor: cardBg,
+                      backgroundColor: colors.card,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(13),
                         side: BorderSide(
                           color: _filterPriority != null
-                              ? const Color(0xFF38BDF8)
-                              : borderColor,
+                              ? colors.accent
+                              : colors.nested,
                         ),
                       ),
                     ),
@@ -1103,25 +1320,51 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       });
                     },
                     itemBuilder: (ctx) => [
-                      const PopupMenuItem(value: 'low', child: Text('Низкий')),
-                      const PopupMenuItem(
-                        value: 'normal',
-                        child: Text('Обычный'),
+                      PopupMenuItem(
+                        value: 'low',
+                        child: Text(
+                          'Низкий',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
+                        value: 'normal',
+                        child: Text(
+                          'Обычный',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
+                      ),
+                      PopupMenuItem(
                         value: 'high',
-                        child: Text('Высокий'),
+                        child: Text(
+                          'Высокий',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
                       const PopupMenuDivider(),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'clear',
-                        child: Text('Сбросить'),
+                        child: Text(
+                          'Сбросить',
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.5),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(width: 8),
                   PopupMenuButton<String>(
                     tooltip: 'Статус',
+                    color: colors.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: colors.nested),
+                    ),
                     child: Chip(
                       label: Text(
                         _filterStatus == 'done'
@@ -1134,19 +1377,20 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                         ? 'Отменено'
                                         : 'Статус',
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           fontSize: 12,
                           color: _filterStatus != null
-                              ? const Color(0xFF38BDF8)
-                              : textPrimary,
+                              ? colors.accent
+                              : colors.text,
                         ),
                       ),
-                      backgroundColor: cardBg,
+                      backgroundColor: colors.card,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(13),
                         side: BorderSide(
                           color: _filterStatus != null
-                              ? const Color(0xFF38BDF8)
-                              : borderColor,
+                              ? colors.accent
+                              : colors.nested,
                         ),
                       ),
                     ),
@@ -1157,49 +1401,77 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       });
                     },
                     itemBuilder: (ctx) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'done',
-                        child: Text('Выполнено'),
+                        child: Text(
+                          'Выполнено',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'todo',
-                        child: Text('К выполнению'),
+                        child: Text(
+                          'К выполнению',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'in_progress',
-                        child: Text('В работе'),
+                        child: Text(
+                          'В работе',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'canceled',
-                        child: Text('Отменено'),
+                        child: Text(
+                          'Отменено',
+                          style: TextStyle(
+                              fontFamily: 'Onest', color: colors.text),
+                        ),
                       ),
                       const PopupMenuDivider(),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'clear',
-                        child: Text('Сбросить'),
+                        child: Text(
+                          'Сбросить',
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.5),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(width: 8),
                   PopupMenuButton<String>(
                     tooltip: 'Категория',
+                    color: colors.card,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: colors.nested),
+                    ),
                     child: Chip(
                       label: Text(
                         _filterCategory ?? 'Категория',
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           fontSize: 12,
                           color: _filterCategory != null
-                              ? const Color(0xFF38BDF8)
-                              : textPrimary,
+                              ? colors.accent
+                              : colors.text,
                         ),
                       ),
-                      backgroundColor: cardBg,
+                      backgroundColor: colors.card,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(13),
                         side: BorderSide(
                           color: _filterCategory != null
-                              ? const Color(0xFF38BDF8)
-                              : borderColor,
+                              ? colors.accent
+                              : colors.nested,
                         ),
                       ),
                     ),
@@ -1211,12 +1483,25 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     },
                     itemBuilder: (ctx) => [
                       ...categories.map(
-                        (cat) => PopupMenuItem(value: cat, child: Text(cat)),
+                        (cat) => PopupMenuItem(
+                          value: cat,
+                          child: Text(
+                            cat,
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text),
+                          ),
+                        ),
                       ),
                       const PopupMenuDivider(),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: '__clear__',
-                        child: Text('Сбросить'),
+                        child: Text(
+                          'Сбросить',
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.5),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1230,12 +1515,16 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   ? Center(
                       child: Text(
                         'Нет задач',
-                        style: TextStyle(color: textSecondary, fontSize: 14),
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          color: colors.text.withValues(alpha: 0.5),
+                          fontSize: 14,
+                        ),
                       ),
                     )
                   : (_taskEnableDrag && _filterAll && _searchQuery.isEmpty)
                       ? ReorderableListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 90),
                           itemCount: filteredTasks.length,
                           onReorder: (oldIndex, newIndex) {
                             ref
@@ -1246,30 +1535,22 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                             final task = filteredTasks[idx];
                             return _buildTaskCard(
                               task,
-                              cardBg,
-                              borderColor,
-                              textPrimary,
-                              textSecondary,
+                              colors,
                               todayStart,
                               todayEnd,
-                              isDark,
                             );
                           },
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 90),
                           itemCount: filteredTasks.length,
                           itemBuilder: (ctx, idx) {
                             final task = filteredTasks[idx];
                             return _buildTaskCard(
                               task,
-                              cardBg,
-                              borderColor,
-                              textPrimary,
-                              textSecondary,
+                              colors,
                               todayStart,
                               todayEnd,
-                              isDark,
                             );
                           },
                         ),
@@ -1278,7 +1559,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF38BDF8),
+        backgroundColor: colors.accent,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         onPressed: () {
           Navigator.push(
             context,
@@ -1289,9 +1572,15 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           'assets/icons/plus.svg',
           width: 24,
           height: 24,
-          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-          placeholderBuilder: (_) =>
-              const Icon(Icons.add, color: Colors.white, size: 28),
+          colorFilter: ColorFilter.mode(
+            colors.isDark ? Colors.black : Colors.white,
+            BlendMode.srcIn,
+          ),
+          placeholderBuilder: (_) => Icon(
+            Icons.add,
+            color: colors.isDark ? Colors.black : Colors.white,
+            size: 28,
+          ),
         ),
       ),
     );

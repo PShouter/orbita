@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../providers/gamification_provider.dart';
+import '../../theme/app_theme.dart';
 import '../gamification/orbital_station_screen.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -78,7 +79,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  Future<void> _saveProfile() async {
+  Future<void> _saveProfile(AppColorsExtension colors) async {
     final name = _nameController.text.trim();
     final username = _usernameController.text.trim().replaceAll('@', '');
 
@@ -109,45 +110,88 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     widget.onProfileUpdated(name, username, _avatarPath);
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Профиль успешно обновлен')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Профиль успешно обновлен',
+            style: TextStyle(fontFamily: 'Onest'),
+          ),
+          backgroundColor: colors.success,
+        ),
+      );
       Navigator.pop(context);
     }
   }
 
-  void _confirmDeleteAccount() {
+  void _confirmDeleteAccount(AppColorsExtension colors) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Row(
           children: [
             Icon(
               Icons.warning_amber_rounded,
-              color: Colors.redAccent,
-              size: 28,
+              color: colors.error,
+              size: 26,
             ),
-            SizedBox(width: 8),
-            Text('Удаление аккаунта'),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Удаление аккаунта',
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
+              ),
+            ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'Вы уверены, что хотите удалить свой аккаунт? '
           'Все ваши задачи, события календаря, привычки и заметки будут безвозвратно удалены с устройства и серверов Орбиты.',
-          style: TextStyle(fontSize: 14),
+          style: TextStyle(
+            fontFamily: 'Onest',
+            fontSize: 14,
+            color: colors.text.withValues(alpha: 0.8),
+            height: 1.45,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.6),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              minimumSize: const Size(120, 44),
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
               await _executeDeleteAccount();
             },
-            child: const Text('Удалить навсегда'),
+            child: const Text(
+              'Удалить навсегда',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -185,53 +229,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final gamification = ref.watch(gamificationProvider);
     final rank = gamification.rank;
 
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         title: Text(
           'Мой профиль',
           style: TextStyle(
-            color: textPrimary,
-            fontWeight: FontWeight.bold,
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
+        iconTheme: IconThemeData(color: colors.text),
         actions: [
           if (_isSaving)
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.only(right: 16),
+                padding: const EdgeInsets.only(right: 16),
                 child: SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colors.accent,
+                  ),
                 ),
               ),
             )
           else
             TextButton(
-              onPressed: _saveProfile,
-              child: const Text(
+              onPressed: () => _saveProfile(colors),
+              child: Text(
                 'Сохранить',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.accent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
             ),
         ],
@@ -246,18 +288,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   children: [
                     CircleAvatar(
                       radius: 48,
-                      backgroundColor: rank.primaryColor.withValues(alpha: 0.3),
+                      backgroundColor:
+                          rank.primaryColor.withValues(alpha: 0.25),
                       backgroundImage:
                           _avatarPath != null && File(_avatarPath!).existsSync()
-                          ? FileImage(File(_avatarPath!))
-                          : null,
-                      child:
-                          _avatarPath == null ||
+                              ? FileImage(File(_avatarPath!))
+                              : null,
+                      child: _avatarPath == null ||
                               !File(_avatarPath!).existsSync()
-                          ? const Icon(
+                          ? Icon(
                               Icons.person,
-                              size: 54,
-                              color: Colors.white,
+                              size: 52,
+                              color: colors.text,
                             )
                           : null,
                     ),
@@ -266,15 +308,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       right: 0,
                       child: InkWell(
                         onTap: _pickAvatar,
+                        borderRadius: BorderRadius.circular(20),
                         child: Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF38BDF8),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: colors.accent,
                             shape: BoxShape.circle,
+                            border: Border.all(color: colors.bg, width: 2),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.camera_alt,
-                            color: Colors.white,
+                            color: colors.isDark ? Colors.black : Colors.white,
                             size: 18,
                           ),
                         ),
@@ -282,32 +326,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    color: colors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(13),
                     border: Border.all(
-                      color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
+                      color: colors.accent.withValues(alpha: 0.35),
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.rocket_launch,
                         size: 16,
-                        color: Color(0xFF38BDF8),
+                        color: colors.accent,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Text(
                         '${widget.daysWithOrbita}-й день на Орбите',
-                        style: const TextStyle(
-                          color: Color(0xFF38BDF8),
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          color: colors.accent,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -319,13 +364,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 // Интерактивная плашка ранга
                 InkWell(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(13),
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
-                            OrbitalStationScreen(isDarkMode: isDark),
+                            OrbitalStationScreen(isDarkMode: colors.isDark),
                       ),
                     );
                   },
@@ -336,7 +381,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: rank.primaryColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(13),
                       border: Border.all(
                         color: rank.primaryColor.withValues(alpha: 0.4),
                       ),
@@ -349,10 +394,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           size: 16,
                           color: rank.primaryColor,
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         Text(
                           'Ранг ${rank.level}: ${rank.title}',
                           style: TextStyle(
+                            fontFamily: 'Onest',
                             color: rank.primaryColor,
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
@@ -372,13 +418,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 24),
-
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.nested),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,106 +431,174 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 Text(
                   'Личные данные',
                   style: TextStyle(
+                    fontFamily: 'Unbounded',
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
                   ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _nameController,
-                  style: TextStyle(color: textPrimary),
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text,
+                    fontSize: 15,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Ваше имя',
-                    prefixIcon: Icon(Icons.badge_outlined),
-                    border: OutlineInputBorder(),
+                    labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                    ),
+                    prefixIcon: Icon(
+                      Icons.badge_outlined,
+                      color: colors.text.withValues(alpha: 0.5),
+                    ),
+                    filled: true,
+                    fillColor: colors.nested.withValues(alpha: 0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.accent, width: 1.5),
+                    ),
                     isDense: true,
                   ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _usernameController,
-                  style: TextStyle(color: textPrimary),
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text,
+                    fontSize: 15,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Имя пользователя',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                    ),
                     prefixText: '@',
-                    prefixIcon: Icon(Icons.alternate_email),
-                    border: OutlineInputBorder(),
+                    prefixStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.alternate_email,
+                      color: colors.text.withValues(alpha: 0.5),
+                    ),
+                    filled: true,
+                    fillColor: colors.nested.withValues(alpha: 0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.accent, width: 1.5),
+                    ),
                     isDense: true,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-
+          const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: Colors.redAccent.withValues(alpha: 0.3),
+                color: colors.error.withValues(alpha: 0.35),
               ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Управление аккаунтом',
                   style: TextStyle(
+                    fontFamily: 'Unbounded',
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w600,
+                    color: colors.error,
                   ),
                 ),
                 const SizedBox(height: 12),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.logout, color: Colors.grey),
+                  leading: Icon(
+                    Icons.logout,
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
                   title: Text(
                     'Выйти из аккаунта',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontSize: 14,
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: colors.text.withValues(alpha: 0.4),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     widget.onLogout();
                   },
                 ),
-                const Divider(),
+                Divider(color: colors.nested),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.delete_forever,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
-                  title: const Text(
+                  title: Text(
                     'Удалить аккаунт',
                     style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 14,
+                      fontFamily: 'Onest',
+                      color: colors.error,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   subtitle: Text(
                     'Удалит все данные без возможности восстановления',
-                    style: TextStyle(fontSize: 12, color: textSecondary),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontSize: 12,
+                      color: colors.text.withValues(alpha: 0.5),
+                    ),
                   ),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.chevron_right,
                     size: 20,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
-                  onTap: _confirmDeleteAccount,
+                  onTap: () => _confirmDeleteAccount(colors),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );

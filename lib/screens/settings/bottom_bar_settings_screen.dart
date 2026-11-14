@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../providers/navigation_tabs_provider.dart';
+import '../../theme/app_theme.dart';
 
 class BottomBarSettingsScreen extends ConsumerWidget {
   final bool isDarkMode;
@@ -21,36 +22,30 @@ class BottomBarSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
     final activeTabs = ref.watch(navigationTabsProvider);
     final notifier = ref.read(navigationTabsProvider.notifier);
 
-    final bg = isDarkMode ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final cardBg = colors.card;
+    final borderColor = colors.nested;
 
-    final inactiveTabs = kAllAvailableTabs
-        .where((t) => !activeTabs.contains(t.key))
-        .toList();
+    final inactiveTabs =
+        kAllAvailableTabs.where((t) => !activeTabs.contains(t.key)).toList();
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         title: Text(
           'Нижняя панель',
           style: TextStyle(
+            fontFamily: 'Unbounded',
             color: textPrimary,
             fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
           ),
         ),
         iconTheme: IconThemeData(color: textPrimary),
@@ -66,29 +61,30 @@ class BottomBarSettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF38BDF8).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: colors.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
+                color: colors.accent.withValues(alpha: 0.3),
               ),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.touch_app_outlined,
-                  color: Color(0xFF38BDF8),
-                  size: 22,
+                  color: colors.accent,
+                  size: 24,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     'Кнопки «Главная» и «Еще» всегда закреплены по краям. Вы можете выбрать от 1 до 4 разделов для центральной части панели и настроить их порядок.',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontSize: 13,
-                      height: 1.4,
+                      height: 1.45,
                     ),
                   ),
                 ),
@@ -96,66 +92,71 @@ class BottomBarSettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 20),
-
           Text(
             'ЗАКРЕПЛЕНА ПЕРВОЙ',
             style: TextStyle(
+              fontFamily: 'Onest',
               color: textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              letterSpacing: 0.6,
+              letterSpacing: 0.8,
             ),
           ),
           const SizedBox(height: 8),
-
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: borderColor),
             ),
             child: ListTile(
               leading: _buildTabIcon(
                 'assets/icons/home.svg',
-                const Color(0xFF38BDF8),
+                colors.accent,
               ),
               title: Text(
                 'Главная',
                 style: TextStyle(
+                  fontFamily: 'Onest',
                   color: textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.circular(6),
+                  color: colors.nested.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: const Text(
+                child: Text(
                   'Фиксировано',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontSize: 11,
+                    color: textSecondary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
           ),
-
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Text(
             'ЦЕНТРАЛЬНЫЕ РАЗДЕЛЫ (${activeTabs.length}/4)',
             style: TextStyle(
+              fontFamily: 'Onest',
               color: textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              letterSpacing: 0.6,
+              letterSpacing: 0.8,
             ),
           ),
           const SizedBox(height: 8),
-
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: borderColor),
             ),
             clipBehavior: Clip.antiAlias,
@@ -174,11 +175,12 @@ class BottomBarSettingsScreen extends ConsumerWidget {
                   key: ValueKey(tabKey),
                   leading: _buildTabIcon(
                     meta.assetIcon,
-                    const Color(0xFF38BDF8),
+                    colors.accent,
                   ),
                   title: Text(
                     meta.title,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
@@ -187,9 +189,9 @@ class BottomBarSettingsScreen extends ConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.remove_circle_outline,
-                          color: Colors.redAccent,
+                          color: colors.error,
                           size: 20,
                         ),
                         tooltip: 'Убрать',
@@ -197,10 +199,12 @@ class BottomBarSettingsScreen extends ConsumerWidget {
                           final ok = await notifier.toggleTab(tabKey);
                           if (!ok && context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
+                              SnackBar(
+                                content: const Text(
                                   'В центре должен остаться минимум 1 раздел',
+                                  style: TextStyle(fontFamily: 'Onest'),
                                 ),
+                                backgroundColor: colors.error,
                               ),
                             );
                           }
@@ -216,32 +220,37 @@ class BottomBarSettingsScreen extends ConsumerWidget {
               },
             ),
           ),
-
           const SizedBox(height: 24),
           Text(
             'ДОСТУПНЫЕ ДЛЯ ДОБАВЛЕНИЯ',
             style: TextStyle(
+              fontFamily: 'Onest',
               color: textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              letterSpacing: 0.6,
+              letterSpacing: 0.8,
             ),
           ),
           const SizedBox(height: 8),
-
           if (inactiveTabs.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Все доступные разделы добавлены в нижнюю панель',
-                style: TextStyle(color: textSecondary, fontSize: 13),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: Text(
+                  'Все доступные разделы добавлены в нижнюю панель',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             )
           else
             Container(
               decoration: BoxDecoration(
                 color: cardBg,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: borderColor),
               ),
               child: Column(
@@ -250,12 +259,16 @@ class BottomBarSettingsScreen extends ConsumerWidget {
                     leading: _buildTabIcon(meta.assetIcon, textSecondary),
                     title: Text(
                       meta.title,
-                      style: TextStyle(color: textPrimary),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.add_circle_outline,
-                        color: Color(0xFF10B981),
+                        color: colors.success,
                         size: 22,
                       ),
                       tooltip: 'Добавить',
@@ -263,8 +276,12 @@ class BottomBarSettingsScreen extends ConsumerWidget {
                         final ok = await notifier.toggleTab(meta.key);
                         if (!ok && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Максимум 4 центральных раздела'),
+                            SnackBar(
+                              content: const Text(
+                                'Максимум 4 центральных раздела',
+                                style: TextStyle(fontFamily: 'Onest'),
+                              ),
+                              backgroundColor: colors.warning,
                             ),
                           );
                         }
@@ -274,6 +291,7 @@ class BottomBarSettingsScreen extends ConsumerWidget {
                 }).toList(),
               ),
             ),
+          const SizedBox(height: 24),
         ],
       ),
     );

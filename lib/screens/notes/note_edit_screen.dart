@@ -14,6 +14,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/notes_provider.dart';
+import '../../theme/app_theme.dart';
 
 class NoteEditScreen extends ConsumerStatefulWidget {
   final NoteItem? initialNote;
@@ -39,7 +40,6 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
   late DateTime _createdAt;
   DateTime? _updatedAt;
 
-  // Настройки
   int _fontSize = 16;
   bool _useMonospace = false;
   bool _showFormatToolbar = true;
@@ -151,9 +151,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
       return;
     }
 
-    ref
-        .read(notesProvider.notifier)
-        .saveNote(
+    ref.read(notesProvider.notifier).saveNote(
           id: widget.initialNote?.id,
           title: title.isEmpty ? 'Без названия' : title,
           body: body,
@@ -250,16 +248,12 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
     }
   }
 
-  void _showHeadingSelector(
-    BuildContext context,
-    Color cardBg,
-    Color textPrimary,
-  ) {
+  void _showHeadingSelector(BuildContext context, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardBg,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -267,13 +261,14 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.all(14.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Text(
                   'Выбор заголовка',
                   style: TextStyle(
-                    color: textPrimary,
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
                     fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -282,9 +277,10 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                   title: Text(
                     'Заголовок H$i',
                     style: TextStyle(
-                      color: const Color(0xFF38BDF8),
-                      fontSize: 24.0 - (i * 2.0),
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Unbounded',
+                      color: colors.accent,
+                      fontSize: 22.0 - (i * 2.0),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   onTap: () {
@@ -292,6 +288,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                     _applyHeading(i);
                   },
                 ),
+              const SizedBox(height: 8),
             ],
           ),
         );
@@ -305,7 +302,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
     return name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
   }
 
-  Future<void> _exportAsMarkdown() async {
+  Future<void> _exportAsMarkdown(AppColorsExtension colors) async {
     try {
       final fileName = _getSanitizedFileName();
       final content =
@@ -320,21 +317,27 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
 
       if (path != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Файл .md успешно сохранен'),
-            backgroundColor: Color(0xFF10B981),
+          SnackBar(
+            content: const Text('Файл .md успешно сохранен',
+                style: TextStyle(fontFamily: 'Onest')),
+            backgroundColor: colors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Ошибка сохранения .md: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка сохранения .md: $e',
+                style: const TextStyle(fontFamily: 'Onest')),
+            backgroundColor: colors.error,
+          ),
+        );
       }
     }
   }
 
-  Future<void> _exportAsWord() async {
+  Future<void> _exportAsWord(AppColorsExtension colors) async {
     try {
       final fileName = _getSanitizedFileName();
       final title = _titleController.text.trim();
@@ -345,8 +348,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
         extensionSet: md.ExtensionSet.gitHubFlavored,
       );
 
-      final wordDocHtml =
-          '''
+      final wordDocHtml = '''
 <html xmlns:o='urn:schemas-microsoft-com:office:office' 
       xmlns:w='urn:schemas-microsoft-com:office:word' 
       xmlns='http://www.w3.org/TR/REC-html40'>
@@ -384,27 +386,32 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
 
       if (path != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Файл Word успешно сохранен'),
-            backgroundColor: Color(0xFF10B981),
+          SnackBar(
+            content: const Text('Файл Word успешно сохранен',
+                style: TextStyle(fontFamily: 'Onest')),
+            backgroundColor: colors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка сохранения Word: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ошибка сохранения Word: $e',
+                style: const TextStyle(fontFamily: 'Onest')),
+            backgroundColor: colors.error,
+          ),
+        );
       }
     }
   }
 
-  void _showShareMenu(BuildContext context, Color cardBg, Color textPrimary) {
+  void _showShareMenu(BuildContext context, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardBg,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -416,37 +423,27 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                 child: Text(
                   'Поделиться и экспорт',
                   style: TextStyle(
-                    color: textPrimary,
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
                     fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               ListTile(
-                leading: const Icon(
-                  Icons.send_outlined,
-                  color: Color(0xFF38BDF8),
-                ),
-                title: Text(
-                  'Отправить как текст',
-                  style: TextStyle(color: textPrimary),
-                ),
+                leading: Icon(Icons.send_outlined, color: colors.accent),
+                title: Text('Отправить как текст',
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text)),
                 onTap: () {
                   Navigator.pop(ctx);
                   Share.share(
-                    '${_titleController.text}\n\n${_bodyController.text}',
-                  );
+                      '${_titleController.text}\n\n${_bodyController.text}');
                 },
               ),
               ListTile(
-                leading: const Icon(
-                  Icons.image_outlined,
-                  color: Colors.orangeAccent,
-                ),
-                title: Text(
-                  'Отправить прикрепленные фото',
-                  style: TextStyle(color: textPrimary),
-                ),
+                leading: Icon(Icons.image_outlined, color: colors.warning),
+                title: Text('Отправить прикрепленные фото',
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text)),
                 onTap: () {
                   Navigator.pop(ctx);
                   if (_attachments.isNotEmpty &&
@@ -458,50 +455,43 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text(
-                          'В заметке нет прикрепленных изображений',
-                        ),
+                        content: Text('В заметке нет прикрепленных изображений',
+                            style: TextStyle(fontFamily: 'Onest')),
                       ),
                     );
                   }
                 },
               ),
               ListTile(
-                leading: const Icon(
-                  Icons.download_for_offline_outlined,
-                  color: Colors.tealAccent,
-                ),
-                title: Text(
-                  'Сохранить в память как Markdown (.md)',
-                  style: TextStyle(color: textPrimary),
-                ),
-                subtitle: const Text(
-                  'Выбор папки на устройстве',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
+                leading: Icon(Icons.download_for_offline_outlined,
+                    color: colors.accent),
+                title: Text('Сохранить в память как Markdown (.md)',
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text)),
+                subtitle: Text('Выбор папки на устройстве',
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        fontSize: 11,
+                        color: colors.text.withValues(alpha: 0.5))),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _exportAsMarkdown();
+                  _exportAsMarkdown(colors);
                 },
               ),
               ListTile(
-                leading: const Icon(
-                  Icons.description_outlined,
-                  color: Colors.blueAccent,
-                ),
-                title: Text(
-                  'Сохранить в память для Word (.doc)',
-                  style: TextStyle(color: textPrimary),
-                ),
-                subtitle: const Text(
-                  'Выбор папки на устройстве',
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
+                leading: Icon(Icons.description_outlined, color: colors.accent),
+                title: Text('Сохранить в память для Word (.doc)',
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text)),
+                subtitle: Text('Выбор папки на устройстве',
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        fontSize: 11,
+                        color: colors.text.withValues(alpha: 0.5))),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _exportAsWord();
+                  _exportAsWord(colors);
                 },
               ),
+              const SizedBox(height: 8),
             ],
           ),
         );
@@ -509,12 +499,12 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
     );
   }
 
-  void _showMoreMenu(BuildContext context, Color cardBg, Color textPrimary) {
+  void _showMoreMenu(BuildContext context, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardBg,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -522,11 +512,9 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.alarm, color: Color(0xFF38BDF8)),
-                title: Text(
-                  'Напоминание',
-                  style: TextStyle(color: textPrimary),
-                ),
+                leading: Icon(Icons.alarm, color: colors.accent),
+                title: Text('Напоминание',
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text)),
                 onTap: () async {
                   Navigator.pop(ctx);
                   final time = await showTimePicker(
@@ -537,8 +525,8 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Напоминание установлено на ${time.format(context)}',
-                        ),
+                            'Напоминание установлено на ${time.format(context)}',
+                            style: const TextStyle(fontFamily: 'Onest')),
                       ),
                     );
                   }
@@ -546,23 +534,24 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
               ),
               if (widget.initialNote != null)
                 ListTile(
-                  leading: const Icon(
-                    Icons.delete_outline,
-                    color: Colors.redAccent,
-                  ),
-                  title: const Text(
+                  leading: Icon(Icons.delete_outline, color: colors.error),
+                  title: Text(
                     'Удалить',
-                    style: TextStyle(color: Colors.redAccent),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.error,
+                        fontWeight: FontWeight.w600),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
                     if (_useTrashBeforeDelete) {
-                      _confirmDeleteDialog();
+                      _confirmDeleteDialog(colors);
                     } else {
                       _performDelete();
                     }
                   },
                 ),
+              const SizedBox(height: 8),
             ],
           ),
         );
@@ -570,24 +559,48 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
     );
   }
 
-  void _confirmDeleteDialog() {
+  void _confirmDeleteDialog(AppColorsExtension colors) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удалить заметку?'),
-        content: const Text('Заметка будет удалена из списка.'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Удалить заметку?',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
+        content: Text(
+          'Заметка будет удалена из списка.',
+          style: TextStyle(
+              fontFamily: 'Onest', color: colors.text.withValues(alpha: 0.8)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text('Отмена',
+                style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6))),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
             onPressed: () {
               Navigator.pop(ctx);
               _performDelete();
             },
-            child: const Text('Удалить', style: TextStyle(color: Colors.white)),
+            child: const Text('Удалить',
+                style: TextStyle(
+                    fontFamily: 'Onest', fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -627,15 +640,14 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
 
   Widget _buildViewBody(
     String rawText,
-    Color textPrimary,
-    Color textSecondary,
-    bool isDark,
+    AppColorsExtension colors,
   ) {
     if (rawText.trim().isEmpty) {
       return Text(
         'Пустая заметка',
         style: TextStyle(
-          color: textSecondary.withValues(alpha: 0.5),
+          fontFamily: 'Onest',
+          color: colors.text.withValues(alpha: 0.4),
           fontStyle: FontStyle.italic,
         ),
       );
@@ -649,59 +661,62 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
         data: markdownData,
         selectable: true,
         softLineBreak: true,
-        styleSheet: _getMarkdownStyleSheet(textPrimary, textSecondary, isDark),
+        styleSheet: _getMarkdownStyleSheet(colors),
         builders: {'tag': _TagElementBuilder(onGetColor: _getTagColor)},
       ),
     );
   }
 
-  MarkdownStyleSheet _getMarkdownStyleSheet(
-    Color textPrimary,
-    Color textSecondary,
-    bool isDark,
-  ) {
+  MarkdownStyleSheet _getMarkdownStyleSheet(AppColorsExtension colors) {
     return MarkdownStyleSheet(
       p: TextStyle(
-        color: textPrimary,
+        fontFamily: _useMonospace ? 'monospace' : 'Onest',
+        color: colors.text,
         fontSize: _fontSize.toDouble(),
         height: 1.5,
       ),
-      h1: const TextStyle(
-        color: Color(0xFF38BDF8),
-        fontSize: 26,
-        fontWeight: FontWeight.bold,
+      h1: TextStyle(
+        fontFamily: 'Unbounded',
+        color: colors.accent,
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
       ),
-      h2: const TextStyle(
-        color: Color(0xFF38BDF8),
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
+      h2: TextStyle(
+        fontFamily: 'Unbounded',
+        color: colors.accent,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
       ),
-      h3: const TextStyle(
-        color: Color(0xFF38BDF8),
-        fontSize: 19,
-        fontWeight: FontWeight.bold,
+      h3: TextStyle(
+        fontFamily: 'Unbounded',
+        color: colors.accent,
+        fontSize: 17,
+        fontWeight: FontWeight.w600,
       ),
       h4: TextStyle(
-        color: textPrimary,
-        fontSize: 17,
+        fontFamily: 'Onest',
+        color: colors.text,
+        fontSize: 16,
         fontWeight: FontWeight.bold,
       ),
       h5: TextStyle(
-        color: textPrimary,
+        fontFamily: 'Onest',
+        color: colors.text,
         fontSize: 15,
         fontWeight: FontWeight.bold,
       ),
-      strong: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
-      em: TextStyle(color: textPrimary, fontStyle: FontStyle.italic),
+      strong: TextStyle(
+          fontFamily: 'Onest', color: colors.text, fontWeight: FontWeight.bold),
+      em: TextStyle(
+          fontFamily: 'Onest', color: colors.text, fontStyle: FontStyle.italic),
       del: TextStyle(
-        color: textSecondary,
+        fontFamily: 'Onest',
+        color: colors.text.withValues(alpha: 0.45),
         decoration: TextDecoration.lineThrough,
       ),
       code: TextStyle(
-        backgroundColor: isDark
-            ? const Color(0xFF21262D)
-            : const Color(0xFFE1E4E8),
-        color: textPrimary,
+        backgroundColor: colors.nested,
+        color: colors.text,
         fontSize: (_fontSize - 2).toDouble(),
         fontFamily: _useMonospace ? 'monospace' : null,
       ),
@@ -722,7 +737,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
           child: Stack(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 child: Image.file(
                   file,
                   width: double.infinity,
@@ -740,14 +755,14 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(6),
                       decoration: const BoxDecoration(
                         color: Colors.black54,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.close,
-                        size: 18,
+                        size: 16,
                         color: Colors.white,
                       ),
                     ),
@@ -762,28 +777,16 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
-
+    final colors = context.colors;
     final dateFormat = DateFormat('dd.MM.yyyy HH:mm');
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textPrimary),
+          icon: Icon(Icons.arrow_back, color: colors.text),
           onPressed: () {
             _saveNote();
             Navigator.pop(context);
@@ -793,7 +796,7 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
           IconButton(
             icon: Icon(
               _isViewMode ? Icons.edit_outlined : Icons.visibility_outlined,
-              color: const Color(0xFF38BDF8),
+              color: colors.accent,
             ),
             tooltip: _isViewMode ? 'Редактировать' : 'Просмотр',
             onPressed: () {
@@ -808,14 +811,14 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.share_outlined, color: textPrimary),
+            icon: Icon(Icons.share_outlined, color: colors.text),
             tooltip: 'Поделиться',
-            onPressed: () => _showShareMenu(context, cardBg, textPrimary),
+            onPressed: () => _showShareMenu(context, colors),
           ),
           IconButton(
-            icon: Icon(Icons.more_vert, color: textPrimary),
+            icon: Icon(Icons.more_vert, color: colors.text),
             tooltip: 'Опции',
-            onPressed: () => _showMoreMenu(context, cardBg, textPrimary),
+            onPressed: () => _showMoreMenu(context, colors),
           ),
         ],
       ),
@@ -833,9 +836,10 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                           ? 'Без названия'
                           : _titleController.text,
                       style: TextStyle(
-                        color: textPrimary,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Unbounded',
+                        color: colors.text,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   )
@@ -843,15 +847,17 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                   TextField(
                     controller: _titleController,
                     style: TextStyle(
-                      color: textPrimary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Unbounded',
+                      color: colors.text,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Заголовок',
                       hintStyle: TextStyle(
-                        color: textSecondary.withValues(alpha: 0.5),
-                        fontSize: 22,
+                        fontFamily: 'Unbounded',
+                        color: colors.text.withValues(alpha: 0.35),
+                        fontSize: 20,
                       ),
                       border: InputBorder.none,
                     ),
@@ -860,32 +866,31 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
                     'Создано: ${dateFormat.format(_createdAt)}${_updatedAt != null ? '   |   Изменено: ${dateFormat.format(_updatedAt!)}' : ''}',
-                    style: TextStyle(color: textSecondary, fontSize: 11),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.5),
+                        fontSize: 11),
                   ),
                 ),
                 _buildAttachmentsList(),
                 if (_isViewMode)
-                  _buildViewBody(
-                    _bodyController.text,
-                    textPrimary,
-                    textSecondary,
-                    isDark,
-                  )
+                  _buildViewBody(_bodyController.text, colors)
                 else
                   TextField(
                     controller: _bodyController,
                     maxLines: null,
                     autofocus: widget.initialNote == null,
                     style: TextStyle(
-                      color: textPrimary,
+                      fontFamily: _useMonospace ? 'monospace' : 'Onest',
+                      color: colors.text,
                       fontSize: _fontSize.toDouble(),
                       height: 1.5,
-                      fontFamily: _useMonospace ? 'monospace' : null,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Начните писать... Используйте #теги',
                       hintStyle: TextStyle(
-                        color: textSecondary.withValues(alpha: 0.4),
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.35),
                         fontSize: 16,
                       ),
                       border: InputBorder.none,
@@ -897,77 +902,65 @@ class _NoteEditScreenState extends ConsumerState<NoteEditScreen> {
           if (!_isViewMode && _showFormatToolbar)
             Container(
               decoration: BoxDecoration(
-                color: cardBg,
-                border: Border(top: BorderSide(color: borderColor)),
+                color: colors.card,
+                border: Border(top: BorderSide(color: colors.nested)),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
                     IconButton(
-                      icon: Icon(Icons.undo, size: 20, color: textPrimary),
+                      icon: Icon(Icons.undo, size: 20, color: colors.text),
                       tooltip: 'Назад',
                       onPressed: _undo,
                     ),
                     IconButton(
-                      icon: Icon(Icons.redo, size: 20, color: textPrimary),
+                      icon: Icon(Icons.redo, size: 20, color: colors.text),
                       tooltip: 'Вперед',
                       onPressed: _redo,
                     ),
                     const SizedBox(width: 2),
                     InkWell(
-                      borderRadius: BorderRadius.circular(6),
-                      onTap: () =>
-                          _showHeadingSelector(context, cardBg, textPrimary),
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _showHeadingSelector(context, colors),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
+                          horizontal: 10,
                           vertical: 6,
                         ),
                         child: Text(
                           'Hn',
                           style: TextStyle(
-                            color: textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontFamily: 'Unbounded',
+                            color: colors.text,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
                           ),
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: Icon(
-                        Icons.format_bold,
-                        size: 20,
-                        color: textPrimary,
-                      ),
+                      icon:
+                          Icon(Icons.format_bold, size: 20, color: colors.text),
                       tooltip: 'Полужирный',
                       onPressed: () => _applyFormat('**', '**'),
                     ),
                     IconButton(
-                      icon: Icon(
-                        Icons.format_italic,
-                        size: 20,
-                        color: textPrimary,
-                      ),
+                      icon: Icon(Icons.format_italic,
+                          size: 20, color: colors.text),
                       tooltip: 'Курсив',
                       onPressed: () => _applyFormat('*', '*'),
                     ),
                     IconButton(
-                      icon: Icon(
-                        Icons.format_strikethrough,
-                        size: 20,
-                        color: textPrimary,
-                      ),
+                      icon: Icon(Icons.format_strikethrough,
+                          size: 20, color: colors.text),
                       tooltip: 'Зачеркнутый',
                       onPressed: () => _applyFormat('~~', '~~'),
                     ),
                     IconButton(
-                      icon: Icon(
-                        Icons.attach_file,
-                        size: 20,
-                        color: textPrimary,
-                      ),
+                      icon:
+                          Icon(Icons.attach_file, size: 20, color: colors.text),
                       tooltip: 'Прикрепить файл',
                       onPressed: _attachImage,
                     ),
@@ -992,16 +985,17 @@ class _TagElementBuilder extends MarkdownElementBuilder {
     final color = onGetColor(text);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       margin: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
       ),
       child: Text(
         text,
         style: TextStyle(
+          fontFamily: 'Onest',
           color: color,
           fontSize: 13,
           fontWeight: FontWeight.bold,

@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../providers/vault_provider.dart';
+import '../../../theme/app_theme.dart';
 
 class VaultSettingsScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -133,7 +134,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
     HapticFeedback.selectionClick();
   }
 
-  void _showChangePinDialog() {
+  void _showChangePinDialog(AppColorsExtension colors) {
     final oldPinCtrl = TextEditingController();
     final newPinCtrl = TextEditingController();
     final confirmPinCtrl = TextEditingController();
@@ -141,7 +142,17 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Смена мастер-PIN'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Смена мастер-PIN',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -151,31 +162,64 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 obscureText: true,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
-                decoration: const InputDecoration(
+                style: TextStyle(
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
+                    letterSpacing: 4),
+                decoration: InputDecoration(
                   labelText: 'Текущий PIN',
+                  labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6)),
                   counterText: '',
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               TextField(
                 controller: newPinCtrl,
                 obscureText: true,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
-                decoration: const InputDecoration(
+                style: TextStyle(
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
+                    letterSpacing: 4),
+                decoration: InputDecoration(
                   labelText: 'Новый PIN (4-6 цифр)',
+                  labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6)),
                   counterText: '',
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               TextField(
                 controller: confirmPinCtrl,
                 obscureText: true,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
-                decoration: const InputDecoration(
+                style: TextStyle(
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
+                    letterSpacing: 4),
+                decoration: InputDecoration(
                   labelText: 'Повторите новый PIN',
+                  labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6)),
                   counterText: '',
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
               ),
             ],
@@ -184,9 +228,18 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text('Отмена',
+                style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6))),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
             onPressed: () async {
               final oldPin = oldPinCtrl.text.trim();
               final newPin = newPinCtrl.text.trim();
@@ -194,15 +247,21 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
 
               if (newPin.length < 4) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('PIN должен содержать от 4 до 6 цифр'),
+                  SnackBar(
+                    content: const Text('PIN должен содержать от 4 до 6 цифр',
+                        style: TextStyle(fontFamily: 'Onest')),
+                    backgroundColor: colors.error,
                   ),
                 );
                 return;
               }
               if (newPin != confirmPin) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Новые PIN-коды не совпадают')),
+                  SnackBar(
+                    content: const Text('Новые PIN-коды не совпадают',
+                        style: TextStyle(fontFamily: 'Onest')),
+                    backgroundColor: colors.error,
+                  ),
                 );
                 return;
               }
@@ -217,8 +276,9 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                       content: Text(
                         ref.read(vaultProvider).errorMessage ??
                             'Текущий PIN указан неверно',
+                        style: const TextStyle(fontFamily: 'Onest'),
                       ),
-                      backgroundColor: Colors.redAccent,
+                      backgroundColor: colors.error,
                     ),
                   );
                 }
@@ -228,21 +288,24 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Мастер-PIN успешно обновлен'),
-                    backgroundColor: Color(0xFF10B981),
+                  SnackBar(
+                    content: const Text('Мастер-PIN успешно обновлен',
+                        style: TextStyle(fontFamily: 'Onest')),
+                    backgroundColor: colors.success,
                   ),
                 );
               }
             },
-            child: const Text('Сохранить'),
+            child: const Text('Сохранить',
+                style: TextStyle(
+                    fontFamily: 'Onest', fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  void _showSecurityQuestionDialog() {
+  void _showSecurityQuestionDialog(AppColorsExtension colors) {
     final answerCtrl = TextEditingController(text: _securityAnswer ?? '');
     String selectedQ = _securityQuestion;
 
@@ -250,35 +313,61 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDState) => AlertDialog(
-          title: const Text('Контрольный вопрос'),
+          backgroundColor: colors.card,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Text(
+            'Контрольный вопрос',
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: colors.text,
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
                 isExpanded: true,
                 initialValue: selectedQ,
+                dropdownColor: colors.card,
                 items: _securityQuestions
                     .map(
                       (q) => DropdownMenuItem(
                         value: q,
-                        child: Text(q, style: const TextStyle(fontSize: 13)),
+                        child: Text(q,
+                            style: TextStyle(
+                                fontFamily: 'Onest',
+                                fontSize: 13,
+                                color: colors.text)),
                       ),
                     )
                     .toList(),
                 onChanged: (v) {
                   if (v != null) setDState(() => selectedQ = v);
                 },
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
                   isDense: true,
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: answerCtrl,
-                decoration: const InputDecoration(
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                decoration: InputDecoration(
                   labelText: 'Ответ на вопрос',
-                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6)),
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16)),
                   isDense: true,
                 ),
               ),
@@ -287,9 +376,18 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Отмена'),
+              child: Text('Отмена',
+                  style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6))),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.accent,
+                foregroundColor: colors.isDark ? Colors.black : Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+              ),
               onPressed: () async {
                 final ans = answerCtrl.text.trim();
                 if (ans.isEmpty) return;
@@ -304,7 +402,9 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 });
                 Navigator.pop(ctx);
               },
-              child: const Text('Сохранить'),
+              child: const Text('Сохранить',
+                  style: TextStyle(
+                      fontFamily: 'Onest', fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -312,12 +412,14 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
     );
   }
 
-  Future<void> _exportVaultBackup() async {
+  Future<void> _exportVaultBackup(AppColorsExtension colors) async {
     final vault = ref.read(vaultProvider);
     if (!vault.isUnlocked) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Сначала разблокируйте Сейф перед экспортом'),
+        SnackBar(
+          content: const Text('Сначала разблокируйте Сейф перед экспортом',
+              style: TextStyle(fontFamily: 'Onest')),
+          backgroundColor: colors.warning,
         ),
       );
       return;
@@ -338,35 +440,56 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Резервная копия сейфа сохранена'),
-          backgroundColor: Color(0xFF10B981),
+        SnackBar(
+          content: const Text('Резервная копия сейфа сохранена',
+              style: TextStyle(fontFamily: 'Onest')),
+          backgroundColor: colors.success,
         ),
       );
     }
   }
 
-  void _confirmWipeEntireVault() {
+  void _confirmWipeEntireVault(AppColorsExtension colors) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
-            SizedBox(width: 8),
-            Text('Полная очистка сейфа?'),
+            Icon(Icons.warning_amber_rounded, color: colors.error),
+            const SizedBox(width: 8),
+            Text(
+              'Полная очистка сейфа?',
+              style: TextStyle(
+                fontFamily: 'Unbounded',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: colors.text,
+              ),
+            ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'Все зашифрованные файлы, фото и заметки будут удалены безвозвратно. Это действие нельзя отменить.',
+          style: TextStyle(
+              fontFamily: 'Onest', color: colors.text.withValues(alpha: 0.8)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text('Отмена',
+                style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6))),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
               final vaultNotifier = ref.read(vaultProvider.notifier);
@@ -375,17 +498,17 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
 
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Сейф полностью очищен'),
-                    backgroundColor: Color(0xFF10B981),
+                  SnackBar(
+                    content: const Text('Сейф полностью очищен',
+                        style: TextStyle(fontFamily: 'Onest')),
+                    backgroundColor: colors.success,
                   ),
                 );
               }
             },
-            child: const Text(
-              'Стереть всё',
-              style: TextStyle(color: Colors.white),
-            ),
+            child: const Text('Стереть всё',
+                style: TextStyle(
+                    fontFamily: 'Onest', fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -394,25 +517,27 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Безопасность Сейфа'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Безопасность Сейфа',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -422,48 +547,58 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.password_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Сменить мастер-PIN',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Изменить секретный код доступа к хранилищу',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: _showChangePinDialog,
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
+                  onTap: () => _showChangePinDialog(colors),
                 ),
                 Divider(height: 1, color: borderColor),
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.fingerprint,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Биометрическая аутентификация',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Вход по отпечатку пальца или Face ID',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  activeThumbColor: const Color(0xFF38BDF8),
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
                   value: _useBiometrics,
                   onChanged: (v) => _updateBool(
                     'vault_biometrics',
@@ -473,40 +608,42 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.lock_clock_outlined,
-                    color: Colors.amber,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Автоблокировка',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _autoLockTime,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
                   trailing: DropdownButton<String>(
                     value: _autoLockTime,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
-                    items:
-                        const [
-                              'Сразу при выходе',
-                              'Через 1 минуту',
-                              'Через 5 минут',
-                              'Через 15 минут',
-                            ]
-                            .map(
-                              (e) => DropdownMenuItem(value: e, child: Text(e)),
-                            )
-                            .toList(),
+                    items: const [
+                      'Сразу при выходе',
+                      'Через 1 минуту',
+                      'Через 5 минут',
+                      'Через 15 минут',
+                    ]
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
                     onChanged: (v) {
                       if (v != null) {
                         _updateString(
@@ -520,23 +657,28 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.help_outline,
-                    color: Colors.purpleAccent,
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Контрольный вопрос',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     '$_securityQuestion (${_securityAnswer != null ? "Задан" : "Не задан"})',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  trailing: const Icon(Icons.edit_outlined, size: 20),
-                  onTap: _showSecurityQuestionDialog,
+                  trailing:
+                      Icon(Icons.edit_outlined, size: 20, color: textSecondary),
+                  onTap: () => _showSecurityQuestionDialog(colors),
                 ),
               ],
             ),
@@ -548,32 +690,37 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.warning_amber_outlined,
-                    color: Colors.orangeAccent,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Лимит неверных попыток',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Блокировка после $_maxFailedAttempts неудачных вводов',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
                   trailing: DropdownButton<int>(
                     value: _maxFailedAttempts,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -595,22 +742,27 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 SwitchListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.auto_delete_outlined,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
                   title: Text(
                     'Экстренное стирание',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Удалить данные сейфа при исчерпании лимита попыток',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  activeThumbColor: Colors.redAccent,
+                  activeThumbColor: colors.error,
+                  activeTrackColor: colors.error.withValues(alpha: 0.3),
                   value: _wipeOnMaxAttempts,
                   onChanged: (v) => _updateBool(
                     'vault_wipe_on_max_attempts',
@@ -628,28 +780,35 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.blur_on,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Скрывать текст заметок в плитках',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Показывать только заголовок до открытия заметки',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _hideTextPreviewInGrid,
                   onChanged: (v) => _updateBool(
                     'vault_hide_text_preview',
@@ -659,32 +818,38 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(Icons.sort, color: Color(0xFF38BDF8)),
+                  leading: Icon(Icons.sort, color: colors.accent),
                   title: Text(
                     'Сортировка документов',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _defaultSort,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
                   trailing: DropdownButton<String>(
                     value: _defaultSort,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
-                    items:
-                        const ['Сначала новые', 'Сначала старые', 'По алфавиту']
-                            .map(
-                              (e) => DropdownMenuItem(value: e, child: Text(e)),
-                            )
-                            .toList(),
+                    items: const [
+                      'Сначала новые',
+                      'Сначала старые',
+                      'По алфавиту',
+                    ]
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
                     onChanged: (v) {
                       if (v != null) {
                         _updateString(
@@ -706,76 +871,89 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.storage_outlined,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Занятое место',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Зашифрованных файлов: $_filesCount ($_totalSizeString)',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.download_for_offline_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Экспорт резервной копии',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Сохранить защищенный бэкап данных сейфа',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  trailing: const Icon(Icons.chevron_right, size: 20),
-                  onTap: _exportVaultBackup,
+                  trailing:
+                      Icon(Icons.chevron_right, size: 20, color: textSecondary),
+                  onTap: () => _exportVaultBackup(colors),
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.delete_forever_outlined,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
-                  title: const Text(
+                  title: Text(
                     'Полная очистка сейфа',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
-                      color: Colors.redAccent,
+                      color: colors.error,
                     ),
                   ),
                   subtitle: Text(
                     'Безвозвратно стереть все файлы и сбросить хранилище',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: textSecondary,
+                        fontSize: 12),
                   ),
-                  trailing: const Icon(
+                  trailing: Icon(
                     Icons.chevron_right,
-                    color: Colors.redAccent,
+                    color: colors.error,
                     size: 20,
                   ),
-                  onTap: _confirmWipeEntireVault,
+                  onTap: () => _confirmWipeEntireVault(colors),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -787,6 +965,7 @@ class _VaultSettingsScreenState extends ConsumerState<VaultSettingsScreen> {
       child: Text(
         title,
         style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,

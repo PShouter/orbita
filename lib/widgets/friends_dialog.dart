@@ -524,7 +524,7 @@ class _FriendsScreenState extends State<FriendsScreen>
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: _searchResults.length,
-                separatorBuilder: (_, _) =>
+                separatorBuilder: (_, __) =>
                     Divider(height: 1, color: borderColor),
                 itemBuilder: (ctx, i) {
                   final user = _searchResults[i];

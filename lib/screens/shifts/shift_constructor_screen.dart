@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../providers/shift_provider.dart';
+import '../../theme/app_theme.dart';
 
 class ShiftConstructorScreen extends ConsumerStatefulWidget {
   const ShiftConstructorScreen({super.key});
@@ -89,28 +90,35 @@ class _ShiftConstructorScreenState
     });
   }
 
-  void _pickColorForShift(int index) {
+  void _pickColorForShift(int index, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Выберите цвет смены',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
               ),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: _palette.map((c) {
+                  final isCurrent = _types[index].color == c.toARGB32();
                   return InkWell(
                     borderRadius: BorderRadius.circular(20),
                     onTap: () {
@@ -124,7 +132,7 @@ class _ShiftConstructorScreenState
                     child: CircleAvatar(
                       backgroundColor: c,
                       radius: 20,
-                      child: (_types[index].color == c.toARGB32())
+                      child: isCurrent
                           ? const Icon(Icons.check, color: Colors.white)
                           : null,
                     ),
@@ -168,26 +176,36 @@ class _ShiftConstructorScreenState
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final shiftState = ref.watch(shiftProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary =
-        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
-
     final typesMap = {for (var t in _types) t.id: t};
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Настройка графика'),
-        backgroundColor: bg,
+        title: Text(
+          'Настройка графика',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
+        backgroundColor: colors.bg,
+        elevation: 0,
+        iconTheme: IconThemeData(color: colors.text),
         actions: [
           TextButton(
             onPressed: _save,
-            child: const Text(
+            child: Text(
               'Сохранить',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: colors.accent,
+              ),
             ),
           ),
         ],
@@ -196,43 +214,56 @@ class _ShiftConstructorScreenState
         padding: const EdgeInsets.all(16),
         children: [
           // 1. Название графика
-          Material(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: TextField(
-                controller: _scheduleNameCtrl,
-                style: TextStyle(
-                  color: textPrimary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: colors.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.nested),
+            ),
+            child: TextField(
+              controller: _scheduleNameCtrl,
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Название этого графика',
+                labelStyle: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.6),
                 ),
-                decoration: const InputDecoration(
-                  labelText: 'Название этого графика',
-                  border: InputBorder.none,
-                ),
+                border: InputBorder.none,
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // 2. Дата начала цикла
-          Material(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          Container(
+            decoration: BoxDecoration(
+              color: colors.card,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.nested),
             ),
-            clipBehavior: Clip.antiAlias,
             child: ListTile(
-              leading: const Icon(Icons.event, color: Color(0xFF38BDF8)),
-              title: const Text('Дата начала цикла'),
+              leading: Icon(Icons.event, color: colors.accent),
+              title: Text(
+                'Дата начала цикла',
+                style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.w600,
+                    color: colors.text),
+              ),
               subtitle: Text(
                 DateFormat('d MMMM yyyy', 'ru').format(_startDate),
+                style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6)),
               ),
-              trailing: const Icon(Icons.edit_calendar),
+              trailing: Icon(Icons.edit_calendar, color: colors.accent),
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
@@ -244,39 +275,65 @@ class _ShiftConstructorScreenState
               },
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // 3. Шаблоны пресетов
-          const Text(
+          Text(
             'Готовые шаблоны',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: colors.text,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             children: ['2/2', '3/3', '1/2', '1/3', '5/2'].map((preset) {
               return ActionChip(
-                label: Text(preset),
+                backgroundColor: colors.card,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                  side: BorderSide(color: colors.nested),
+                ),
+                label: Text(
+                  preset,
+                  style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontWeight: FontWeight.w600,
+                      color: colors.text),
+                ),
                 onPressed: () => _applyPreset(preset),
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // 4. Дни цикла
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Последовательность дней цикла',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              Text(
+                'Дни цикла',
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
               ),
               if (_cycle.isNotEmpty)
                 TextButton(
                   onPressed: () => setState(() => _cycle.clear()),
-                  child: const Text(
+                  child: Text(
                     'Очистить',
-                    style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.error,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
             ],
@@ -287,7 +344,8 @@ class _ShiftConstructorScreenState
               child: Text(
                 'Цикл не задан (календарь будет пустым)',
                 style: TextStyle(
-                  color: Colors.grey.shade500,
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.5),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -299,19 +357,37 @@ class _ShiftConstructorScreenState
               children: List.generate(_cycle.length, (i) {
                 final shift = typesMap[_cycle[i]] ?? defaultRestShift;
                 return Chip(
+                  backgroundColor: colors.card,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                    side: BorderSide(color: colors.nested),
+                  ),
                   avatar: CircleAvatar(
                     backgroundColor: Color(shift.color),
                     child: Text(
                       shift.shortName,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: ThemeData.estimateBrightnessForColor(
+                                    Color(shift.color)) ==
+                                Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  label: Text('${i + 1}: ${shift.name}'),
+                  label: Text(
+                    '${i + 1}: ${shift.name}',
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                  ),
+                  deleteIconColor: colors.text.withValues(alpha: 0.5),
                   onDeleted: () => setState(() => _cycle.removeAt(i)),
                 );
               }),
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           // Кнопки добавления смены в цепочку цикла
           Wrap(
@@ -322,10 +398,19 @@ class _ShiftConstructorScreenState
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(type.color).withValues(alpha: 0.15),
                   foregroundColor: Color(type.color),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(13),
+                    side: BorderSide(
+                        color: Color(type.color).withValues(alpha: 0.4)),
+                  ),
                   elevation: 0,
                 ),
                 icon: const Icon(Icons.add, size: 16),
-                label: Text(type.name),
+                label: Text(
+                  type.name,
+                  style: const TextStyle(
+                      fontFamily: 'Onest', fontWeight: FontWeight.w600),
+                ),
                 onPressed: () => setState(() => _cycle.add(type.id)),
               );
             }).toList(),
@@ -336,167 +421,242 @@ class _ShiftConstructorScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Типы смен и цвета',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
               ),
               TextButton.icon(
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Добавить смену'),
+                icon: Icon(Icons.add, size: 18, color: colors.accent),
+                label: Text(
+                  'Добавить смену',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.w600,
+                    color: colors.accent,
+                  ),
+                ),
                 onPressed: _addNewShiftType,
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
 
           ..._types.asMap().entries.map((entry) {
             final idx = entry.key;
             final item = entry.value;
 
-            return Material(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              clipBehavior: Clip.antiAlias,
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        // Кружок выбора цвета смены
-                        InkWell(
-                          borderRadius: BorderRadius.circular(18),
-                          onTap: () => _pickColorForShift(idx),
-                          child: CircleAvatar(
-                            backgroundColor: Color(item.color),
-                            radius: 18,
-                            child: const Icon(
-                              Icons.palette_outlined,
-                              size: 18,
-                              color: Colors.white,
-                            ),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colors.card,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.nested),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () => _pickColorForShift(idx, colors),
+                        child: CircleAvatar(
+                          backgroundColor: Color(item.color),
+                          radius: 18,
+                          child: const Icon(
+                            Icons.palette_outlined,
+                            size: 18,
+                            color: Colors.white,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // Название смены
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          initialValue: item.name,
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontWeight: FontWeight.w600,
+                            color: colors.text,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: 'Название смены',
+                            labelStyle: TextStyle(
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.6),
+                            ),
+                            border: UnderlineInputBorder(
+                              borderSide: BorderSide(color: colors.nested),
+                            ),
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide:
+                                  BorderSide(color: colors.accent, width: 2),
+                            ),
+                          ),
+                          onChanged: (val) {
+                            final trimmed = val.trim();
+                            _types[idx] = item.copyWith(
+                              name: trimmed.isEmpty ? 'Смена' : trimmed,
+                              shortName: trimmed.isNotEmpty
+                                  ? trimmed[0].toUpperCase()
+                                  : 'С',
+                            );
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: item.isWork
+                            ? 'Смена рабочая'
+                            : 'Смена считается выходным',
+                        icon: Icon(
+                          item.isWork ? Icons.work : Icons.beach_access,
+                          color: item.isWork ? colors.warning : colors.success,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _types[idx] = item.copyWith(isWork: !item.isWork);
+                          });
+                        },
+                      ),
+                      if (_types.length > 1)
+                        IconButton(
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: colors.error,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _cycle.removeWhere((id) => id == item.id);
+                              _types.removeAt(idx);
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                  if (item.isWork) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
                         Expanded(
                           child: TextFormField(
-                            initialValue: item.name,
-                            decoration: const InputDecoration(
-                              labelText: 'Название смены',
-                              border: UnderlineInputBorder(),
+                            initialValue: item.startTime,
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text),
+                            decoration: InputDecoration(
+                              labelText: 'Начало (например 08:00)',
+                              labelStyle: TextStyle(
+                                fontFamily: 'Onest',
+                                color: colors.text.withValues(alpha: 0.6),
+                              ),
+                              border: UnderlineInputBorder(
+                                borderSide: BorderSide(color: colors.nested),
+                              ),
                             ),
                             onChanged: (val) {
-                              final trimmed = val.trim();
                               _types[idx] = item.copyWith(
-                                name: trimmed.isEmpty ? 'Смена' : trimmed,
-                                shortName: trimmed.isNotEmpty
-                                    ? trimmed[0].toUpperCase()
-                                    : 'С',
+                                startTime: val.trim(),
                               );
                             },
                           ),
                         ),
-                        // Переключатель: Рабочая / Выходной
-                        IconButton(
-                          tooltip: item.isWork
-                              ? 'Смена рабочая'
-                              : 'Смена считается выходным',
-                          icon: Icon(
-                            item.isWork ? Icons.work : Icons.beach_access,
-                            color: item.isWork ? Colors.amber : Colors.green,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _types[idx] = item.copyWith(isWork: !item.isWork);
-                            });
-                          },
-                        ),
-                        if (_types.length > 1)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.redAccent,
-                              size: 20,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: TextFormField(
+                            initialValue: item.endTime,
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text),
+                            decoration: InputDecoration(
+                              labelText: 'Конец (например 20:00)',
+                              labelStyle: TextStyle(
+                                fontFamily: 'Onest',
+                                color: colors.text.withValues(alpha: 0.6),
+                              ),
+                              border: UnderlineInputBorder(
+                                borderSide: BorderSide(color: colors.nested),
+                              ),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _cycle.removeWhere((id) => id == item.id);
-                                _types.removeAt(idx);
-                              });
+                            onChanged: (val) {
+                              _types[idx] = item.copyWith(
+                                endTime: val.trim(),
+                              );
                             },
                           ),
+                        ),
                       ],
                     ),
-                    if (item.isWork) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: item.startTime,
-                              decoration: const InputDecoration(
-                                labelText: 'Начало (например 08:00)',
-                              ),
-                              onChanged: (val) {
-                                _types[idx] = item.copyWith(
-                                  startTime: val.trim(),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: item.endTime,
-                              decoration: const InputDecoration(
-                                labelText: 'Конец (например 20:00)',
-                              ),
-                              onChanged: (val) {
-                                _types[idx] = item.copyWith(
-                                  endTime: val.trim(),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
             );
           }),
 
           const SizedBox(height: 16),
 
-          // 6. Удаление текущего графика (если их больше 1)
+          // 6. Удаление текущего графика
           if (shiftState.schedules.length > 1)
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.redAccent,
-                side: const BorderSide(color: Colors.redAccent),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                foregroundColor: colors.error,
+                side: BorderSide(color: colors.error),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               icon: const Icon(Icons.delete_forever),
-              label: const Text('Удалить этот график'),
+              label: Text(
+                'Удалить этот график',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               onPressed: () {
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Удалить график?'),
+                    backgroundColor: colors.card,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22)),
+                    title: Text(
+                      'Удалить график?',
+                      style: TextStyle(
+                        fontFamily: 'Unbounded',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
+                      ),
+                    ),
                     content: Text(
                       'Вы действительно хотите удалить "${_scheduleNameCtrl.text}"?',
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.7),
+                      ),
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Отмена'),
+                        child: Text(
+                          'Отмена',
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.6),
+                          ),
+                        ),
                       ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.error,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: () {
                           Navigator.pop(ctx);
@@ -507,7 +667,10 @@ class _ShiftConstructorScreenState
                         },
                         child: const Text(
                           'Удалить',
-                          style: TextStyle(color: Colors.white),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -515,6 +678,7 @@ class _ShiftConstructorScreenState
                 );
               },
             ),
+          const SizedBox(height: 24),
         ],
       ),
     );

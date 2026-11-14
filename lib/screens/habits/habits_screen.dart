@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/habits_provider.dart';
+import '../../theme/app_theme.dart';
 import '../settings/sections/habit_settings_screen.dart';
 import 'habit_archive_screen.dart';
 import 'habit_detail_screen.dart';
@@ -68,63 +69,49 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final habits = ref.watch(sortedHabitsProvider);
     final sortType = ref.watch(habitSortProvider);
     final isReverseDays = ref.watch(habitReverseDaysProvider);
     final visibleDates = _getVisibleDates(isReverseDays);
 
-    final isDark = widget.isDarkMode;
-    final bgColor = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
-
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bgColor,
+        backgroundColor: colors.bg,
         elevation: 0,
         title: Text(
           'Привычки',
           style: TextStyle(
+            fontFamily: 'Unbounded',
             fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: textPrimary,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.archive_outlined, color: textSecondary),
+            icon: Icon(Icons.archive_outlined,
+                color: colors.text.withValues(alpha: 0.6)),
             tooltip: 'Архив привычек',
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => HabitArchiveScreen(isDarkMode: isDark),
+                  builder: (_) => HabitArchiveScreen(isDarkMode: colors.isDark),
                 ),
               );
             },
           ),
           IconButton(
-            icon: Icon(Icons.filter_list, color: textSecondary),
+            icon: Icon(Icons.filter_list,
+                color: colors.text.withValues(alpha: 0.6)),
             tooltip: 'Фильтр',
-            onPressed: () => _showFilterDialog(
-              context,
-              isDark,
-              cardBg,
-              textPrimary,
-              textSecondary,
-            ),
+            onPressed: () => _showFilterDialog(context, colors),
           ),
           IconButton(
-            icon: Icon(Icons.settings_outlined, color: textSecondary),
+            icon: Icon(Icons.settings_outlined,
+                color: colors.text.withValues(alpha: 0.6)),
             tooltip: 'Настройки',
             onPressed: () {
               Navigator.push(
@@ -136,19 +123,15 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
         ],
       ),
       body: habits.isEmpty
-          ? _buildEmptyState(textSecondary)
+          ? _buildEmptyState(colors)
           : Column(
               children: [
-                _buildDatesHeader(
-                  visibleDates,
-                  cardBg,
-                  textPrimary,
-                  textSecondary,
-                ),
-                Divider(height: 1, color: borderColor),
+                _buildDatesHeader(visibleDates, colors),
+                Divider(height: 1, color: colors.nested),
                 Expanded(
                   child: sortType == HabitSortType.manual
                       ? ReorderableListView.builder(
+                          padding: const EdgeInsets.only(bottom: 84),
                           itemCount: habits.length,
                           onReorder: (oldIndex, newIndex) {
                             ref
@@ -161,15 +144,12 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               key: ValueKey('habit_${habit.id}'),
                               habit: habit,
                               visibleDates: visibleDates,
-                              isDark: isDark,
-                              cardBg: cardBg,
-                              textPrimary: textPrimary,
-                              textSecondary: textSecondary,
-                              borderColor: borderColor,
+                              colors: colors,
                             );
                           },
                         )
                       : ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 84),
                           itemCount: habits.length,
                           itemBuilder: (context, index) {
                             final habit = habits[index];
@@ -177,11 +157,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                               key: ValueKey('habit_${habit.id}'),
                               habit: habit,
                               visibleDates: visibleDates,
-                              isDark: isDark,
-                              cardBg: cardBg,
-                              textPrimary: textPrimary,
-                              textSecondary: textSecondary,
-                              borderColor: borderColor,
+                              colors: colors,
                             );
                           },
                         ),
@@ -189,21 +165,17 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF38BDF8),
-        foregroundColor: Colors.white,
+        backgroundColor: colors.accent,
+        foregroundColor: colors.isDark ? Colors.black : Colors.white,
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: const Icon(Icons.add, size: 28),
-        onPressed: () => _showCreateTypeDialog(
-          context,
-          isDark,
-          cardBg,
-          textPrimary,
-          textSecondary,
-        ),
+        onPressed: () => _showCreateTypeDialog(context, colors),
       ),
     );
   }
 
-  Widget _buildEmptyState(Color textSecondary) {
+  Widget _buildEmptyState(AppColorsExtension colors) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -211,18 +183,24 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
           Icon(
             Icons.repeat,
             size: 64,
-            color: textSecondary.withValues(alpha: 0.3),
+            color: colors.text.withValues(alpha: 0.2),
           ),
           const SizedBox(height: 16),
           Text(
             'Нет привычек',
-            style: TextStyle(color: textSecondary, fontSize: 16),
+            style: TextStyle(
+              fontFamily: 'Onest',
+              color: colors.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Нажмите "+", чтобы создать первую привычку',
             style: TextStyle(
-              color: textSecondary.withValues(alpha: 0.7),
+              fontFamily: 'Onest',
+              color: colors.text.withValues(alpha: 0.5),
               fontSize: 13,
             ),
           ),
@@ -233,17 +211,15 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
   Widget _buildDatesHeader(
     List<DateTime> visibleDates,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onHorizontalDragStart: (_) => _handleDragStart(),
       onHorizontalDragUpdate: _handleDragUpdate,
       child: Container(
-        color: cardBg,
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        color: colors.card,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
         child: Row(
           children: [
             Expanded(
@@ -253,7 +229,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                     child: Text(
                       'Привычка',
                       style: TextStyle(
-                        color: textSecondary,
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -261,26 +238,28 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                     ),
                   ),
                   if (_dayOffset > 0) ...[
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     InkWell(
                       onTap: () {
                         setState(() => _dayOffset = 0);
                         HapticFeedback.selectionClick();
                       },
+                      borderRadius: BorderRadius.circular(13),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
+                          horizontal: 8,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
+                          color: colors.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(13),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Сегодня',
                           style: TextStyle(
-                            color: Color(0xFF38BDF8),
-                            fontSize: 9,
+                            fontFamily: 'Onest',
+                            color: colors.accent,
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -297,7 +276,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 final dayStr = date.day.toString();
 
                 return Container(
-                  width: 34,
+                  width: 36,
                   margin: const EdgeInsets.symmetric(horizontal: 2),
                   child: Column(
                     children: [
@@ -306,13 +285,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         child: Text(
                           weekdayStr,
                           style: TextStyle(
+                            fontFamily: 'Onest',
                             fontSize: 11,
-                            fontWeight: isToday
-                                ? FontWeight.bold
-                                : FontWeight.normal,
+                            fontWeight:
+                                isToday ? FontWeight.bold : FontWeight.w500,
                             color: isToday
-                                ? const Color(0xFF38BDF8)
-                                : textSecondary,
+                                ? colors.accent
+                                : colors.text.withValues(alpha: 0.5),
                           ),
                         ),
                       ),
@@ -322,11 +301,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         child: Text(
                           dayStr,
                           style: TextStyle(
+                            fontFamily: isToday ? 'Unbounded' : 'Onest',
                             fontSize: 12,
-                            fontWeight: isToday
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: isToday ? textPrimary : textSecondary,
+                            fontWeight:
+                                isToday ? FontWeight.w600 : FontWeight.w500,
+                            color: isToday
+                                ? colors.text
+                                : colors.text.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
@@ -345,22 +326,19 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     required Key key,
     required HabitItem habit,
     required List<DateTime> visibleDates,
-    required bool isDark,
-    required Color cardBg,
-    required Color textPrimary,
-    required Color textSecondary,
-    required Color borderColor,
+    required AppColorsExtension colors,
   }) {
     return Container(
       key: key,
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: borderColor, width: 0.5)),
+        border: Border(bottom: BorderSide(color: colors.nested, width: 0.5)),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
       child: Row(
         children: [
           Expanded(
             child: InkWell(
+              borderRadius: BorderRadius.circular(12),
               onTap: () {
                 Navigator.push(
                   context,
@@ -373,13 +351,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 children: [
                   Container(
                     width: 4,
-                    height: 28,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: habit.color,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,24 +365,28 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         Text(
                           habit.title,
                           style: TextStyle(
-                            color: textPrimary,
+                            fontFamily: 'Onest',
+                            color: colors.text,
                             fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (habit.question != null &&
-                            habit.question!.isNotEmpty)
+                            habit.question!.isNotEmpty) ...[
+                          const SizedBox(height: 2),
                           Text(
                             habit.question!,
                             style: TextStyle(
-                              color: textSecondary,
-                              fontSize: 10,
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.5),
+                              fontSize: 11,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                        ],
                       ],
                     ),
                   ),
@@ -420,7 +402,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
               final val = habit.valueOn(dateStr);
 
               return Container(
-                width: 34,
+                width: 36,
                 margin: const EdgeInsets.symmetric(horizontal: 2),
                 alignment: Alignment.center,
                 child: _buildDayCheckCell(
@@ -428,9 +410,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   dateStr: dateStr,
                   isDone: isDone,
                   value: val,
-                  isDark: isDark,
-                  cardBg: cardBg,
-                  textPrimary: textPrimary,
+                  colors: colors,
                 ),
               );
             }).toList(),
@@ -445,61 +425,59 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     required String dateStr,
     required bool isDone,
     required double value,
-    required bool isDark,
-    required Color cardBg,
-    required Color textPrimary,
+    required AppColorsExtension colors,
   }) {
     final isNumerical = habit.type == 'numerical';
     final isShortTap = ref.watch(habitShortTapProvider);
 
     final cellBody = Container(
-      width: 30,
-      height: 30,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: isDone ? habit.color : Colors.transparent,
         border: Border.all(
-          color: isDone
-              ? habit.color
-              : (isDark ? Colors.white24 : Colors.black26),
+          color: isDone ? habit.color : colors.nested,
           width: 2,
         ),
       ),
       alignment: Alignment.center,
       child: isNumerical
           ? (isDone
-                ? Text(
-                    value >= 1000
-                        ? '${(value / 1000).toStringAsFixed(1)}k'
-                        : value.toStringAsFixed(
-                            value.truncateToDouble() == value ? 0 : 1,
-                          ),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : (value > 0
-                      ? Text(
-                          value.toStringAsFixed(0),
-                          style: TextStyle(
-                            color: habit.color,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      : null))
+              ? Text(
+                  value >= 1000
+                      ? '${(value / 1000).toStringAsFixed(1)}k'
+                      : value.toStringAsFixed(
+                          value.truncateToDouble() == value ? 0 : 1,
+                        ),
+                  style: const TextStyle(
+                    fontFamily: 'Onest',
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : (value > 0
+                  ? Text(
+                      value.toStringAsFixed(0),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: habit.color,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null))
           : (isDone
-                ? const Icon(Icons.check, size: 16, color: Colors.white)
-                : null),
+              ? const Icon(Icons.check, size: 18, color: Colors.white)
+              : null),
     );
 
     return InkWell(
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(16),
       onTap: () async {
         if (isNumerical) {
-          _showNumericalInputDialog(habit, dateStr, value, cardBg, textPrimary);
+          _showNumericalInputDialog(habit, dateStr, value, colors);
         } else if (isShortTap) {
           HapticFeedback.selectionClick();
           await ref
@@ -509,7 +487,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
       },
       onLongPress: () async {
         if (isNumerical) {
-          _showNumericalInputDialog(habit, dateStr, value, cardBg, textPrimary);
+          _showNumericalInputDialog(habit, dateStr, value, colors);
         } else {
           HapticFeedback.mediumImpact();
           await ref
@@ -517,7 +495,10 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
               .toggleHabitDay(habit.id, dateStr);
         }
       },
-      child: cellBody,
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: cellBody,
+      ),
     );
   }
 
@@ -525,8 +506,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     HabitItem habit,
     String dateStr,
     double currentValue,
-    Color cardBg,
-    Color textPrimary,
+    AppColorsExtension colors,
   ) {
     double tempVal = currentValue > 0 ? currentValue : habit.targetValue;
     final controller = TextEditingController(
@@ -541,10 +521,17 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: cardBg,
+              backgroundColor: colors.card,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22)),
               title: Text(
                 habit.title,
-                style: TextStyle(color: textPrimary, fontSize: 17),
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  color: colors.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -552,7 +539,8 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   Text(
                     'Цель: ${habit.targetValue} ${habit.unit ?? ""}',
                     style: TextStyle(
-                      color: textPrimary.withValues(alpha: 0.6),
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
                       fontSize: 13,
                     ),
                   ),
@@ -563,7 +551,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                       IconButton(
                         icon: Icon(
                           Icons.remove_circle_outline,
-                          color: textPrimary,
+                          color: colors.text,
                         ),
                         onPressed: () {
                           setDialogState(() {
@@ -580,14 +568,26 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                             decimal: true,
                           ),
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: textPrimary, fontSize: 20),
+                          style: TextStyle(
+                            fontFamily: 'Unbounded',
+                            color: colors.text,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                           decoration: InputDecoration(
                             suffixText: habit.unit,
                             suffixStyle: TextStyle(
-                              color: textPrimary.withValues(alpha: 0.5),
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.5),
                               fontSize: 12,
                             ),
-                            border: const UnderlineInputBorder(),
+                            border: UnderlineInputBorder(
+                              borderSide: BorderSide(color: colors.nested),
+                            ),
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide:
+                                  BorderSide(color: colors.accent, width: 2),
+                            ),
                           ),
                           onChanged: (v) {
                             tempVal = double.tryParse(v) ?? tempVal;
@@ -597,7 +597,7 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                       IconButton(
                         icon: Icon(
                           Icons.add_circle_outline,
-                          color: textPrimary,
+                          color: colors.text,
                         ),
                         onPressed: () {
                           setDialogState(() {
@@ -618,15 +618,22 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         .setNumericalValue(habit.id, dateStr, 0);
                     Navigator.pop(ctx);
                   },
-                  child: const Text(
+                  child: Text(
                     'Сбросить',
-                    style: TextStyle(color: Colors.redAccent),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
+                FilledButton(
+                  style: FilledButton.styleFrom(
                     backgroundColor: habit.color,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                   onPressed: () {
                     final entered = double.tryParse(controller.text) ?? tempVal;
@@ -635,7 +642,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                         .setNumericalValue(habit.id, dateStr, entered);
                     Navigator.pop(ctx);
                   },
-                  child: const Text('Сохранить'),
+                  child: const Text(
+                    'Сохранить',
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             );
@@ -647,16 +660,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
   void _showFilterDialog(
     BuildContext context,
-    bool isDark,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardBg,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
         final currentSort = ref.watch(habitSortProvider);
@@ -671,9 +681,10 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 child: Text(
                   'Сортировка',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                    fontFamily: 'Unbounded',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
                   ),
                 ),
               ),
@@ -682,40 +693,35 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 subtitle: 'Перетаскивание элементов вверх/вниз',
                 value: HabitSortType.manual,
                 groupValue: currentSort,
-                textPrimary: textPrimary,
-                textSecondary: textSecondary,
+                colors: colors,
               ),
               _buildSortTile(
                 title: 'По названию',
                 subtitle: 'Алфавитный порядок (А–Я)',
                 value: HabitSortType.name,
                 groupValue: currentSort,
-                textPrimary: textPrimary,
-                textSecondary: textSecondary,
+                colors: colors,
               ),
               _buildSortTile(
                 title: 'По цвету',
                 subtitle: 'Группировка по оттенкам',
                 value: HabitSortType.color,
                 groupValue: currentSort,
-                textPrimary: textPrimary,
-                textSecondary: textSecondary,
+                colors: colors,
               ),
               _buildSortTile(
                 title: 'По результатам',
                 subtitle: 'По силе привычки за 30 дней',
                 value: HabitSortType.score,
                 groupValue: currentSort,
-                textPrimary: textPrimary,
-                textSecondary: textSecondary,
+                colors: colors,
               ),
               _buildSortTile(
                 title: 'По статусу',
                 subtitle: 'Сначала невыполненные на сегодня',
                 value: HabitSortType.status,
                 groupValue: currentSort,
-                textPrimary: textPrimary,
-                textSecondary: textSecondary,
+                colors: colors,
               ),
               const SizedBox(height: 8),
             ],
@@ -730,16 +736,26 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
     required String subtitle,
     required HabitSortType value,
     required HabitSortType groupValue,
-    required Color textPrimary,
-    required Color textSecondary,
+    required AppColorsExtension colors,
   }) {
     return RadioListTile<HabitSortType>(
-      title: Text(title, style: TextStyle(color: textPrimary)),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontFamily: 'Onest',
+          fontWeight: FontWeight.w600,
+          color: colors.text,
+        ),
+      ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(color: textSecondary, fontSize: 12),
+        style: TextStyle(
+          fontFamily: 'Onest',
+          color: colors.text.withValues(alpha: 0.6),
+          fontSize: 12,
+        ),
       ),
-      activeColor: const Color(0xFF38BDF8),
+      activeColor: colors.accent,
       value: value,
       groupValue: groupValue,
       onChanged: (selected) {
@@ -753,16 +769,13 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
 
   void _showCreateTypeDialog(
     BuildContext context,
-    bool isDark,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardBg,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -774,9 +787,10 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                 Text(
                   'Создать привычку',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                    fontFamily: 'Unbounded',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -784,24 +798,29 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                      color: colors.accent.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.check_circle_outline,
-                      color: Color(0xFF38BDF8),
+                      color: colors.accent,
                     ),
                   ),
                   title: Text(
                     'Да или Нет',
                     style: TextStyle(
-                      color: textPrimary,
+                      fontFamily: 'Onest',
+                      color: colors.text,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   subtitle: Text(
                     'Например: медитировать, сделать зарядку',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
@@ -817,21 +836,26 @@ class _HabitsScreenState extends ConsumerState<HabitsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.15),
+                      color: colors.warning.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.speed, color: Colors.amber),
+                    child: Icon(Icons.speed, color: colors.warning),
                   ),
                   title: Text(
                     'Измеримая',
                     style: TextStyle(
-                      color: textPrimary,
+                      fontFamily: 'Onest',
+                      color: colors.text,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   subtitle: Text(
                     'Например: выпить 2000 мл воды, прочитать 20 страниц',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
                   ),
                   onTap: () {
                     Navigator.pop(ctx);

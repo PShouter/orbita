@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/gamification_provider.dart';
+import '../../theme/app_theme.dart';
 import 'achievements_screen.dart';
 
 class OrbitalStationScreen extends ConsumerStatefulWidget {
@@ -21,25 +22,13 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
     Future.microtask(() => ref.read(gamificationProvider.notifier).loadData());
   }
 
-  void _showExpRulesDialog(BuildContext context) {
-    final isDarkMode = widget.isDarkMode;
-    final bg = isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
-
+  void _showExpRulesDialog(BuildContext context, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: bg,
+      backgroundColor: colors.card,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
         return DraggableScrollableSheet(
@@ -58,9 +47,7 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                     height: 4,
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: isDarkMode
-                          ? const Color(0xFF30363D)
-                          : const Color(0xFFE2E8F0),
+                      color: colors.nested,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -70,12 +57,12 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                        color: colors.accent.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.info_outline,
-                        color: Color(0xFF38BDF8),
+                        color: colors.accent,
                         size: 22,
                       ),
                     ),
@@ -83,9 +70,10 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                     Text(
                       'Как получить EXP',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
+                        fontFamily: 'Unbounded',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
                       ),
                     ),
                   ],
@@ -93,25 +81,25 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Энергия станции пополняется за ежедневные действия и самодисциплину:',
-                  style: TextStyle(fontSize: 13, color: textSecondary),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontSize: 13,
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
                 ),
                 const SizedBox(height: 18),
-
                 _buildExpRuleGroup(
                   icon: Icons.check_circle_outline,
-                  color: const Color(0xFF10B981),
+                  color: colors.success,
                   title: 'Привычки',
                   rules: [
                     'Выполнение привычки — +15 EXP',
                     'Серия 7 дней без пропусков — бонус x1.2 к EXP',
                     'Идеальный день (закрыты все привычки) — +30 EXP',
                   ],
-                  textPrimary: textPrimary,
-                  textSecondary: textSecondary,
-                  borderColor: borderColor,
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
-
                 _buildExpRuleGroup(
                   icon: Icons.book_outlined,
                   color: const Color(0xFF8B5CF6),
@@ -121,15 +109,12 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                     'Прикрепление фото или тегов — +5 EXP',
                     'Серия 7 дней ведения дневника — +100 EXP',
                   ],
-                  textPrimary: textPrimary,
-                  textSecondary: textSecondary,
-                  borderColor: borderColor,
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
-
                 _buildExpRuleGroup(
                   icon: Icons.account_balance_wallet_outlined,
-                  color: const Color(0xFFF59E0B),
+                  color: colors.warning,
                   title: 'Бюджет',
                   rules: [
                     'Внесение ежедневной траты или дохода — +10 EXP (до 3 раз в день)',
@@ -137,24 +122,19 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                     'Соблюдение недельного лимита трат — +40 EXP',
                     'Месяц без перерасхода бюджета — +150 EXP',
                   ],
-                  textPrimary: textPrimary,
-                  textSecondary: textSecondary,
-                  borderColor: borderColor,
+                  colors: colors,
                 ),
                 const SizedBox(height: 12),
-
                 _buildExpRuleGroup(
                   icon: Icons.task_alt,
-                  color: const Color(0xFF38BDF8),
+                  color: colors.accent,
                   title: 'Задачи и Смены',
                   rules: [
                     'Выполнение обычной задачи — +10 EXP',
                     'Выполнение приоритетной задачи — +20 EXP',
                     'Закрытие смены по графику — +25 EXP',
                   ],
-                  textPrimary: textPrimary,
-                  textSecondary: textSecondary,
-                  borderColor: borderColor,
+                  colors: colors,
                 ),
                 const SizedBox(height: 20),
               ],
@@ -170,16 +150,14 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
     required Color color,
     required String title,
     required List<String> rules,
-    required Color textPrimary,
-    required Color textSecondary,
-    required Color borderColor,
+    required AppColorsExtension colors,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,9 +169,10 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
               Text(
                 title,
                 style: TextStyle(
+                  fontFamily: 'Onest',
                   fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: textPrimary,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
                 ),
               ),
             ],
@@ -218,9 +197,10 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                     child: Text(
                       rule,
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 12.5,
-                        color: textSecondary,
-                        height: 1.3,
+                        color: colors.text.withValues(alpha: 0.7),
+                        height: 1.35,
                       ),
                     ),
                   ),
@@ -235,44 +215,34 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final gamification = ref.watch(gamificationProvider);
     final rank = gamification.rank;
-    final isDarkMode = widget.isDarkMode;
-
-    final bg = isDarkMode ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: colors.text),
         title: Text(
           'Орбитальная станция',
           style: TextStyle(
-            color: textPrimary,
-            fontWeight: FontWeight.bold,
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
         actions: [
           IconButton(
             tooltip: 'Условия начисления EXP',
-            icon: const Icon(
+            icon: Icon(
               Icons.info_outline,
-              color: Color(0xFF38BDF8),
+              color: colors.accent,
               size: 22,
             ),
-            onPressed: () => _showExpRulesDialog(context),
+            onPressed: () => _showExpRulesDialog(context, colors),
           ),
         ],
       ),
@@ -283,8 +253,8 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(20),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(
                 color: rank.primaryColor.withValues(alpha: 0.4),
                 width: 1.5,
@@ -327,8 +297,9 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                         child: Text(
                           '${rank.level}',
                           style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
+                            fontFamily: 'Unbounded',
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
                             color: rank.primaryColor,
                           ),
                         ),
@@ -340,15 +311,17 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                 Text(
                   rank.title,
                   style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: textPrimary,
+                    fontFamily: 'Unbounded',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   rank.echelon,
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontSize: 13,
                     color: rank.primaryColor,
                     fontWeight: FontWeight.w600,
@@ -356,13 +329,11 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                 ),
                 const SizedBox(height: 14),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(13),
                   child: LinearProgressIndicator(
                     value: gamification.progress,
                     minHeight: 10,
-                    backgroundColor: isDarkMode
-                        ? const Color(0xFF21262D)
-                        : const Color(0xFFE2E8F0),
+                    backgroundColor: colors.nested.withValues(alpha: 0.5),
                     valueColor: AlwaysStoppedAnimation<Color>(
                       rank.primaryColor,
                     ),
@@ -374,16 +345,21 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                   children: [
                     Text(
                       '${gamification.totalExp} EXP',
-                      style: TextStyle(fontSize: 12, color: textSecondary),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        fontSize: 12,
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
                     ),
                     Text(
                       rank.level == 20
                           ? 'Макс. ранг'
                           : 'До след: ${rank.maxExp + 1 - gamification.totalExp} EXP',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: textSecondary,
+                        color: colors.text.withValues(alpha: 0.6),
                       ),
                     ),
                   ],
@@ -395,33 +371,33 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
 
           // 2. Кнопка «Достижения»
           InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(22),
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AchievementsScreen(isDarkMode: isDarkMode),
+                  builder: (_) => AchievementsScreen(isDarkMode: colors.isDark),
                 ),
               );
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
+                color: colors.card,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.nested),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                      color: colors.warning.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.emoji_events,
-                      color: Color(0xFFF59E0B),
+                      color: colors.warning,
                       size: 24,
                     ),
                   ),
@@ -433,33 +409,39 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                         Text(
                           'Достижения',
                           style: TextStyle(
+                            fontFamily: 'Onest',
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: textPrimary,
+                            fontWeight: FontWeight.w600,
+                            color: colors.text,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Витрина космических наград и медалей',
-                          style: TextStyle(fontSize: 12, color: textSecondary),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontSize: 12,
+                            color: colors.text.withValues(alpha: 0.6),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right, color: textSecondary),
+                  Icon(Icons.chevron_right,
+                      color: colors.text.withValues(alpha: 0.5)),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
 
-          // 3. Недельный импульс станции (Соревнование)
+          // 3. Недельный импульс станции
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.nested),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -470,48 +452,54 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                     Text(
                       'Недельный импульс',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
+                        horizontal: 10,
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
+                        color: colors.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(13),
                       ),
                       child: Text(
                         '${gamification.weeklyExp} EXP за 7 дн.',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF38BDF8),
-                          fontWeight: FontWeight.bold,
+                        style: TextStyle(
+                          fontFamily: 'Unbounded',
+                          fontSize: 11,
+                          color: colors.accent,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Text(
                   'Импульс станции обновляется каждый понедельник в 00:00.',
-                  style: TextStyle(fontSize: 12, color: textSecondary),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontSize: 12,
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // 4. Энергоснабжение модулей (Разбивка по сферам)
+          // 4. Энергоснабжение модулей
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.nested),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,42 +507,39 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
                 Text(
                   'Энергоснабжение модулей',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
                   ),
                 ),
                 const SizedBox(height: 14),
                 _buildModuleStat(
                   'Привычки',
                   gamification.habitsExp,
-                  const Color(0xFF10B981),
-                  textPrimary,
-                  textSecondary,
+                  colors.success,
+                  colors,
                 ),
                 const SizedBox(height: 10),
                 _buildModuleStat(
                   'Дневник',
                   gamification.diaryExp,
                   const Color(0xFF8B5CF6),
-                  textPrimary,
-                  textSecondary,
+                  colors,
                 ),
                 const SizedBox(height: 10),
                 _buildModuleStat(
                   'Бюджет',
                   gamification.budgetExp,
-                  const Color(0xFFF59E0B),
-                  textPrimary,
-                  textSecondary,
+                  colors.warning,
+                  colors,
                 ),
                 const SizedBox(height: 10),
                 _buildModuleStat(
                   'Задачи',
                   gamification.tasksExp,
-                  const Color(0xFF38BDF8),
-                  textPrimary,
-                  textSecondary,
+                  colors.accent,
+                  colors,
                 ),
               ],
             ),
@@ -567,9 +552,8 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
   Widget _buildModuleStat(
     String title,
     int exp,
-    Color color,
-    Color textPrimary,
-    Color textSecondary,
+    Color accentColor,
+    AppColorsExtension colors,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -580,17 +564,19 @@ class _OrbitalStationScreenState extends ConsumerState<OrbitalStationScreen> {
             Text(
               title,
               style: TextStyle(
+                fontFamily: 'Onest',
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: textPrimary,
+                color: colors.text,
               ),
             ),
             Text(
               '$exp EXP',
               style: TextStyle(
+                fontFamily: 'Unbounded',
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: color,
+                fontWeight: FontWeight.w600,
+                color: accentColor,
               ),
             ),
           ],

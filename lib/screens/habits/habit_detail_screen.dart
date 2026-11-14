@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../providers/habits_provider.dart';
+import '../../theme/app_theme.dart';
 import 'habit_edit_screen.dart';
 
 class HabitDetailScreen extends ConsumerStatefulWidget {
@@ -23,20 +24,24 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final habits = ref.watch(habitsProvider);
     final habit = habits.where((h) => h.id == widget.habitId).firstOrNull;
 
     if (habit == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: colors.bg,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F172A),
-          iconTheme: const IconThemeData(color: Colors.white),
+          backgroundColor: colors.bg,
+          iconTheme: IconThemeData(color: colors.text),
         ),
-        body: const Center(
+        body: Center(
           child: Text(
             'Привычка не найдена',
-            style: TextStyle(color: Colors.white54),
+            style: TextStyle(
+              fontFamily: 'Onest',
+              color: colors.text.withValues(alpha: 0.5),
+            ),
           ),
         ),
       );
@@ -45,35 +50,45 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     final streaks = _calculateStreaks(habit);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: colors.bg,
         elevation: 0,
         title: Text(
           habit.title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: colors.text),
         actions: [
           IconButton(
-            icon: const Icon(Icons.archive_outlined, color: Colors.white70),
+            icon: Icon(
+              Icons.archive_outlined,
+              color: colors.text.withValues(alpha: 0.6),
+            ),
             tooltip: 'В архив',
             onPressed: () {
               ref.read(habitsProvider.notifier).archiveHabit(habit.id);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Привычка "${habit.title}" перенесена в архив'),
+                  content: Text(
+                    'Привычка "${habit.title}" перенесена в архив',
+                    style: const TextStyle(fontFamily: 'Onest'),
+                  ),
                 ),
               );
             },
           ),
           IconButton(
-            icon: const Icon(Icons.edit_outlined, color: Colors.white70),
+            icon: Icon(
+              Icons.edit_outlined,
+              color: colors.text.withValues(alpha: 0.6),
+            ),
             tooltip: 'Редактировать',
             onPressed: () {
               Navigator.push(
@@ -86,9 +101,9 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            icon: Icon(Icons.delete_outline, color: colors.error),
             tooltip: 'Удалить',
-            onPressed: () => _showDeleteConfirm(context, habit),
+            onPressed: () => _showDeleteConfirm(context, habit, colors),
           ),
         ],
       ),
@@ -97,10 +112,11 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
         children: [
           if (habit.question != null && habit.question!.isNotEmpty) ...[
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
+                color: colors.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: colors.nested),
               ),
               child: Row(
                 children: [
@@ -109,8 +125,9 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                   Expanded(
                     child: Text(
                       habit.question!,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.8),
                         fontSize: 14,
                       ),
                     ),
@@ -120,7 +137,6 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
             ),
             const SizedBox(height: 16),
           ],
-
           Row(
             children: [
               Expanded(
@@ -128,35 +144,37 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                   title: 'Текущий стрик',
                   value: '${streaks.current} дн.',
                   icon: Icons.local_fire_department,
-                  iconColor: Colors.orangeAccent,
+                  iconColor: colors.warning,
+                  colors: colors,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: _buildMetricCard(
                   title: 'Рекорд стрика',
                   value: '${streaks.best} дн.',
                   icon: Icons.emoji_events_outlined,
                   iconColor: Colors.amber,
+                  colors: colors,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: _buildMetricCard(
                   title: 'Сила (30 дн)',
                   value: '${(habit.score30Days * 100).round()}%',
                   icon: Icons.trending_up,
                   iconColor: habit.color,
+                  colors: colors,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-
-          _buildMonthCalendar(habit),
-          const SizedBox(height: 20),
-
-          _buildInfoSection(habit),
+          const SizedBox(height: 16),
+          _buildMonthCalendar(habit, colors),
+          const SizedBox(height: 16),
+          _buildInfoSection(habit, colors),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -167,12 +185,14 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     required String value,
     required IconData icon,
     required Color iconColor,
+    required AppColorsExtension colors,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.nested),
       ),
       child: Column(
         children: [
@@ -180,16 +200,22 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              color: colors.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
+            style: TextStyle(
+              fontFamily: 'Onest',
+              color: colors.text.withValues(alpha: 0.5),
+              fontSize: 11,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -197,7 +223,7 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     );
   }
 
-  Widget _buildMonthCalendar(HabitItem habit) {
+  Widget _buildMonthCalendar(HabitItem habit, AppColorsExtension colors) {
     final monthFormat = DateFormat('LLLL yyyy', 'ru');
     final titleMonth = monthFormat.format(_currentMonth);
 
@@ -214,8 +240,9 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.nested),
       ),
       child: Column(
         children: [
@@ -223,7 +250,7 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: const Icon(Icons.chevron_left, color: Colors.white70),
+                icon: Icon(Icons.chevron_left, color: colors.text),
                 onPressed: () {
                   setState(() {
                     _currentMonth = DateTime(
@@ -236,14 +263,15 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
               ),
               Text(
                 titleMonth[0].toUpperCase() + titleMonth.substring(1),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  color: colors.text,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.chevron_right, color: Colors.white70),
+                icon: Icon(Icons.chevron_right, color: colors.text),
                 onPressed: () {
                   setState(() {
                     _currentMonth = DateTime(
@@ -263,13 +291,17 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                 .map(
                   (d) => Text(
                     d,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.5),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 )
                 .toList(),
           ),
-          const SizedBox(height: 8),
-
+          const SizedBox(height: 10),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -296,7 +328,7 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
               final isToday = DateUtils.isSameDay(cellDate, DateTime.now());
 
               return InkWell(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
                 onTap: () {
                   if (habit.type == 'numerical') {
                     final newVal = isDone ? 0.0 : habit.targetValue;
@@ -313,17 +345,24 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
                   decoration: BoxDecoration(
                     color: isDone
                         ? habit.color
-                        : Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(8),
+                        : colors.nested.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(10),
                     border: isToday
-                        ? Border.all(color: const Color(0xFF38BDF8), width: 1.5)
+                        ? Border.all(color: colors.accent, width: 2)
                         : null,
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     '$dayNumber',
                     style: TextStyle(
-                      color: isDone ? Colors.white : Colors.white70,
+                      fontFamily: 'Onest',
+                      color: isDone
+                          ? (ThemeData.estimateBrightnessForColor(
+                                      habit.color) ==
+                                  Brightness.dark
+                              ? Colors.white
+                              : Colors.black)
+                          : colors.text.withValues(alpha: 0.8),
                       fontWeight: isDone || isToday
                           ? FontWeight.bold
                           : FontWeight.normal,
@@ -339,22 +378,24 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     );
   }
 
-  Widget _buildInfoSection(HabitItem habit) {
+  Widget _buildInfoSection(HabitItem habit, AppColorsExtension colors) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
+        color: colors.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colors.nested),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Информация',
             style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontFamily: 'Unbounded',
+              color: colors.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 12),
@@ -363,18 +404,19 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
             habit.type == 'numerical'
                 ? 'Измеримая (${habit.targetValue} ${habit.unit ?? ""})'
                 : 'Да / Нет',
+            colors,
           ),
-          _infoRow('Частота', _formatFrequency(habit)),
+          _infoRow('Частота', _formatFrequency(habit), colors),
           if (habit.reminderTime != null)
-            _infoRow('Напоминание', habit.reminderTime!),
+            _infoRow('Напоминание', habit.reminderTime!, colors),
           if (habit.description != null && habit.description!.isNotEmpty)
-            _infoRow('Заметки', habit.description!),
+            _infoRow('Заметки', habit.description!, colors),
         ],
       ),
     );
   }
 
-  Widget _infoRow(String label, String value) {
+  Widget _infoRow(String label, String value, AppColorsExtension colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -384,13 +426,22 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
             width: 110,
             child: Text(
               label,
-              style: const TextStyle(color: Colors.white38, fontSize: 13),
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.5),
+                fontSize: 13,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -468,35 +519,65 @@ class _HabitDetailScreenState extends ConsumerState<HabitDetailScreen> {
     return (current: current, best: best > current ? best : current);
   }
 
-  void _showDeleteConfirm(BuildContext context, HabitItem habit) {
+  void _showDeleteConfirm(
+    BuildContext context,
+    HabitItem habit,
+    AppColorsExtension colors,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
           'Удалить привычку?',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
         ),
         content: Text(
           'Привычка "${habit.title}" и вся история ее выполнения будут удалены.',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(
+            fontFamily: 'Onest',
+            color: colors.text.withValues(alpha: 0.7),
+            fontSize: 13,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
+            child: Text(
               'Отмена',
-              style: TextStyle(color: Colors.white54),
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.6),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
             onPressed: () {
               ref.read(habitsProvider.notifier).deleteHabit(habit.id);
               Navigator.pop(ctx);
               Navigator.pop(context);
             },
-            child: const Text('Удалить', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Удалить',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

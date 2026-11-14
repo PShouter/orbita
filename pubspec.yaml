@@ -18,6 +18,8 @@ dependencies:
   shared_preferences: ^2.2.2
   image_picker: ^1.1.2
   flutter_markdown: ^0.7.7+1
+  intl: ^0.20.3
+  markdown: ^7.3.1
   crypto: ^3.0.3
   flutter_local_notifications: ^17.2.2
   timezone: ^0.9.4
@@ -68,15 +70,24 @@ flutter:
     - .env
 
   fonts:
-    - family: Ethnocentric
+    - family: Unbounded
       fonts:
-        - asset: assets/fonts/ethnocentric_rg.ttf
-
-    - family: ElMessiri
-      fonts:
-        - asset: assets/fonts/ElMessiri.ttf
+        - asset: assets/fonts/Unbounded-Regular.ttf
           weight: 400
-        - asset: assets/fonts/El-Messiri-Medium.ttf
+        - asset: assets/fonts/Unbounded-Medium.ttf
           weight: 500
-        - asset: assets/fonts/El-Messiri-Bold.ttf
+        - asset: assets/fonts/Unbounded-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Unbounded-Bold.ttf
+          weight: 700
+
+    - family: Onest
+      fonts:
+        - asset: assets/fonts/Onest-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Onest-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Onest-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Onest-Bold.ttf
           weight: 700

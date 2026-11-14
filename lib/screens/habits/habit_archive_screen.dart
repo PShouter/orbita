@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/habits_provider.dart';
+import '../../theme/app_theme.dart';
 
 class HabitArchiveScreen extends ConsumerWidget {
   final bool isDarkMode;
@@ -10,34 +11,24 @@ class HabitArchiveScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
     final archived = ref.watch(archivedHabitsProvider);
 
-    final bg = isDarkMode ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         title: Text(
           'Архив привычек',
           style: TextStyle(
-            color: textPrimary,
+            fontFamily: 'Unbounded',
+            color: colors.text,
             fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        iconTheme: IconThemeData(color: textPrimary),
+        iconTheme: IconThemeData(color: colors.text),
       ),
       body: archived.isEmpty
           ? Center(
@@ -47,21 +38,26 @@ class HabitArchiveScreen extends ConsumerWidget {
                   Icon(
                     Icons.archive_outlined,
                     size: 64,
-                    color: textSecondary.withValues(alpha: 0.3),
+                    color: colors.text.withValues(alpha: 0.2),
                   ),
                   const SizedBox(height: 14),
                   Text(
                     'Архив пуст',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                      fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Заархивированные привычки появятся здесь',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.5),
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -74,11 +70,11 @@ class HabitArchiveScreen extends ConsumerWidget {
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: borderColor),
+                    color: colors.card,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: colors.nested),
                   ),
                   child: Row(
                     children: [
@@ -98,7 +94,8 @@ class HabitArchiveScreen extends ConsumerWidget {
                             Text(
                               habit.title,
                               style: TextStyle(
-                                color: textPrimary,
+                                fontFamily: 'Onest',
+                                color: colors.text,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -109,7 +106,8 @@ class HabitArchiveScreen extends ConsumerWidget {
                               Text(
                                 habit.question!,
                                 style: TextStyle(
-                                  color: textSecondary,
+                                  fontFamily: 'Onest',
+                                  color: colors.text.withValues(alpha: 0.5),
                                   fontSize: 12,
                                 ),
                               ),
@@ -118,9 +116,9 @@ class HabitArchiveScreen extends ConsumerWidget {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.unarchive_outlined,
-                          color: Color(0xFF38BDF8),
+                          color: colors.accent,
                         ),
                         tooltip: 'Восстановить',
                         onPressed: () {
@@ -131,18 +129,20 @@ class HabitArchiveScreen extends ConsumerWidget {
                             SnackBar(
                               content: Text(
                                 'Привычка "${habit.title}" восстановлена',
+                                style: const TextStyle(fontFamily: 'Onest'),
                               ),
                             ),
                           );
                         },
                       ),
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.delete_outline,
-                          color: Colors.redAccent,
+                          color: colors.error,
                         ),
                         tooltip: 'Удалить навсегда',
-                        onPressed: () => _confirmDelete(context, ref, habit),
+                        onPressed: () =>
+                            _confirmDelete(context, ref, habit, colors),
                       ),
                     ],
                   ),
@@ -152,27 +152,65 @@ class HabitArchiveScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, HabitItem habit) {
+  void _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    HabitItem habit,
+    AppColorsExtension colors,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDarkMode ? const Color(0xFF161B22) : Colors.white,
-        title: const Text('Удалить привычку навсегда?'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Удалить привычку навсегда?',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: Text(
           'Привычка "${habit.title}" и вся её история будут безвозвратно удалены.',
+          style: TextStyle(
+            fontFamily: 'Onest',
+            color: colors.text.withValues(alpha: 0.7),
+            fontSize: 13,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.6),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
             onPressed: () {
               ref.read(habitsProvider.notifier).deleteHabit(habit.id);
               Navigator.pop(ctx);
             },
-            child: const Text('Удалить', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Удалить',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

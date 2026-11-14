@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../providers/habits_provider.dart';
+import '../../../theme/app_theme.dart';
 
 class HabitSettingsScreen extends ConsumerStatefulWidget {
   const HabitSettingsScreen({super.key});
@@ -25,13 +26,12 @@ class _HabitSettingsScreenState extends ConsumerState<HabitSettingsScreen> {
   Future<void> _loadSound() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _soundTitle =
-          prefs.getString('habit_notif_sound_title') ??
+      _soundTitle = prefs.getString('habit_notif_sound_title') ??
           'По умолчанию (системный)';
     });
   }
 
-  Future<void> _pickNotificationSound() async {
+  Future<void> _pickNotificationSound(AppColorsExtension colors) async {
     final options = [
       'По умолчанию (системный)',
       'Звон победы (Орбита)',
@@ -43,19 +43,28 @@ class _HabitSettingsScreenState extends ConsumerState<HabitSettingsScreen> {
     final selected = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
           'Сигнал напоминания',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: options.map((sound) {
             return RadioListTile<String>(
-              title: Text(sound, style: const TextStyle(color: Colors.white70)),
+              title: Text(
+                sound,
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               value: sound,
               groupValue: _soundTitle,
-              activeColor: const Color(0xFF38BDF8),
+              activeColor: colors.accent,
               onChanged: (val) => Navigator.pop(ctx, val),
             );
           }).toList(),
@@ -73,73 +82,89 @@ class _HabitSettingsScreenState extends ConsumerState<HabitSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final isShortTap = ref.watch(habitShortTapProvider);
     final isReverseDays = ref.watch(habitReverseDaysProvider);
 
-    const cardBg = Color(0xFF1E293B);
-    const borderColor = Color(0xFF334155);
+    final cardBg = colors.card;
+    final borderColor = colors.nested;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: colors.bg,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Настройки привычек',
           style: TextStyle(
-            color: Colors.white,
+            fontFamily: 'Unbounded',
+            color: textPrimary,
             fontSize: 18,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
           // 1. ИНТЕРФЕЙС
-          _buildSectionHeader('ИНТЕРФЕЙС'),
+          _buildSectionHeader('ИНТЕРФЕЙС', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 SwitchListTile(
-                  activeThumbColor: const Color(0xFF38BDF8),
-                  title: const Text(
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
+                  title: Text(
                     'Отмечать коротким нажатием',
                     style: TextStyle(
-                      color: Colors.white,
+                      fontFamily: 'Onest',
+                      color: textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Если выключено, отметка ставится долгим нажатием для защиты от случайных кликов',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   value: isShortTap,
                   onChanged: (val) {
                     ref.read(habitShortTapProvider.notifier).toggle(val);
                   },
                 ),
-                const Divider(height: 1, color: borderColor),
+                Divider(height: 1, color: borderColor),
                 SwitchListTile(
-                  activeThumbColor: const Color(0xFF38BDF8),
-                  title: const Text(
+                  activeThumbColor: colors.accent,
+                  activeTrackColor: colors.accent.withValues(alpha: 0.3),
+                  title: Text(
                     'Обратный порядок дней',
                     style: TextStyle(
-                      color: Colors.white,
+                      fontFamily: 'Onest',
+                      color: textPrimary,
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
                   ),
-                  subtitle: const Text(
+                  subtitle: Text(
                     'Слева направо дни идут на убывание: сегодня, вчера, позавчера...',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   value: isReverseDays,
                   onChanged: (val) {
@@ -152,52 +177,59 @@ class _HabitSettingsScreenState extends ConsumerState<HabitSettingsScreen> {
           const SizedBox(height: 24),
 
           // 2. НАПОМИНАНИЯ
-          _buildSectionHeader('НАПОМИНАНИЯ'),
+          _buildSectionHeader('НАПОМИНАНИЯ', textSecondary),
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.music_note_outlined,
-                color: Colors.purpleAccent,
+                color: colors.warning,
               ),
-              title: const Text(
+              title: Text(
                 'Сигнал уведомления',
                 style: TextStyle(
-                  color: Colors.white,
+                  fontFamily: 'Onest',
+                  color: textPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
               ),
               subtitle: Text(
                 _soundTitle,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: textSecondary,
+                  fontSize: 12,
+                ),
               ),
-              trailing: const Icon(
+              trailing: Icon(
                 Icons.chevron_right,
-                color: Colors.white54,
+                color: textSecondary,
                 size: 20,
               ),
-              onTap: _pickNotificationSound,
+              onTap: () => _pickNotificationSound(colors),
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(String title, Color color) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          color: Colors.white54,
+          color: color,
           letterSpacing: 0.8,
         ),
       ),

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/diary_provider.dart';
+import '../../theme/app_theme.dart';
 import '../settings/sections/diary_settings_screen.dart';
 import 'diary_detail_screen.dart';
 
@@ -58,33 +59,34 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     });
   }
 
-  void _showUnlockDialog() {
+  void _showUnlockDialog(AppColorsExtension colors) {
     final inputCtrl = TextEditingController();
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        final cardBg =
-            widget.isDarkMode ? const Color(0xFF161B22) : Colors.white;
-        final textPrimary = widget.isDarkMode
-            ? const Color(0xFFF0F6FC)
-            : const Color(0xFF24292F);
-
         return AlertDialog(
-          backgroundColor: cardBg,
+          backgroundColor: colors.card,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(22),
           ),
           title: Row(
             children: [
-              const Icon(Icons.lock_outline, color: Color(0xFF38BDF8)),
-              const SizedBox(width: 8),
-              Text(
-                _lockType == 'pin'
-                    ? 'Введите 6-значный код'
-                    : 'Введите графический ключ',
-                style: TextStyle(color: textPrimary, fontSize: 16),
+              Icon(Icons.lock_outline, color: colors.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _lockType == 'pin'
+                      ? 'Введите 6-значный код'
+                      : 'Введите ключ доступа',
+                  style: TextStyle(
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),
@@ -100,12 +102,26 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                 maxLength: _lockType == 'pin' ? 6 : 12,
                 obscureText: true,
                 style: TextStyle(
-                  color: textPrimary,
+                  fontFamily: 'Unbounded',
+                  color: colors.text,
                   letterSpacing: 4,
                   fontWeight: FontWeight.bold,
                 ),
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.nested),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.nested),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.accent, width: 1.5),
+                  ),
                   isDense: true,
                 ),
               ),
@@ -114,11 +130,16 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                 child: TextButton(
                   onPressed: () {
                     Navigator.pop(ctx);
-                    _showRecoveryDialog();
+                    _showRecoveryDialog(colors);
                   },
-                  child: const Text(
+                  child: Text(
                     'Забыли пароль?',
-                    style: TextStyle(fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -126,17 +147,37 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
           ),
           actions: [
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.accent,
+                foregroundColor: colors.isDark ? Colors.black : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                minimumSize: const Size(80, 44),
+              ),
               onPressed: () {
                 if (inputCtrl.text.trim() == _savedSecret) {
                   Navigator.pop(ctx);
                   setState(() => _isUnlocked = true);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Неверный код доступа')),
+                    SnackBar(
+                      content: const Text(
+                        'Неверный код доступа',
+                        style: TextStyle(fontFamily: 'Onest'),
+                      ),
+                      backgroundColor: colors.error,
+                    ),
                   );
                 }
               },
-              child: const Text('Войти'),
+              child: const Text(
+                'Войти',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -144,21 +185,26 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     );
   }
 
-  void _showRecoveryDialog() {
+  void _showRecoveryDialog(AppColorsExtension colors) {
     final answerCtrl = TextEditingController();
 
     showDialog(
       context: context,
       builder: (ctx) {
-        final cardBg =
-            widget.isDarkMode ? const Color(0xFF161B22) : Colors.white;
-        final textPrimary = widget.isDarkMode
-            ? const Color(0xFFF0F6FC)
-            : const Color(0xFF24292F);
-
         return AlertDialog(
-          backgroundColor: cardBg,
-          title: const Text('Восстановление доступа'),
+          backgroundColor: colors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: Text(
+            'Восстановление доступа',
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              color: colors.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,16 +212,28 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
               Text(
                 'Вопрос: $_securityQuestion',
                 style: TextStyle(
-                  color: textPrimary,
+                  fontFamily: 'Onest',
+                  color: colors.text,
                   fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextField(
                 controller: answerCtrl,
-                decoration: const InputDecoration(
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                decoration: InputDecoration(
                   labelText: 'Ваш ответ',
-                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.nested),
+                  ),
                 ),
               ),
             ],
@@ -183,26 +241,56 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Отмена'),
+              child: Text(
+                'Отмена',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.6),
+                ),
+              ),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.accent,
+                foregroundColor: colors.isDark ? Colors.black : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                minimumSize: const Size(100, 44),
+              ),
               onPressed: () {
                 if (answerCtrl.text.trim().toLowerCase() ==
                     (_securityAnswer ?? '').toLowerCase()) {
                   Navigator.pop(ctx);
                   setState(() => _isUnlocked = true);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Доступ подтвержден контрольным вопросом'),
+                    SnackBar(
+                      content: const Text(
+                        'Доступ подтвержден контрольным вопросом',
+                        style: TextStyle(fontFamily: 'Onest'),
+                      ),
+                      backgroundColor: colors.success,
                     ),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Неверный ответ на вопрос')),
+                    SnackBar(
+                      content: const Text(
+                        'Неверный ответ на вопрос',
+                        style: TextStyle(fontFamily: 'Onest'),
+                      ),
+                      backgroundColor: colors.error,
+                    ),
                   );
                 }
               },
-              child: const Text('Подтвердить'),
+              child: const Text(
+                'Подтвердить',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -218,79 +306,111 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final diaries = ref.watch(filteredDiariesProvider);
-    final isDark = widget.isDarkMode;
 
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary =
-        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
-    final textSecondary =
-        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final borderColor =
-        isDark ? const Color(0xFF30363D) : const Color(0xFFE1E4E8);
-
-    // Заблокированное состояние экрана дневника
     if (_isLockEnabled && !_isUnlocked) {
       return Scaffold(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         appBar: AppBar(
-          backgroundColor: bg,
+          backgroundColor: colors.bg,
           elevation: 0,
-          title: const Text(
+          title: Text(
             'Дневник',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              fontWeight: FontWeight.w600,
+              fontSize: 22,
+              color: colors.text,
+            ),
           ),
         ),
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.lock_outline,
-                size: 72,
-                color: Color(0xFF38BDF8),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Дневник защищен паролем',
-                style: TextStyle(
-                  color: textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colors.accent.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.lock_outline,
+                    size: 64,
+                    color: colors.accent,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Введите код для доступа к личным записям',
-                style: TextStyle(color: textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                icon: const Icon(Icons.key),
-                label: const Text('Разблокировать'),
-                onPressed: _showUnlockDialog,
-              ),
-            ],
+                const SizedBox(height: 20),
+                Text(
+                  'Дневник защищен паролем',
+                  style: TextStyle(
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Введите код для доступа к личным записям',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.accent,
+                    foregroundColor:
+                        colors.isDark ? Colors.black : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    minimumSize: const Size(180, 48),
+                  ),
+                  icon: const Icon(Icons.key, size: 20),
+                  label: const Text(
+                    'Разблокировать',
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onPressed: () => _showUnlockDialog(colors),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         title: _isSearching
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                style: TextStyle(color: textPrimary, fontSize: 16),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text,
+                  fontSize: 16,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Поиск по заголовку, дате, тексту...',
                   hintStyle: TextStyle(
-                    color: textSecondary.withValues(alpha: 0.6),
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.4),
                   ),
                   border: InputBorder.none,
                 ),
@@ -298,15 +418,20 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                   ref.read(diarySearchQueryProvider.notifier).setQuery(val);
                 },
               )
-            : const Text(
+            : Text(
                 'Дневник',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
+                ),
               ),
         actions: [
           IconButton(
             icon: Icon(
               _isSearching ? Icons.close : Icons.search,
-              color: textPrimary,
+              color: colors.text,
             ),
             tooltip: _isSearching ? 'Закрыть поиск' : 'Поиск',
             onPressed: () {
@@ -322,14 +447,14 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.more_vert, color: textPrimary),
+            icon: Icon(Icons.more_vert, color: colors.text),
             tooltip: 'Настройки',
             onPressed: () async {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                      DiarySettingsScreen(isDarkMode: widget.isDarkMode),
+                      DiarySettingsScreen(isDarkMode: colors.isDark),
                 ),
               );
               _checkLockStatus();
@@ -345,15 +470,19 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                   Icon(
                     Icons.auto_stories_outlined,
                     size: 64,
-                    color: textSecondary.withValues(alpha: 0.4),
+                    color: colors.text.withValues(alpha: 0.25),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Text(
                     _isSearching
                         ? 'Ничего не найдено'
                         : 'В дневнике пока нет записей\nНажмите +, чтобы добавить первую',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: textSecondary, fontSize: 15),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontSize: 15,
+                    ),
                   ),
                 ],
               ),
@@ -373,10 +502,10 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                 final timeFormat = DateFormat('HH:mm');
 
                 return Material(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
+                  color: colors.card,
+                  borderRadius: BorderRadius.circular(22),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(22),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -391,11 +520,11 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(22),
                         border: Border.all(
                           color: item.isDraft
-                              ? Colors.amber.withValues(alpha: 0.5)
-                              : borderColor,
+                              ? colors.warning.withValues(alpha: 0.5)
+                              : colors.nested,
                         ),
                       ),
                       child: Column(
@@ -405,9 +534,9 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                             children: [
                               Text(
                                 item.moodObject.emoji,
-                                style: const TextStyle(fontSize: 22),
+                                style: const TextStyle(fontSize: 24),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,16 +544,19 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                                     Text(
                                       dateFormat.format(item.date),
                                       style: TextStyle(
+                                        fontFamily: 'Onest',
                                         fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.text,
                                       ),
                                     ),
                                     Text(
                                       timeFormat.format(item.createdAt),
                                       style: TextStyle(
+                                        fontFamily: 'Onest',
                                         fontSize: 12,
-                                        color: textSecondary,
+                                        color:
+                                            colors.text.withValues(alpha: 0.5),
                                       ),
                                     ),
                                   ],
@@ -437,29 +569,30 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.amber.withValues(alpha: 0.18),
-                                    borderRadius: BorderRadius.circular(8),
+                                    color:
+                                        colors.warning.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(13),
                                     border: Border.all(
-                                      color: Colors.amber.withValues(
-                                        alpha: 0.6,
-                                      ),
+                                      color:
+                                          colors.warning.withValues(alpha: 0.5),
                                     ),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Icon(
                                         Icons.edit_note,
                                         size: 14,
-                                        color: Colors.amber,
+                                        color: colors.warning,
                                       ),
-                                      SizedBox(width: 4),
+                                      const SizedBox(width: 4),
                                       Text(
                                         'Черновик',
                                         style: TextStyle(
+                                          fontFamily: 'Onest',
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.amber,
+                                          color: colors.warning,
                                         ),
                                       ),
                                     ],
@@ -467,16 +600,17 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           if (item.title.isNotEmpty) ...[
                             Text(
                               item.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: textPrimary,
+                                fontFamily: 'Unbounded',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: colors.text,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -494,9 +628,11 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
+                                          fontFamily: 'Onest',
                                           fontSize: 14,
-                                          height: 1.4,
-                                          color: textSecondary,
+                                          height: 1.45,
+                                          color: colors.text
+                                              .withValues(alpha: 0.7),
                                         ),
                                       ),
                                     ),
@@ -506,31 +642,32 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                                     maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
+                                      fontFamily: 'Onest',
                                       fontSize: 14,
-                                      height: 1.4,
-                                      color: textSecondary,
+                                      height: 1.45,
+                                      color: colors.text.withValues(alpha: 0.7),
                                     ),
                                   ),
                           if (item.images.isNotEmpty) ...[
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             SizedBox(
-                              height: 60,
+                              height: 64,
                               child: ListView.separated(
                                 scrollDirection: Axis.horizontal,
                                 itemCount: item.images.length,
                                 separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 12),
+                                    const SizedBox(width: 8),
                                 itemBuilder: (ctx, i) {
                                   final file = File(item.images[i]);
                                   if (!file.existsSync()) {
                                     return const SizedBox.shrink();
                                   }
                                   final imgWidget = ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(12),
                                     child: Image.file(
                                       file,
-                                      width: 60,
-                                      height: 60,
+                                      width: 64,
+                                      height: 64,
                                       fit: BoxFit.cover,
                                     ),
                                   );
@@ -555,8 +692,10 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
               },
             ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF38BDF8),
-        foregroundColor: Colors.white,
+        backgroundColor: colors.accent,
+        foregroundColor: colors.isDark ? Colors.black : Colors.white,
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: const Icon(Icons.add, size: 28),
         onPressed: () {
           Navigator.push(

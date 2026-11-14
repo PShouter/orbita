@@ -11,6 +11,7 @@ import '../../providers/habits_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/tasks_provider.dart';
+import '../../theme/app_theme.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -61,20 +62,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildShiftBadge(ShiftType? todayShift, Color borderColor) {
+  Widget _buildShiftBadge(ShiftType? todayShift, AppColorsExtension colors) {
     if (todayShift == null) return const SizedBox.shrink();
 
     final shiftColor = Color(todayShift.color);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: shiftColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: shiftColor.withValues(alpha: 0.6),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: shiftColor.withValues(alpha: 0.6), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -85,17 +83,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ? Icons.nights_stay
                     : Icons.work_outline)
                 : Icons.beach_access,
-            size: 13,
+            size: 14,
             color: shiftColor,
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 6),
           Text(
             todayShift.isWork && todayShift.startTime.isNotEmpty
                 ? '${todayShift.name} (${todayShift.startTime}-${todayShift.endTime})'
                 : todayShift.name,
             style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
+              fontFamily: 'Onest',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
               color: shiftColor,
             ),
           ),
@@ -107,15 +106,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildDailyFocusCard({
     required List focusTasks,
     required ShiftType? todayShift,
-    required Color cardBg,
-    required Color borderColor,
-    required Color textPrimary,
-    required Color textSecondary,
+    required AppColorsExtension colors,
   }) {
     if (focusTasks.isEmpty) return const SizedBox.shrink();
 
-    final Map<String, dynamic> mainTask =
-        Map<String, dynamic>.from(focusTasks.first as Map);
+    final Map<String, dynamic> mainTask = Map<String, dynamic>.from(
+      focusTasks.first as Map,
+    );
     final isDone = mainTask['done'] == true;
     final priority =
         (mainTask['priority'] as String? ?? 'normal').toLowerCase();
@@ -125,16 +122,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
+        color: colors.card,
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+          color: colors.accent.withValues(alpha: 0.5),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF38BDF8).withValues(alpha: 0.08),
-            blurRadius: 10,
+            color: colors.accent.withValues(alpha: 0.08),
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
@@ -143,46 +140,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
+              color: colors.accent.withValues(alpha: 0.12),
               borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(15),
-                topRight: Radius.circular(15),
+                topLeft: Radius.circular(21),
+                topRight: Radius.circular(21),
               ),
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.gps_fixed,
-                  size: 16,
-                  color: Color(0xFF38BDF8),
-                ),
+                Icon(Icons.gps_fixed, size: 16, color: colors.accent),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'ФОКУС ДНЯ',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 0.8,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                 ),
                 const Spacer(),
                 if (priority == 'high')
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
                     ),
-                    child: const Text(
+                    decoration: BoxDecoration(
+                      color: colors.error.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Text(
                       'Высокий приоритет',
                       style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.redAccent,
+                        fontFamily: 'Onest',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: colors.error,
                       ),
                     ),
                   ),
@@ -190,20 +187,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Transform.scale(
-                      scale: 1.15,
+                    SizedBox(
+                      width: 24,
+                      height: 24,
                       child: Checkbox(
                         value: isDone,
-                        activeColor: const Color(0xFF38BDF8),
+                        activeColor: colors.accent,
+                        checkColor: colors.isDark ? Colors.black : Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        side: BorderSide(
+                          color: colors.text.withValues(alpha: 0.4),
+                          width: 1.5,
                         ),
                         onChanged: (v) {
                           HapticFeedback.lightImpact();
@@ -214,7 +217,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,9 +225,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Text(
                             mainTask['title'] ?? '',
                             style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: isDone ? textSecondary : textPrimary,
+                              fontFamily: 'Onest',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isDone
+                                  ? colors.text.withValues(alpha: 0.45)
+                                  : colors.text,
                               decoration:
                                   isDone ? TextDecoration.lineThrough : null,
                             ),
@@ -232,33 +238,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           if (mainTask['description'] != null &&
                               (mainTask['description'] as String)
                                   .isNotEmpty) ...[
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 4),
                             Text(
                               mainTask['description'] as String,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 11,
-                                color: textSecondary,
+                                fontFamily: 'Onest',
+                                fontSize: 13,
+                                color: colors.text.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
                           if (time != null) ...[
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.access_time,
-                                  size: 11,
-                                  color: Color(0xFF38BDF8),
+                                  size: 13,
+                                  color: colors.accent,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   time,
-                                  style: const TextStyle(
-                                    fontSize: 11,
+                                  style: TextStyle(
+                                    fontFamily: 'Onest',
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF38BDF8),
+                                    color: colors.accent,
                                   ),
                                 ),
                               ],
@@ -270,31 +278,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
                 if (isShiftOverlap) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                      color: colors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(13),
                       border: Border.all(
-                        color: Colors.amber.withValues(alpha: 0.35),
+                        color: colors.warning.withValues(alpha: 0.4),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.info_outline,
-                          size: 13,
-                          color: Colors.amber,
+                          size: 14,
+                          color: colors.warning,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'Сегодня смена: ${todayShift.name} (${todayShift.startTime}-${todayShift.endTime})',
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              color: Colors.amber,
+                            style: TextStyle(
+                              fontFamily: 'Onest',
+                              fontSize: 11,
+                              color: colors.warning,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -314,6 +325,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
+    final colors = context.colors;
 
     final profile = ref.watch(profileProvider);
     final allTasks = ref.watch(tasksProvider);
@@ -358,15 +370,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return false;
     }).toList();
 
-    final Color cardBg =
-        widget.isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final Color textPrimary =
-        widget.isDarkMode ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
-    final Color textSecondary =
-        widget.isDarkMode ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final Color borderColor =
-        widget.isDarkMode ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
-
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
@@ -374,76 +377,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Привет, ${profile.userName}',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Привет, ${profile.userName}',
+                    style: TextStyle(
+                      fontFamily: 'Unbounded',
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: colors.text,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Дней с Орбитой: ${profile.daysWithOrbita}',
-                  style: TextStyle(fontSize: 13, color: textSecondary),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    'Дней с Орбитой: ${profile.daysWithOrbita}',
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontSize: 13,
+                      color: colors.text.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            _buildShiftBadge(todayShift, borderColor),
+            const SizedBox(width: 8),
+            _buildShiftBadge(todayShift, colors),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
+
+        // Карточка цитаты
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.nested),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.format_quote,
-                size: 18,
-                color: Color(0xFF38BDF8),
+                size: 20,
+                color: colors.accent,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   _randomQuote,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontFamily: 'Onest',
+                    fontSize: 13,
                     fontStyle: FontStyle.italic,
-                    color: textPrimary,
+                    color: colors.text.withValues(alpha: 0.85),
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
+
+        // Фокус дня
         _buildDailyFocusCard(
           focusTasks: activeTodayTasks,
           todayShift: todayShift,
-          cardBg: cardBg,
-          borderColor: borderColor,
-          textPrimary: textPrimary,
-          textSecondary: textSecondary,
+          colors: colors,
         ),
+
+        // Сдвоенная карточка: Календарь и Задачи
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Колонка Календарь
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,20 +472,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Text(
                             'Календарь',
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: textPrimary,
+                              fontFamily: 'Onest',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: colors.text,
                             ),
                           ),
                           InkWell(
                             onTap: widget.onOpenCreateEvent,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                             child: Padding(
-                              padding: const EdgeInsets.all(4.0),
+                              padding: const EdgeInsets.all(8.0),
                               child: _buildSvgIcon(
                                 'assets/icons/plus.svg',
                                 size: 16,
-                                color: const Color(0xFF38BDF8),
+                                color: colors.accent,
                               ),
                             ),
                           ),
@@ -480,7 +499,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           child: Text(
                             'Событий нет',
                             style: TextStyle(
-                              color: textSecondary,
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.5),
                               fontSize: 12,
                             ),
                           ),
@@ -488,27 +508,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       else
                         ...todayEvents.map(
                           (ev) => Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.only(bottom: 8),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   ev['title'] ?? '',
                                   style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: textPrimary,
+                                    fontFamily: 'Onest',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.text,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
+                                const SizedBox(height: 2),
                                 Text(
                                   ev['isAllDay'] == true
                                       ? 'Весь день'
                                       : '${ev['startTime'] ?? '00:00'} - ${ev['endTime'] ?? ''}',
                                   style: TextStyle(
-                                    fontSize: 10,
-                                    color: textSecondary,
+                                    fontFamily: 'Onest',
+                                    fontSize: 11,
+                                    color: colors.text.withValues(alpha: 0.5),
                                   ),
                                 ),
                               ],
@@ -519,10 +542,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
                   width: 1,
-                  color: borderColor,
+                  color: colors.nested,
                 ),
+
+                // Колонка Задачи
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,20 +558,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Text(
                             'Задачи',
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: textPrimary,
+                              fontFamily: 'Onest',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: colors.text,
                             ),
                           ),
                           InkWell(
                             onTap: widget.onOpenCreateTask,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                             child: Padding(
-                              padding: const EdgeInsets.all(4.0),
+                              padding: const EdgeInsets.all(8.0),
                               child: _buildSvgIcon(
                                 'assets/icons/plus.svg',
                                 size: 16,
-                                color: const Color(0xFF38BDF8),
+                                color: colors.accent,
                               ),
                             ),
                           ),
@@ -559,7 +585,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           child: Text(
                             'Задач нет',
                             style: TextStyle(
-                              color: textSecondary,
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.5),
                               fontSize: 12,
                             ),
                           ),
@@ -571,7 +598,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           final time = t['time'];
 
                           return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -580,7 +607,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   height: 20,
                                   child: Checkbox(
                                     value: isDone,
+                                    activeColor: colors.accent,
+                                    checkColor: colors.isDark
+                                        ? Colors.black
+                                        : Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    side: BorderSide(
+                                      color: colors.text.withValues(alpha: 0.4),
+                                    ),
                                     onChanged: (v) {
+                                      HapticFeedback.lightImpact();
                                       ref
                                           .read(tasksProvider.notifier)
                                           .toggleTask(
@@ -590,7 +628,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     },
                                   ),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -599,10 +637,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       Text(
                                         t['title'] ?? '',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontFamily: 'Onest',
+                                          fontSize: 13,
                                           color: isDone
-                                              ? textSecondary
-                                              : textPrimary,
+                                              ? colors.text
+                                                  .withValues(alpha: 0.45)
+                                              : colors.text,
                                           decoration: isDone
                                               ? TextDecoration.lineThrough
                                               : null,
@@ -614,11 +654,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         Text(
                                           '⏱ $time',
                                           style: TextStyle(
-                                            fontSize: 10,
+                                            fontFamily: 'Onest',
+                                            fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                             color: isDone
-                                                ? textSecondary
-                                                : const Color(0xFF38BDF8),
+                                                ? colors.text
+                                                    .withValues(alpha: 0.45)
+                                                : colors.accent,
                                           ),
                                         ),
                                     ],
@@ -636,12 +678,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
+
+        // Блок Привычки
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,33 +696,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text(
                     'Привычки',
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: textPrimary,
+                      fontFamily: 'Onest',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colors.text,
                     ),
                   ),
                   InkWell(
                     onTap: widget.onOpenCreateHabit,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                     child: Padding(
-                      padding: const EdgeInsets.all(4.0),
+                      padding: const EdgeInsets.all(8.0),
                       child: _buildSvgIcon(
                         'assets/icons/plus.svg',
                         size: 16,
-                        color: const Color(0xFF38BDF8),
+                        color: colors.accent,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               if (habits.isEmpty)
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
                     child: Text(
                       'Привычек пока нет. Нажмите +, чтобы добавить!',
-                      style: TextStyle(color: textSecondary, fontSize: 12),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.5),
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 )
@@ -705,16 +754,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             child: Container(
                               margin: const EdgeInsets.symmetric(horizontal: 4),
                               padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 6,
+                                vertical: 12,
+                                horizontal: 8,
                               ),
                               decoration: BoxDecoration(
                                 color: itemColor.withValues(
                                   alpha: isDone ? 0.25 : 0.08,
                                 ),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: isDone ? itemColor : borderColor,
+                                  color: isDone ? itemColor : colors.nested,
                                   width: isDone ? 1.5 : 1,
                                 ),
                               ),
@@ -724,16 +773,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     isDone
                                         ? Icons.check_circle
                                         : Icons.circle_outlined,
-                                    size: 20,
+                                    size: 22,
                                     color: itemColor,
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 6),
                                   Text(
                                     h.title,
                                     style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: textPrimary,
+                                      fontFamily: 'Onest',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.text,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -742,8 +792,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   Text(
                                     '${h.streak} дн.',
                                     style: TextStyle(
-                                      fontSize: 10,
-                                      color: textSecondary,
+                                      fontFamily: 'Onest',
+                                      fontSize: 11,
+                                      color: colors.text.withValues(alpha: 0.6),
                                     ),
                                   ),
                                 ],
@@ -759,12 +810,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
+
+        // Блок Финансы
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -775,63 +828,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text(
                     'Финансы',
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: textPrimary,
+                      fontFamily: 'Onest',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colors.text,
                     ),
                   ),
-                  ElevatedButton(
+                  FilledButton(
                     onPressed: widget.onOpenBudget,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2C69D1),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.accent,
+                      foregroundColor:
+                          colors.isDark ? Colors.black : Colors.white,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 6,
+                        horizontal: 16,
+                        vertical: 8,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(13),
                       ),
+                      minimumSize: const Size(44, 36),
                       elevation: 0,
                     ),
                     child: const Text(
                       'Бюджет',
                       style: TextStyle(
-                        color: Colors.white,
+                        fontFamily: 'Onest',
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
                 'Свободно: ${budgetState.freeMoney.toStringAsFixed(0)} ₽',
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: budgetState.freeMoney >= 0
-                      ? const Color(0xFF38BDF8)
-                      : Colors.redAccent,
+                  fontFamily: 'Unbounded',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      budgetState.freeMoney >= 0 ? colors.accent : colors.error,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Text(
                     'На счетах: ${budgetState.totalAccountsBalance.toStringAsFixed(0)} ₽',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w600,
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontSize: 12,
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Text(
                     'В день: ~${budgetState.dailySafeLimit.toStringAsFixed(0)} ₽',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFFFBBF24),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontSize: 12,
+                      color: colors.warning,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -840,6 +899,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 24),
       ],
     );
   }

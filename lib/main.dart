@@ -15,6 +15,10 @@ import 'services/permission_service.dart';
 import 'services/sync_service.dart';
 import 'services/update_service.dart';
 
+// Тема и Дизайн-система
+import 'theme/app_theme.dart';
+import 'providers/theme_provider.dart';
+
 // Провайдеры
 import 'providers/profile_provider.dart';
 import 'providers/calendar_provider.dart';
@@ -45,6 +49,7 @@ import 'screens/habits/habits_screen.dart';
 import 'screens/diary/diary_screen.dart';
 import 'screens/vault/vault_screen.dart';
 import 'screens/settings/settings_screen.dart';
+import 'screens/settings/sections/theme_settings_screen.dart';
 import 'screens/gamification/orbital_station_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -79,7 +84,8 @@ Future<void> main() async {
       await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
     } else {
       debugPrint(
-          'Supabase init warning: SUPABASE_URL или SUPABASE_ANON_KEY не найдены в .env');
+        'Supabase init warning: SUPABASE_URL или SUPABASE_ANON_KEY не найдены в .env',
+      );
     }
   } catch (e) {
     debugPrint('Supabase init notice: $e');
@@ -174,6 +180,7 @@ class _OrbitaAppState extends ConsumerState<OrbitaApp> {
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
+    final themeState = ref.watch(themeProvider);
 
     if (profile.isCheckingAuth) {
       return const MaterialApp(
@@ -182,11 +189,37 @@ class _OrbitaAppState extends ConsumerState<OrbitaApp> {
       );
     }
 
+    // Определение активной палитры темы
+    AppColorsExtension activePalette;
+    if (themeState.followSystem) {
+      final brightness = MediaQuery.platformBrightnessOf(context);
+      activePalette = (brightness == Brightness.dark)
+          ? AppColorsExtension.space
+          : AppColorsExtension.dawn;
+    } else {
+      switch (themeState.currentTheme) {
+        case AppThemeType.space:
+          activePalette = AppColorsExtension.space;
+          break;
+        case AppThemeType.dawn:
+          activePalette = AppColorsExtension.dawn;
+          break;
+        case AppThemeType.aurora:
+          activePalette = AppColorsExtension.aurora;
+          break;
+        case AppThemeType.sunset:
+          activePalette = AppColorsExtension.sunset;
+          break;
+        case AppThemeType.amoled:
+          activePalette = AppColorsExtension.amoled;
+          break;
+      }
+    }
+
     return MaterialApp(
       navigatorKey: rootNavigatorKey,
       title: 'Орбита',
       debugShowCheckedModeBanner: false,
-      themeMode: profile.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       locale: const Locale('ru', 'RU'),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -194,29 +227,15 @@ class _OrbitaAppState extends ConsumerState<OrbitaApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('ru', 'RU')],
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'ElMessiri',
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF6F8FA),
-        cardColor: Colors.white,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2C69D1),
-          brightness: Brightness.light,
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'ElMessiri',
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0D1117),
-        cardColor: const Color(0xFF161B22),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF38BDF8),
-          brightness: Brightness.dark,
-          surface: const Color(0xFF161B22),
-        ),
-      ),
+      theme: buildThemeData(activePalette),
+      // Глобальный пересчет масштабирования шрифта
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(themeState.scaleFactor)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: profile.isAuthenticated
           ? FutureBuilder<bool>(
               future: PermissionService.shouldShowOnboarding(),
@@ -240,7 +259,7 @@ class _OrbitaAppState extends ConsumerState<OrbitaApp> {
               },
             )
           : AuthScreen(
-              isDarkMode: profile.isDarkMode,
+              isDarkMode: activePalette.isDark,
               onAuthenticated: () async {
                 ref.read(profileProvider.notifier).markAuthenticated();
                 try {
@@ -332,7 +351,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (idx != -1) {
       setNavIndex(idx + 1);
     } else {
-      final isDark = ref.read(profileProvider).isDarkMode;
+      final isDark = context.colors.isDark;
       final widget = _getScreenWidget(key, isDark);
       if (widget != null) {
         rootNavigatorKey.currentState?.push(
@@ -353,7 +372,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       context,
       MaterialPageRoute(
         builder: (_) => ProfileScreen(
-          isDarkMode: profile.isDarkMode,
+          isDarkMode: context.colors.isDark,
           userName: profile.userName,
           customUsername: profile.customUsername,
           userAvatarPath: profile.avatarPath,
@@ -372,12 +391,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
-  void _showNotificationsMenu(
-    BuildContext context,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
-  ) {
+  void _showNotificationsMenu(BuildContext context, AppColorsExtension colors) {
     final RenderBox? button = context.findRenderObject() as RenderBox?;
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
@@ -402,14 +416,10 @@ class _MainShellState extends ConsumerState<MainShell> {
         16,
         0,
       ),
-      color: cardBg,
+      color: colors.card,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: ref.read(profileProvider).isDarkMode
-              ? const Color(0xFF30363D)
-              : const Color(0xFFD0D7DE),
-        ),
+        side: BorderSide(color: colors.nested),
       ),
       items: [
         PopupMenuItem<String>(
@@ -420,21 +430,23 @@ class _MainShellState extends ConsumerState<MainShell> {
               Text(
                 'Уведомления',
                 style: TextStyle(
+                  fontFamily: 'Onest',
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: textPrimary,
+                  color: colors.text,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                  color: colors.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
+                child: Text(
                   'Орбита',
                   style: TextStyle(
-                    color: Color(0xFF38BDF8),
+                    fontFamily: 'Onest',
+                    color: colors.accent,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -448,7 +460,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           value: 'sync',
           child: Row(
             children: [
-              const Icon(Icons.cloud_done, size: 18, color: Color(0xFF10B981)),
+              Icon(Icons.cloud_done, size: 18, color: colors.success),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -458,14 +470,19 @@ class _MainShellState extends ConsumerState<MainShell> {
                     Text(
                       'Синхронизация активна',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: textPrimary,
+                        color: colors.text,
                       ),
                     ),
                     Text(
                       'Все модули подключены к облаку',
-                      style: TextStyle(fontSize: 10, color: textSecondary),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        fontSize: 10,
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
                     ),
                   ],
                 ),
@@ -477,11 +494,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           value: 'focus',
           child: Row(
             children: [
-              const Icon(
-                Icons.auto_awesome,
-                size: 18,
-                color: Color(0xFFF59E0B),
-              ),
+              Icon(Icons.auto_awesome, size: 18, color: colors.warning),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -491,14 +504,19 @@ class _MainShellState extends ConsumerState<MainShell> {
                     Text(
                       'Фокус дня обновлен',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: textPrimary,
+                        color: colors.text,
                       ),
                     ),
                     Text(
                       'Продуктивного дня на Орбите!',
-                      style: TextStyle(fontSize: 10, color: textSecondary),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        fontSize: 10,
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
                     ),
                   ],
                 ),
@@ -510,8 +528,13 @@ class _MainShellState extends ConsumerState<MainShell> {
     );
   }
 
-  Widget _buildSvgNavIcon(String path, bool isSelected) {
-    final Color color = isSelected ? const Color(0xFF38BDF8) : Colors.grey;
+  Widget _buildSvgNavIcon(
+    String path,
+    bool isSelected,
+    AppColorsExtension colors,
+  ) {
+    final Color color =
+        isSelected ? colors.accent : colors.text.withValues(alpha: 0.4);
     return SvgPicture.asset(
       path,
       width: 20,
@@ -552,20 +575,15 @@ class _MainShellState extends ConsumerState<MainShell> {
     final profile = ref.watch(profileProvider);
     final profileNotifier = ref.read(profileProvider.notifier);
     final activeTabs = ref.watch(navigationTabsProvider);
+    final colors = context.colors;
+    final isDark = colors.isDark;
 
     if (_isBudgetModeActive) {
       return BudgetScreen(
-        isDarkMode: profile.isDarkMode,
+        isDarkMode: isDark,
         onExitBudget: () => setState(() => _isBudgetModeActive = false),
       );
     }
-
-    final isDark = profile.isDarkMode;
-    final textPrimary =
-        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
-    final textSecondary =
-        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
 
     final maxValidIndex = activeTabs.length;
     if (_navIndex > maxValidIndex) {
@@ -592,7 +610,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     // 1. Главная
     navItems.add(
       BottomNavigationBarItem(
-        icon: _buildSvgNavIcon('assets/icons/home.svg', _navIndex == 0),
+        icon: _buildSvgNavIcon('assets/icons/home.svg', _navIndex == 0, colors),
         label: 'Главная',
       ),
     );
@@ -603,7 +621,7 @@ class _MainShellState extends ConsumerState<MainShell> {
       final meta = kAllAvailableTabs.firstWhere((t) => t.key == tabKey);
       navItems.add(
         BottomNavigationBarItem(
-          icon: _buildSvgNavIcon(meta.assetIcon, _navIndex == (i + 1)),
+          icon: _buildSvgNavIcon(meta.assetIcon, _navIndex == (i + 1), colors),
           label: meta.title,
         ),
       );
@@ -612,65 +630,62 @@ class _MainShellState extends ConsumerState<MainShell> {
     // 3. Еще (открывает Drawer)
     navItems.add(
       BottomNavigationBarItem(
-        icon: _buildSvgNavIcon('assets/icons/more.svg', false),
+        icon: _buildSvgNavIcon('assets/icons/more.svg', false, colors),
         label: 'Еще',
       ),
     );
 
     return Scaffold(
       key: _scaffoldKey,
-      drawer: _buildDrawer(profile, profileNotifier, isDark, textPrimary),
+      backgroundColor: colors.bg,
+      drawer: _buildDrawer(profile, profileNotifier, colors),
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        backgroundColor: colors.bg,
+        elevation: 0,
         titleSpacing: 16,
         title: Text(
           'ОРБИТА',
           style: TextStyle(
             fontFamily: 'Ethnocentric',
-            color: textPrimary,
+            color: colors.text,
             fontSize: 16,
             letterSpacing: 1.5,
           ),
         ),
         actions: [
-          // 3-й справа налево: Переключатель темы (Солнце / Луна)
+          // 3-й справа налево: Переключатель темы
           IconButton(
-            tooltip: isDark ? 'Включить светлую тему' : 'Включить тёмную тему',
-            icon: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              color: textPrimary,
-              size: 22,
-            ),
+            tooltip: 'Оформление',
+            icon: Icon(Icons.palette_outlined, color: colors.text, size: 22),
             onPressed: () {
               HapticFeedback.selectionClick();
-              profileNotifier.toggleTheme();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ThemeSettingsScreen()),
+              );
             },
           ),
 
-          // 2-й справа налево: Уведомления (всплывающее меню справа сверху)
+          // 2-й справа налево: Уведомления
           Builder(
             builder: (btnContext) {
               return IconButton(
                 tooltip: 'Уведомления',
                 icon: Icon(
                   Icons.notifications_none_outlined,
-                  color: textPrimary,
+                  color: colors.text,
                   size: 22,
                 ),
                 onPressed: () {
                   HapticFeedback.lightImpact();
-                  _showNotificationsMenu(
-                    btnContext,
-                    cardBg,
-                    textPrimary,
-                    textSecondary,
-                  );
+                  _showNotificationsMenu(btnContext, colors);
                 },
               );
             },
           ),
 
-          // 1-й справа налево (крайний справа): Аватарка (открывает профиль)
+          // 1-й справа налево: Профиль
           Padding(
             padding: const EdgeInsets.only(right: 16, left: 4),
             child: InkWell(
@@ -690,9 +705,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                       )
                     : CircleAvatar(
                         radius: 17,
-                        backgroundColor:
-                            const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                        child: Icon(Icons.person, size: 20, color: textPrimary),
+                        backgroundColor: colors.accent.withValues(alpha: 0.2),
+                        child: Icon(Icons.person, size: 20, color: colors.text),
                       ),
               ),
             ),
@@ -710,8 +724,14 @@ class _MainShellState extends ConsumerState<MainShell> {
           }
         },
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF38BDF8),
-        unselectedItemColor: Colors.grey,
+        backgroundColor: colors.card,
+        selectedItemColor: colors.accent,
+        unselectedItemColor: colors.text.withValues(alpha: 0.4),
+        selectedLabelStyle: const TextStyle(
+          fontFamily: 'Onest',
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: const TextStyle(fontFamily: 'Onest'),
         selectedFontSize: 11,
         unselectedFontSize: 11,
         items: navItems,
@@ -722,15 +742,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget _buildDrawer(
     ProfileState profile,
     ProfileNotifier notifier,
-    bool isDark,
-    Color textPrimary,
+    AppColorsExtension colors,
   ) {
-    final Color textSecondary =
-        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final Color borderColor =
-        isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
-
     final dynamicDrawerTabs = ref.watch(drawerTabsProvider);
     final activeBottomTabs = ref.watch(navigationTabsProvider);
 
@@ -739,15 +752,14 @@ class _MainShellState extends ConsumerState<MainShell> {
         assetPath,
         width: 22,
         height: 22,
-        colorFilter: ColorFilter.mode(textPrimary, BlendMode.srcIn),
+        colorFilter: ColorFilter.mode(colors.text, BlendMode.srcIn),
         placeholderBuilder: (_) =>
-            Icon(fallbackIcon, size: 22, color: textPrimary),
+            Icon(fallbackIcon, size: 22, color: colors.text),
       );
     }
 
     return Drawer(
-      backgroundColor:
-          isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA),
+      backgroundColor: colors.bg,
       child: SafeArea(
         child: Column(
           children: [
@@ -764,8 +776,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                   vertical: 20,
                 ),
                 decoration: BoxDecoration(
-                  color: cardBg,
-                  border: Border(bottom: BorderSide(color: borderColor)),
+                  color: colors.card,
+                  border: Border(bottom: BorderSide(color: colors.nested)),
                 ),
                 child: Row(
                   children: [
@@ -786,13 +798,13 @@ class _MainShellState extends ConsumerState<MainShell> {
                               width: 52,
                               height: 52,
                               colorFilter: ColorFilter.mode(
-                                textPrimary,
+                                colors.text,
                                 BlendMode.srcIn,
                               ),
-                              placeholderBuilder: (_) => const CircleAvatar(
+                              placeholderBuilder: (_) => CircleAvatar(
                                 radius: 26,
-                                backgroundColor: Color(0xFF2C69D1),
-                                child: Icon(
+                                backgroundColor: colors.accent,
+                                child: const Icon(
                                   Icons.person,
                                   size: 28,
                                   color: Colors.white,
@@ -808,9 +820,10 @@ class _MainShellState extends ConsumerState<MainShell> {
                           Text(
                             profile.userName,
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               fontSize: 17,
                               fontWeight: FontWeight.bold,
-                              color: textPrimary,
+                              color: colors.text,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -818,9 +831,10 @@ class _MainShellState extends ConsumerState<MainShell> {
                           const SizedBox(height: 3),
                           Text(
                             '@${profile.customUsername}',
-                            style: const TextStyle(
+                            style: TextStyle(
+                              fontFamily: 'Onest',
                               fontSize: 13,
-                              color: Color(0xFF38BDF8),
+                              color: colors.accent,
                               fontWeight: FontWeight.w500,
                             ),
                             maxLines: 1,
@@ -829,7 +843,11 @@ class _MainShellState extends ConsumerState<MainShell> {
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: textSecondary, size: 20),
+                    Icon(
+                      Icons.chevron_right,
+                      color: colors.text.withValues(alpha: 0.5),
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -850,7 +868,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                     title: Text(
                       'Профиль',
                       style: TextStyle(
-                        color: textPrimary,
+                        fontFamily: 'Onest',
+                        color: colors.text,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -863,15 +882,16 @@ class _MainShellState extends ConsumerState<MainShell> {
                   // 2. Орбитальная станция
                   if (!activeBottomTabs.contains(AppTabKey.station))
                     ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.radar_outlined,
-                        color: Color(0xFF38BDF8),
+                        color: colors.accent,
                         size: 22,
                       ),
                       title: Text(
                         'Орбитальная станция',
                         style: TextStyle(
-                          color: textPrimary,
+                          fontFamily: 'Onest',
+                          color: colors.text,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -881,7 +901,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                           context,
                           MaterialPageRoute(
                             builder: (_) =>
-                                OrbitalStationScreen(isDarkMode: isDark),
+                                OrbitalStationScreen(isDarkMode: colors.isDark),
                           ),
                         );
                       },
@@ -896,7 +916,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                     title: Text(
                       'Друзья',
                       style: TextStyle(
-                        color: textPrimary,
+                        fontFamily: 'Onest',
+                        color: colors.text,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -906,7 +927,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => FriendsScreen(
-                            isDarkMode: isDark,
+                            isDarkMode: colors.isDark,
                             currentUsername: profile.customUsername,
                           ),
                         ),
@@ -926,7 +947,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                         Text(
                           'Сообщения',
                           style: TextStyle(
-                            color: textSecondary,
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.5),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -969,7 +991,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                       title: Text(
                         tabMeta.title,
                         style: TextStyle(
-                          color: textPrimary,
+                          fontFamily: 'Onest',
+                          color: colors.text,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -978,7 +1001,10 @@ class _MainShellState extends ConsumerState<MainShell> {
                         if (tabMeta.key == AppTabKey.budget) {
                           setState(() => _isBudgetModeActive = true);
                         } else {
-                          final screen = _getScreenWidget(tabMeta.key, isDark);
+                          final screen = _getScreenWidget(
+                            tabMeta.key,
+                            colors.isDark,
+                          );
                           if (screen != null) {
                             Navigator.push(
                               context,
@@ -1001,7 +1027,8 @@ class _MainShellState extends ConsumerState<MainShell> {
                     title: Text(
                       'Настройки',
                       style: TextStyle(
-                        color: textPrimary,
+                        fontFamily: 'Onest',
+                        color: colors.text,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1011,7 +1038,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => SettingsScreen(
-                            isDarkMode: isDark,
+                            isDarkMode: colors.isDark,
                             onToggleTheme: () => notifier.toggleTheme(),
                             userName: profile.userName,
                             customUsername: profile.customUsername,
@@ -1029,20 +1056,25 @@ class _MainShellState extends ConsumerState<MainShell> {
                 ],
               ),
             ),
-            Divider(color: borderColor, height: 1),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            Divider(color: colors.nested, height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Demo 0.4.0',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                    'Версия: Demo 0.4.1',
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.5),
+                      fontSize: 12,
+                    ),
                   ),
                   Text(
                     'Pavel Krikun',
                     style: TextStyle(
-                      color: Color(0xFF38BDF8),
+                      fontFamily: 'Onest',
+                      color: colors.accent,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),

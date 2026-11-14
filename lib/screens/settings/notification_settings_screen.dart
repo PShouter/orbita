@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/notification_settings_provider.dart';
+import '../../theme/app_theme.dart';
 
 class NotificationSettingsScreen extends ConsumerWidget {
   final bool isDarkMode;
@@ -9,25 +10,19 @@ class NotificationSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
     final notif = ref.watch(notificationSettingsProvider);
     final notifier = ref.read(notificationSettingsProvider.notifier);
 
-    final bg = isDarkMode ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDarkMode ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDarkMode
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDarkMode
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDarkMode
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final cardBg = colors.card;
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new, size: 18, color: textPrimary),
@@ -36,8 +31,9 @@ class NotificationSettingsScreen extends ConsumerWidget {
         title: Text(
           'Уведомления',
           style: TextStyle(
+            fontFamily: 'Unbounded',
             color: textPrimary,
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
@@ -48,14 +44,17 @@ class NotificationSettingsScreen extends ConsumerWidget {
           _buildSectionCard(
             cardBg,
             borderColor,
+            colors: colors,
             title: 'События и задачи',
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeThumbColor: const Color(0xFF38BDF8),
+                activeThumbColor: colors.accent,
+                activeTrackColor: colors.accent.withValues(alpha: 0.3),
                 title: Text(
                   'События Календаря',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     color: textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -63,19 +62,25 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Напоминания до начала событий',
-                  style: TextStyle(color: textSecondary, fontSize: 12),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
                 value: notif.calendarEnabled,
                 onChanged: (v) =>
                     notifier.updateSetting('notif_calendar', v.toString()),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: borderColor),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeThumbColor: const Color(0xFF38BDF8),
+                activeThumbColor: colors.accent,
+                activeTrackColor: colors.accent.withValues(alpha: 0.3),
                 title: Text(
                   'Задачи со сроком',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     color: textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -83,7 +88,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Оповещения в назначенное время',
-                  style: TextStyle(color: textSecondary, fontSize: 12),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
                 value: notif.tasksEnabled,
                 onChanged: (v) =>
@@ -91,19 +100,21 @@ class NotificationSettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-
+          const SizedBox(height: 16),
           _buildSectionCard(
             cardBg,
             borderColor,
+            colors: colors,
             title: 'Привычки и График смен',
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeThumbColor: const Color(0xFF38BDF8),
+                activeThumbColor: colors.accent,
+                activeTrackColor: colors.accent.withValues(alpha: 0.3),
                 title: Text(
                   'Привычки',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     color: textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -111,19 +122,25 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Индивидуальные напоминания для привычек',
-                  style: TextStyle(color: textSecondary, fontSize: 12),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
                 value: notif.habitsEnabled,
                 onChanged: (v) =>
                     notifier.updateSetting('notif_habits', v.toString()),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: borderColor),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeThumbColor: const Color(0xFF38BDF8),
+                activeThumbColor: colors.accent,
+                activeTrackColor: colors.accent.withValues(alpha: 0.3),
                 title: Text(
                   'График смен',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     color: textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -131,7 +148,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Напоминание о смене накануне вечером и до выезда',
-                  style: TextStyle(color: textSecondary, fontSize: 12),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: textSecondary,
+                    fontSize: 12,
+                  ),
                 ),
                 value: notif.shiftsEnabled,
                 onChanged: (v) =>
@@ -139,19 +160,21 @@ class NotificationSettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-
+          const SizedBox(height: 16),
           _buildSectionCard(
             cardBg,
             borderColor,
+            colors: colors,
             title: 'Дневник и Финансы',
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeThumbColor: const Color(0xFF38BDF8),
+                activeThumbColor: colors.accent,
+                activeTrackColor: colors.accent.withValues(alpha: 0.3),
                 title: Text(
                   'Вечерний Дневник',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     color: textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -159,9 +182,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Время: ${notif.diaryTime.format(context)}',
-                  style: const TextStyle(
-                    color: Color(0xFF38BDF8),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.accent,
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 value: notif.diaryEnabled,
@@ -172,8 +197,15 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.accent,
+                    ),
                     icon: const Icon(Icons.access_time, size: 16),
-                    label: const Text('Изменить время дневника'),
+                    label: const Text(
+                      'Изменить время дневника',
+                      style: TextStyle(
+                          fontFamily: 'Onest', fontWeight: FontWeight.bold),
+                    ),
                     onPressed: () async {
                       final t = await showTimePicker(
                         context: context,
@@ -188,13 +220,15 @@ class NotificationSettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ),
-              const Divider(height: 1),
+              Divider(height: 1, color: borderColor),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                activeThumbColor: const Color(0xFF38BDF8),
+                activeThumbColor: colors.accent,
+                activeTrackColor: colors.accent.withValues(alpha: 0.3),
                 title: Text(
                   'Бюджет: Утренний план и вечерний учёт',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     color: textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -202,9 +236,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
                 ),
                 subtitle: Text(
                   'Утро: ${notif.budgetMorningTime.format(context)} • Вечер: ${notif.budgetEveningTime.format(context)}',
-                  style: const TextStyle(
-                    color: Color(0xFF38BDF8),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.accent,
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 value: notif.budgetEnabled,
@@ -213,6 +249,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -221,6 +258,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
   Widget _buildSectionCard(
     Color cardBg,
     Color borderColor, {
+    required AppColorsExtension colors,
     required String title,
     required List<Widget> children,
   }) {
@@ -228,7 +266,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -236,10 +274,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              color: Color(0xFF38BDF8),
+            style: TextStyle(
+              fontFamily: 'Unbounded',
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: colors.accent,
             ),
           ),
           const SizedBox(height: 10),

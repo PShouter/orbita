@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../theme/app_theme.dart';
+
 class DiaryLockSettingsScreen extends StatefulWidget {
   final bool isDarkMode;
 
@@ -14,7 +16,7 @@ class DiaryLockSettingsScreen extends StatefulWidget {
 
 class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
   bool _isLockEnabled = false;
-  String _lockType = 'pin'; // 'pin' | 'pattern'
+  String _lockType = 'pin';
   bool _useFingerprint = false;
   String? _savedSecret;
   String _securityQuestion = 'Любимый цвет';
@@ -48,9 +50,9 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
     });
   }
 
-  Future<void> _toggleLock(bool val) async {
+  Future<void> _toggleLock(bool val, AppColorsExtension colors) async {
     if (val && (_savedSecret == null || _savedSecret!.isEmpty)) {
-      final success = await _openSetPasswordFlow();
+      final success = await _openSetPasswordFlow(colors: colors);
       if (!success) return;
     }
 
@@ -67,12 +69,15 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
     HapticFeedback.selectionClick();
   }
 
-  Future<void> _changeLockType(String type) async {
+  Future<void> _changeLockType(String type, AppColorsExtension colors) async {
     setState(() => _lockType = type);
-    await _openSetPasswordFlow(targetType: type);
+    await _openSetPasswordFlow(targetType: type, colors: colors);
   }
 
-  Future<bool> _openSetPasswordFlow({String? targetType}) async {
+  Future<bool> _openSetPasswordFlow({
+    String? targetType,
+    required AppColorsExtension colors,
+  }) async {
     final effectiveType = targetType ?? _lockType;
     final secretController = TextEditingController();
     final answerController = TextEditingController();
@@ -83,29 +88,30 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          final isDark = widget.isDarkMode;
-          final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-          final textPrimary = isDark
-              ? const Color(0xFFF0F6FC)
-              : const Color(0xFF24292F);
-
           return AlertDialog(
-            backgroundColor: cardBg,
+            backgroundColor: colors.card,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
             ),
             title: Row(
               children: [
                 Icon(
                   effectiveType == 'pin' ? Icons.pin_outlined : Icons.pattern,
-                  color: const Color(0xFF38BDF8),
+                  color: colors.accent,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  effectiveType == 'pin'
-                      ? 'Установка 6-значного кода'
-                      : 'Графический ключ',
-                  style: TextStyle(color: textPrimary, fontSize: 16),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    effectiveType == 'pin'
+                        ? 'Установка 6-значного кода'
+                        : 'Графический ключ',
+                    style: TextStyle(
+                      fontFamily: 'Unbounded',
+                      color: colors.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -118,9 +124,13 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                     effectiveType == 'pin'
                         ? 'Введите 6 цифр пароля для входа:'
                         : 'Введите узлы ключа (например, 1-2-3-5):',
-                    style: TextStyle(color: textPrimary, fontSize: 13),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.8),
+                      fontSize: 13,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   TextField(
                     controller: secretController,
                     keyboardType: effectiveType == 'pin'
@@ -129,32 +139,68 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                     maxLength: effectiveType == 'pin' ? 6 : 12,
                     obscureText: true,
                     style: TextStyle(
-                      color: textPrimary,
+                      fontFamily: 'Unbounded',
+                      color: colors.text,
                       letterSpacing: 4,
                       fontWeight: FontWeight.bold,
                     ),
                     decoration: InputDecoration(
                       hintText: effectiveType == 'pin' ? '••••••' : '1-2-3-5',
-                      border: const OutlineInputBorder(),
+                      hintStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.35),
+                        letterSpacing: 0,
+                      ),
+                      filled: true,
+                      fillColor: colors.nested.withValues(alpha: 0.4),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide:
+                            BorderSide(color: colors.accent, width: 1.5),
+                      ),
                       isDense: true,
                     ),
                   ),
-                  const Divider(height: 24),
-                  const Text(
+                  Divider(height: 24, color: colors.nested),
+                  Text(
                     'КОНТРОЛЬНЫЙ ВОПРОС (ДЛЯ ВОССТАНОВЛЕНИЯ)',
                     style: TextStyle(
-                      color: Colors.grey,
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.5),
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
                     ),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: selectedQuestion,
                     isExpanded: true,
-                    dropdownColor: cardBg,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
+                    dropdownColor: colors.card,
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: colors.nested.withValues(alpha: 0.4),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
                       isDense: true,
                     ),
                     items: _securityQuestions
@@ -164,8 +210,9 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                             child: Text(
                               q,
                               style: TextStyle(
+                                fontFamily: 'Onest',
                                 fontSize: 13,
-                                color: textPrimary,
+                                color: colors.text,
                               ),
                             ),
                           ),
@@ -178,10 +225,29 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: answerController,
-                    style: TextStyle(color: textPrimary, fontSize: 14),
-                    decoration: const InputDecoration(
+                    style: TextStyle(
+                        fontFamily: 'Onest', color: colors.text, fontSize: 14),
+                    decoration: InputDecoration(
                       labelText: 'Ответ на контрольный вопрос',
-                      border: OutlineInputBorder(),
+                      labelStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
+                      filled: true,
+                      fillColor: colors.nested.withValues(alpha: 0.4),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide:
+                            BorderSide(color: colors.accent, width: 1.5),
+                      ),
                       isDense: true,
                     ),
                   ),
@@ -191,29 +257,46 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Отмена'),
+                child: Text(
+                  'Отмена',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
+                ),
               ),
               FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.accent,
+                  foregroundColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
                 onPressed: () async {
                   final secret = secretController.text.trim();
                   final answer = answerController.text.trim();
 
                   if (effectiveType == 'pin' && secret.length != 6) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
+                      SnackBar(
+                        content: const Text(
                           'PIN-код должен состоять ровно из 6 цифр',
+                          style: TextStyle(fontFamily: 'Onest'),
                         ),
+                        backgroundColor: colors.error,
                       ),
                     );
                     return;
                   }
                   if (secret.isEmpty || answer.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
+                      SnackBar(
+                        content: const Text(
                           'Заполните пароль и ответ на контрольный вопрос',
+                          style: TextStyle(fontFamily: 'Onest'),
                         ),
+                        backgroundColor: colors.error,
                       ),
                     );
                     return;
@@ -239,7 +322,13 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
 
                   Navigator.pop(ctx, true);
                 },
-                child: const Text('Сохранить'),
+                child: const Text(
+                  'Сохранить',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           );
@@ -252,45 +341,47 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Блокировка дневника'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Блокировка дневника',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
-          // Главный чекбокс / тумблер
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: SwitchListTile(
               secondary: Icon(
                 _isLockEnabled ? Icons.lock : Icons.lock_open,
-                color: _isLockEnabled ? const Color(0xFF38BDF8) : textSecondary,
+                color: _isLockEnabled ? colors.accent : textSecondary,
               ),
               title: Text(
                 'Блокировка дневника',
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Onest',
+                  fontWeight: FontWeight.w600,
                   color: textPrimary,
                 ),
               ),
@@ -298,16 +389,19 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                 _isLockEnabled
                     ? 'Защита включена'
                     : 'Дневник открывается без пароля',
-                style: TextStyle(color: textSecondary, fontSize: 12),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: textSecondary,
+                  fontSize: 12,
+                ),
               ),
-              activeThumbColor: const Color(0xFF38BDF8),
+              activeThumbColor: colors.accent,
+              activeTrackColor: colors.accent.withValues(alpha: 0.3),
               value: _isLockEnabled,
-              onChanged: _toggleLock,
+              onChanged: (val) => _toggleLock(val, colors),
             ),
           ),
           const SizedBox(height: 20),
-
-          // Зависимые настройки (некликабельны и серые, если блокировка отключена)
           Opacity(
             opacity: _isLockEnabled ? 1.0 : 0.4,
             child: IgnorePointer(
@@ -320,6 +414,7 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                     child: Text(
                       'СПОСОБ АУТЕНТИФИКАЦИИ',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: textSecondary,
@@ -330,19 +425,20 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                   Container(
                     decoration: BoxDecoration(
                       color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: borderColor),
                     ),
                     child: Column(
                       children: [
                         ListTile(
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.pin,
-                            color: Color(0xFF38BDF8),
+                            color: colors.accent,
                           ),
                           title: Text(
                             'Тип пароля',
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               fontWeight: FontWeight.w600,
                               color: textPrimary,
                             ),
@@ -352,6 +448,7 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                                 ? 'Код (6 цифр)'
                                 : 'Графический ключ',
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               color: textSecondary,
                               fontSize: 12,
                             ),
@@ -361,6 +458,7 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                             underline: const SizedBox(),
                             dropdownColor: cardBg,
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               color: textPrimary,
                               fontWeight: FontWeight.bold,
                             ),
@@ -376,20 +474,21 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                             ],
                             onChanged: (v) {
                               if (v != null && v != _lockType) {
-                                _changeLockType(v);
+                                _changeLockType(v, colors);
                               }
                             },
                           ),
                         ),
                         Divider(height: 1, color: borderColor),
                         ListTile(
-                          leading: const Icon(
+                          leading: Icon(
                             Icons.password,
-                            color: Colors.amber,
+                            color: colors.warning,
                           ),
                           title: Text(
                             'Сменить пароль',
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               fontWeight: FontWeight.w600,
                               color: textPrimary,
                             ),
@@ -399,22 +498,25 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                                 ? 'Пароль сохранен'
                                 : 'Не установлен',
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               color: textSecondary,
                               fontSize: 12,
                             ),
                           ),
-                          trailing: const Icon(Icons.chevron_right, size: 20),
-                          onTap: () => _openSetPasswordFlow(),
+                          trailing: Icon(Icons.chevron_right,
+                              size: 20, color: textSecondary),
+                          onTap: () => _openSetPasswordFlow(colors: colors),
                         ),
                         Divider(height: 1, color: borderColor),
                         CheckboxListTile(
-                          secondary: const Icon(
+                          secondary: Icon(
                             Icons.fingerprint,
-                            color: Color(0xFF10B981),
+                            color: colors.success,
                           ),
                           title: Text(
-                            'Включить отпечаток пальца',
+                            'Включить биометрию',
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               fontWeight: FontWeight.w600,
                               color: textPrimary,
                             ),
@@ -422,11 +524,17 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                           subtitle: Text(
                             'Разблокировка биометрией без ручного ввода кода',
                             style: TextStyle(
+                              fontFamily: 'Onest',
                               color: textSecondary,
                               fontSize: 12,
                             ),
                           ),
-                          activeColor: const Color(0xFF38BDF8),
+                          activeColor: colors.accent,
+                          checkColor:
+                              colors.isDark ? Colors.black : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
                           value: _useFingerprint,
                           onChanged: (v) => _toggleFingerprint(v ?? false),
                         ),
@@ -434,12 +542,12 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 8),
                     child: Text(
                       'ВОССТАНОВЛЕНИЕ ДОСТУПА',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: textSecondary,
@@ -450,17 +558,18 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                   Container(
                     decoration: BoxDecoration(
                       color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: borderColor),
                     ),
                     child: ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.help_outline,
-                        color: Colors.purpleAccent,
+                        color: colors.accent,
                       ),
                       title: Text(
                         'Контрольный вопрос',
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           fontWeight: FontWeight.w600,
                           color: textPrimary,
                         ),
@@ -468,13 +577,15 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                       subtitle: Text(
                         'Вопрос: $_securityQuestion\nОтвет: ${_securityAnswer != null ? "••••••" : "Не задан"}',
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           color: textSecondary,
                           fontSize: 12,
                           height: 1.4,
                         ),
                       ),
-                      trailing: const Icon(Icons.edit_outlined, size: 20),
-                      onTap: () => _openSetPasswordFlow(),
+                      trailing: Icon(Icons.edit_outlined,
+                          size: 20, color: colors.accent),
+                      onTap: () => _openSetPasswordFlow(colors: colors),
                     ),
                   ),
                 ],

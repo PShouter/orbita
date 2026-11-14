@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../providers/notes_provider.dart';
+import '../../../theme/app_theme.dart';
 
 class NotesSettingsScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -88,25 +89,27 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
+    final cardBg = colors.card;
+    final textPrimary = colors.text;
+    final textSecondary = colors.text.withValues(alpha: 0.6);
+    final borderColor = colors.nested;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        title: const Text('Настройки заметок'),
-        backgroundColor: cardBg,
+        title: Text(
+          'Настройки заметок',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+          ),
+        ),
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: textPrimary),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -116,32 +119,38 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.grid_view,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Макет по умолчанию',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _layout,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<String>(
                     value: _layout,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -151,9 +160,7 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                     onChanged: (v) {
                       if (v != null) {
                         _updateString('notes_layout', v, () => _layout = v);
-                        ref
-                            .read(notesViewModeProvider.notifier)
-                            .setMode(
+                        ref.read(notesViewModeProvider.notifier).setMode(
                               v == 'Список'
                                   ? NotesViewMode.list
                                   : NotesViewMode.grid,
@@ -164,36 +171,39 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(Icons.sort, color: Color(0xFF38BDF8)),
+                  leading: Icon(Icons.sort, color: colors.accent),
                   title: Text(
                     'Сортировка по умолчанию',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _sortBy,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<String>(
                     value: _sortBy,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
-                    items:
-                        const [
-                              'По дате изменения',
-                              'По дате создания',
-                              'По названию (А–Я)',
-                            ]
-                            .map(
-                              (e) => DropdownMenuItem(value: e, child: Text(e)),
-                            )
-                            .toList(),
+                    items: const [
+                      'По дате изменения',
+                      'По дате создания',
+                      'По названию (А–Я)',
+                    ]
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
                     onChanged: (v) {
                       if (v != null) {
                         _updateString('notes_sort_by', v, () => _sortBy = v);
@@ -203,13 +213,14 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.format_size,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Размер шрифта в редакторе',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
@@ -218,15 +229,21 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                     _fontSize == 14
                         ? 'Маленький (14)'
                         : (_fontSize == 16 ? 'Обычный (16)' : 'Крупный (18)'),
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<int>(
                     value: _fontSize,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Unbounded',
                       color: textPrimary,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
                     items: const [
                       DropdownMenuItem(value: 14, child: Text('14')),
@@ -242,22 +259,30 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.visibility_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Открывать в режиме предпросмотра',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Рендерить Markdown сразу при открытии заметки',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _startInPreview,
                   onChanged: (v) => _updateBool(
                     'notes_start_in_preview',
@@ -267,22 +292,30 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.calendar_today_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Показ даты на карточке',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Отображать время последнего изменения в списке',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _showDateOnCard,
                   onChanged: (v) => _updateBool(
                     'notes_show_date_on_card',
@@ -300,45 +333,48 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.save_outlined,
-                    color: Color(0xFF10B981),
+                    color: colors.success,
                   ),
                   title: Text(
                     'Автосохранение',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     _autoSaveInterval,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<String>(
                     value: _autoSaveInterval,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
-                    items:
-                        const [
-                              'Мгновенно при выходе',
-                              'Каждые 30 секунд',
-                              'Каждую минуту',
-                            ]
-                            .map(
-                              (e) => DropdownMenuItem(value: e, child: Text(e)),
-                            )
-                            .toList(),
+                    items: const [
+                      'Мгновенно при выходе',
+                      'Каждые 30 секунд',
+                      'Каждую минуту',
+                    ]
+                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                        .toList(),
                     onChanged: (v) {
                       if (v != null) {
                         _updateString(
@@ -352,19 +388,27 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(Icons.code, color: Colors.purpleAccent),
+                  secondary: Icon(Icons.code, color: colors.accent),
                   title: Text(
                     'Моноширинный шрифт',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Использовать шрифт кода в режиме редактирования Markdown',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _useMonospaceFont,
                   onChanged: (v) => _updateBool(
                     'notes_use_monospace',
@@ -374,19 +418,27 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(Icons.text_format, color: Colors.amber),
+                  secondary: Icon(Icons.text_format, color: colors.warning),
                   title: Text(
                     'Панель быстрого форматирования',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Отображать панель инструментов Markdown над клавиатурой',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _showFormatToolbar,
                   onChanged: (v) => _updateBool(
                     'notes_show_format_toolbar',
@@ -404,32 +456,38 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
           Container(
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: borderColor),
             ),
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.folder_open_outlined,
-                    color: Colors.orangeAccent,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Папка по умолчанию',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Основной раздел для новых заметок: $_defaultFolder',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                   trailing: DropdownButton<String>(
                     value: _defaultFolder,
                     underline: const SizedBox(),
                     dropdownColor: cardBg,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -449,22 +507,30 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
                 ),
                 Divider(height: 1, color: borderColor),
                 CheckboxListTile(
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.delete_sweep_outlined,
-                    color: Colors.redAccent,
+                    color: colors.error,
                   ),
                   title: Text(
                     'Подтверждать удаление заметки',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.w600,
                       color: textPrimary,
                     ),
                   ),
                   subtitle: Text(
                     'Запрашивать подтверждение перед удалением',
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
-                  activeColor: const Color(0xFF38BDF8),
+                  activeColor: colors.accent,
+                  checkColor: colors.isDark ? Colors.black : Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5)),
                   value: _useTrashBeforeDelete,
                   onChanged: (v) => _updateBool(
                     'notes_use_trash_before_delete',
@@ -475,6 +541,7 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -486,6 +553,7 @@ class _NotesSettingsScreenState extends ConsumerState<NotesSettingsScreen> {
       child: Text(
         title,
         style: TextStyle(
+          fontFamily: 'Onest',
           fontSize: 11,
           fontWeight: FontWeight.bold,
           color: color,

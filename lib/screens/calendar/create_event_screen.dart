@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/calendar_provider.dart';
+import '../../theme/app_theme.dart';
 
 class CreateEventScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -32,7 +33,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   bool _isAllDay = false;
   UserCalendar? _selectedCalendar;
 
-  int _reminderMinutes = -1; // -1 = без напоминания, 0 = вовремя, >0 минуты
+  int _reminderMinutes = -1;
   String _recurrence = 'none';
 
   final Map<int, String> _presetReminders = {
@@ -77,60 +78,51 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final calendars = ref.watch(userCalendarsProvider);
     if (_selectedCalendar == null && calendars.isNotEmpty) {
       _selectedCalendar = calendars.first;
     }
 
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: Icon(Icons.close, color: colors.text),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Новое событие',
           style: TextStyle(
-            color: textPrimary,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontWeight: FontWeight.w600,
+            fontSize: 17,
           ),
         ),
         actions: [
           IconButton(
             tooltip: 'Сохранить как шаблон',
-            icon: const Icon(
+            icon: Icon(
               Icons.bookmark_add_outlined,
-              color: Color(0xFF38BDF8),
+              color: colors.accent,
             ),
-            onPressed: _saveAsTemplate,
+            onPressed: () => _saveAsTemplate(colors),
           ),
           TextButton.icon(
-            icon: const Icon(Icons.check, color: Color(0xFF38BDF8)),
-            label: const Text(
+            icon: Icon(Icons.check, color: colors.accent),
+            label: Text(
               'Сохранить',
               style: TextStyle(
+                fontFamily: 'Onest',
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF38BDF8),
+                color: colors.accent,
+                fontSize: 15,
               ),
             ),
-            onPressed: _saveEvent,
+            onPressed: () => _saveEvent(colors),
           ),
         ],
       ),
@@ -141,22 +133,30 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           TextField(
             controller: _titleCtrl,
             style: TextStyle(
+              fontFamily: 'Onest',
               fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: textPrimary,
+              fontWeight: FontWeight.w600,
+              color: colors.text,
             ),
             decoration: InputDecoration(
               hintText: 'Название события',
-              hintStyle: TextStyle(color: textSecondary),
+              hintStyle: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.4),
+              ),
               filled: true,
-              fillColor: cardBg,
+              fillColor: colors.card,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.nested),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.nested),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.accent, width: 1.5),
               ),
             ),
           ),
@@ -166,16 +166,15 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.nested),
             ),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 8,
-                  backgroundColor:
-                      _selectedCalendar?.color ?? const Color(0xFF38BDF8),
+                  backgroundColor: _selectedCalendar?.color ?? colors.accent,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -183,14 +182,15 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                     child: DropdownButton<UserCalendar>(
                       isExpanded: true,
                       value: _selectedCalendar,
-                      dropdownColor: cardBg,
+                      dropdownColor: colors.card,
                       items: calendars.map((c) {
                         return DropdownMenuItem<UserCalendar>(
                           value: c,
                           child: Text(
                             c.title,
                             style: TextStyle(
-                              color: textPrimary,
+                              fontFamily: 'Onest',
+                              color: colors.text,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -208,43 +208,51 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
           // 3. Блок времени и даты
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.nested),
             ),
             child: Column(
               children: [
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
+                  activeColor: colors.accent,
                   title: Text(
                     'Весь день',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   value: _isAllDay,
                   onChanged: (v) => setState(() => _isAllDay = v),
                 ),
-                const Divider(),
+                Divider(color: colors.nested),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.calendar_today,
                     size: 20,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                   ),
                   title: Text(
                     'Начало',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
                   ),
                   trailing: Text(
                     '${_startDate.day}.${_startDate.month}.${_startDate.year}',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Unbounded',
+                      fontSize: 13,
+                      color: colors.text,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   onTap: () async {
@@ -260,20 +268,26 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 if (!_isAllDay)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.access_time,
                       size: 20,
-                      color: Color(0xFF38BDF8),
+                      color: colors.accent,
                     ),
                     title: Text(
                       'Время начала',
-                      style: TextStyle(color: textSecondary, fontSize: 13),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                        fontSize: 13,
+                      ),
                     ),
                     trailing: Text(
                       _startTime.format(context),
                       style: TextStyle(
-                        color: textPrimary,
-                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Unbounded',
+                        fontSize: 13,
+                        color: colors.text,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     onTap: () async {
@@ -284,23 +298,29 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                       if (t != null) setState(() => _startTime = t);
                     },
                   ),
-                const Divider(),
+                Divider(color: colors.nested),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.event_available,
                     size: 20,
-                    color: Colors.orangeAccent,
+                    color: colors.warning,
                   ),
                   title: Text(
                     'Конец',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
                   ),
                   trailing: Text(
                     '${_endDate.day}.${_endDate.month}.${_endDate.year}',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Unbounded',
+                      fontSize: 13,
+                      color: colors.text,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   onTap: () async {
@@ -316,20 +336,26 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                 if (!_isAllDay)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.timer_outlined,
                       size: 20,
-                      color: Colors.orangeAccent,
+                      color: colors.warning,
                     ),
                     title: Text(
                       'Время окончания',
-                      style: TextStyle(color: textSecondary, fontSize: 13),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                        fontSize: 13,
+                      ),
                     ),
                     trailing: Text(
                       _endTime.format(context),
                       style: TextStyle(
-                        color: textPrimary,
-                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Unbounded',
+                        fontSize: 13,
+                        color: colors.text,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     onTap: () async {
@@ -347,65 +373,67 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
           // 4. Блок Напоминания и Повторения
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.nested),
             ),
             child: Column(
               children: [
-                // Напоминание
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.notifications_active_outlined,
-                    color: Color(0xFF38BDF8),
+                    color: colors.accent,
                     size: 22,
                   ),
                   title: Text(
                     'Напоминание',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   trailing: Text(
                     _presetReminders[_reminderMinutes] ??
                         '$_reminderMinutes мин.',
-                    style: const TextStyle(
-                      color: Color(0xFF38BDF8),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.accent,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
                   ),
-                  onTap: _pickReminder,
+                  onTap: () => _pickReminder(colors),
                 ),
-                const Divider(),
-                // Повторение
+                Divider(color: colors.nested),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.repeat,
-                    color: Colors.purpleAccent,
+                    color: colors.accent,
                     size: 22,
                   ),
                   title: Text(
                     'Повторение',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   trailing: Text(
                     _formatRecurrence(_recurrence),
-                    style: const TextStyle(
-                      color: Colors.purpleAccent,
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.accent,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
                   ),
-                  onTap: _pickRecurrence,
+                  onTap: () => _pickRecurrence(colors),
                 ),
               ],
             ),
@@ -414,26 +442,31 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
           // 5. Добавление друга / участника
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.nested),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.person_add_alt_1,
-                  color: Color(0xFF38BDF8),
+                  color: colors.accent,
                   size: 22,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
                     controller: _attendeeCtrl,
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text),
                     decoration: InputDecoration(
                       hintText: 'Пригласить друга / имя участника',
-                      hintStyle: TextStyle(color: textSecondary, fontSize: 14),
+                      hintStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.4),
+                        fontSize: 14,
+                      ),
                       border: InputBorder.none,
                     ),
                   ),
@@ -445,26 +478,31 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
           // 6. Место
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: borderColor),
+              color: colors.card,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colors.nested),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.location_on_outlined,
-                  color: Colors.redAccent,
+                  color: colors.error,
                   size: 22,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
                     controller: _locationCtrl,
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text),
                     decoration: InputDecoration(
                       hintText: 'Место проведения',
-                      hintStyle: TextStyle(color: textSecondary, fontSize: 14),
+                      hintStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.4),
+                        fontSize: 14,
+                      ),
                       border: InputBorder.none,
                     ),
                   ),
@@ -478,50 +516,66 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
           TextField(
             controller: _descCtrl,
             maxLines: 3,
+            style: TextStyle(fontFamily: 'Onest', color: colors.text),
             decoration: InputDecoration(
               hintText: 'Описание или заметка к событию',
-              hintStyle: TextStyle(color: textSecondary, fontSize: 14),
+              hintStyle: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.4),
+                fontSize: 14,
+              ),
               filled: true,
-              fillColor: cardBg,
+              fillColor: colors.card,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.nested),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: borderColor),
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.nested),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.accent, width: 1.5),
               ),
             ),
           ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  void _pickReminder() {
+  void _pickReminder(AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: widget.isDarkMode
-          ? const Color(0xFF161B22)
-          : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => ListView(
         shrinkWrap: true,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Text(
               'Установить напоминание',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontFamily: 'Unbounded',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: colors.text,
+              ),
             ),
           ),
           ..._presetReminders.entries.map(
             (e) => ListTile(
-              title: Text(e.value),
+              title: Text(
+                e.value,
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               trailing: _reminderMinutes == e.key
-                  ? const Icon(Icons.check, color: Color(0xFF38BDF8))
+                  ? Icon(Icons.check, color: colors.accent)
                   : null,
               onTap: () {
                 setState(() => _reminderMinutes = e.key);
@@ -530,11 +584,18 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.edit, color: Color(0xFF38BDF8)),
-            title: const Text('Другой интервал...'),
+            leading: Icon(Icons.edit, color: colors.accent),
+            title: Text(
+              'Другой интервал...',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             onTap: () {
               Navigator.pop(ctx);
-              _pickCustomReminder();
+              _pickCustomReminder(colors);
             },
           ),
         ],
@@ -542,23 +603,52 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     );
   }
 
-  void _pickCustomReminder() {
+  void _pickCustomReminder(AppColorsExtension colors) {
     final ctrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Свой интервал (в минутах)'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Свой интервал (в минутах)',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'Например, 15'),
+          style: TextStyle(fontFamily: 'Onest', color: colors.text),
+          decoration: InputDecoration(
+            hintText: 'Например, 15',
+            hintStyle: TextStyle(
+              fontFamily: 'Onest',
+              color: colors.text.withValues(alpha: 0.4),
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.6)),
+            ),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
             onPressed: () {
               final val = int.tryParse(ctrl.text.trim());
               if (val != null && val >= 0) {
@@ -566,14 +656,16 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
               }
               Navigator.pop(ctx);
             },
-            child: const Text('ОК'),
+            child: const Text('ОК',
+                style: TextStyle(
+                    fontFamily: 'Onest', fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  void _pickRecurrence() {
+  void _pickRecurrence(AppColorsExtension colors) {
     final options = {
       'none': 'Не повторяется',
       'daily': 'Каждый день',
@@ -584,27 +676,33 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: widget.isDarkMode
-          ? const Color(0xFF161B22)
-          : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => ListView(
         shrinkWrap: true,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Text(
               'Повторение события',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontFamily: 'Unbounded',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: colors.text,
+              ),
             ),
           ),
           ...options.entries.map(
             (e) => ListTile(
-              title: Text(e.value),
+              title: Text(
+                e.value,
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
               trailing: _recurrence == e.key
-                  ? const Icon(Icons.check, color: Colors.purpleAccent)
+                  ? Icon(Icons.check, color: colors.accent)
                   : null,
               onTap: () {
                 setState(() => _recurrence = e.key);
@@ -632,11 +730,14 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     }
   }
 
-  void _saveAsTemplate() {
+  void _saveAsTemplate(AppColorsExtension colors) {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите название для шаблона')),
+        const SnackBar(
+          content: Text('Введите название для шаблона',
+              style: TextStyle(fontFamily: 'Onest')),
+        ),
       );
       return;
     }
@@ -651,28 +752,32 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       'calendar': _selectedCalendar?.title ?? 'Основной',
     });
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Шаблон сохранен!')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content:
+            Text('Шаблон сохранен!', style: TextStyle(fontFamily: 'Onest')),
+      ),
+    );
   }
 
-  void _saveEvent() {
+  void _saveEvent(AppColorsExtension colors) {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Укажите название события')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Укажите название события',
+              style: TextStyle(fontFamily: 'Onest')),
+        ),
+      );
       return;
     }
 
     final attendee = _attendeeCtrl.text.trim();
     final desc = _descCtrl.text.trim();
-    final fullDesc = attendee.isNotEmpty
-        ? '$desc\nУчастник: $attendee'.trim()
-        : desc;
+    final fullDesc =
+        attendee.isNotEmpty ? '$desc\nУчастник: $attendee'.trim() : desc;
 
-    ref
-        .read(calendarProvider.notifier)
-        .addEvent(
+    ref.read(calendarProvider.notifier).addEvent(
           title: title,
           date: _startDate,
           endDate: _endDate,
@@ -684,7 +789,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
               : '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
           isAllDay: _isAllDay,
           calendar: _selectedCalendar?.title ?? 'Основной',
-          color: _selectedCalendar?.color ?? const Color(0xFF2C69D1),
+          color: _selectedCalendar?.color ?? colors.accent,
           location: _locationCtrl.text.trim().isNotEmpty
               ? _locationCtrl.text.trim()
               : null,

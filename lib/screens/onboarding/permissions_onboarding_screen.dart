@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../services/permission_service.dart';
+import '../../theme/app_theme.dart';
 
 class PermissionsOnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -22,32 +23,48 @@ class _PermissionsOnboardingScreenState
     {
       'icon': Icons.notifications_active_outlined,
       'title': 'Уведомления Орбиты',
-      'subtitle': 'Чтобы вовремя получать напоминания о задачах, сменном графике и привычках',
+      'subtitle':
+          'Чтобы вовремя получать напоминания о задачах, сменном графике и привычках',
       'button': 'Разрешить уведомления',
-      'color': Color(0xFF38BDF8),
+      'colorType': 'accent',
     },
     {
       'icon': Icons.alarm_on_outlined,
       'title': 'Точные будильники',
-      'subtitle': 'Гарантирует доставку напоминаний минута в минуту, даже если телефон находится в спящем режиме',
+      'subtitle':
+          'Гарантирует доставку напоминаний минута в минуту, даже если телефон находится в спящем режиме',
       'button': 'Включить точные сигналы',
-      'color': Color(0xFF8B5CF6),
+      'colorType': 'accent',
     },
     {
       'icon': Icons.photo_library_outlined,
       'title': 'Доступ к галерее',
-      'subtitle': 'Необходим для прикрепления изображений к заметкам и безопасного хранения документов в Сейфе',
+      'subtitle':
+          'Необходим для прикрепления изображений к заметкам и безопасного хранения документов в Сейфе',
       'button': 'Открыть доступ к фото',
-      'color': Color(0xFF10B981),
+      'colorType': 'success',
     },
     {
       'icon': Icons.battery_charging_full_outlined,
       'title': 'Фоновая работа',
-      'subtitle': 'Отключение жестких ограничений батареи Android позволит виджетам и синхронизации работать бесперебойно',
+      'subtitle':
+          'Отключение жестких ограничений батареи Android позволит виджетам и синхронизации работать бесперебойно',
       'button': 'Разрешить работу в фоне',
-      'color': Color(0xFFF59E0B),
+      'colorType': 'warning',
     },
   ];
+
+  Color _resolveStepColor(String colorType, AppColorsExtension colors) {
+    switch (colorType) {
+      case 'success':
+        return colors.success;
+      case 'warning':
+        return colors.warning;
+      case 'accent':
+      default:
+        return colors.accent;
+    }
+  }
 
   Future<void> _handleStepAction() async {
     if (_isProcessing) return;
@@ -92,11 +109,12 @@ class _PermissionsOnboardingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final step = _steps[_currentStep];
-    final Color stepColor = step['color'] as Color;
+    final Color stepColor = _resolveStepColor(step['colorType'] as String, colors);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF07090E),
+      backgroundColor: colors.bg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -115,9 +133,9 @@ class _PermissionsOnboardingScreenState
                         color: isCurrent
                             ? stepColor
                             : (isDone
-                                  ? const Color(0xFF38BDF8)
-                                  : Colors.white12),
-                        borderRadius: BorderRadius.circular(2),
+                                ? colors.accent
+                                : colors.nested.withValues(alpha: 0.8)),
+                        borderRadius: BorderRadius.circular(13),
                       ),
                     ),
                   );
@@ -134,13 +152,13 @@ class _PermissionsOnboardingScreenState
                   color: stepColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: stepColor.withValues(alpha: 0.3),
+                    color: stepColor.withValues(alpha: 0.35),
                     width: 2,
                   ),
                 ),
                 child: Icon(
                   step['icon'] as IconData,
-                  size: 48,
+                  size: 46,
                   color: stepColor,
                 ),
               ),
@@ -150,10 +168,11 @@ class _PermissionsOnboardingScreenState
               Text(
                 step['title'] as String,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  color: colors.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -165,8 +184,9 @@ class _PermissionsOnboardingScreenState
                 child: Text(
                   step['subtitle'] as String,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.65),
                     fontSize: 14,
                     height: 1.5,
                   ),
@@ -181,26 +201,35 @@ class _PermissionsOnboardingScreenState
                 child: FilledButton(
                   style: FilledButton.styleFrom(
                     backgroundColor: stepColor,
-                    foregroundColor: Colors.white,
+                    foregroundColor:
+                        ThemeData.estimateBrightnessForColor(stepColor) ==
+                                Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   onPressed: _isProcessing ? null : _handleStepAction,
                   child: _isProcessing
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
+                            color:
+                                ThemeData.estimateBrightnessForColor(stepColor) ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black,
                             strokeWidth: 2,
                           ),
                         )
                       : Text(
                           step['button'] as String,
                           style: const TextStyle(
+                            fontFamily: 'Onest',
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 15,
                           ),
                         ),
                 ),
@@ -210,9 +239,13 @@ class _PermissionsOnboardingScreenState
               // Кнопка пропустить
               TextButton(
                 onPressed: _isProcessing ? null : _skipStep,
-                child: const Text(
+                child: Text(
                   'Пропустить этот шаг',
-                  style: TextStyle(color: Colors.white38, fontSize: 13),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.4),
+                    fontSize: 13,
+                  ),
                 ),
               ),
             ],

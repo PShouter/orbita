@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/notes_provider.dart';
+import '../../theme/app_theme.dart';
 import '../settings/sections/notes_settings_screen.dart';
 import 'note_edit_screen.dart';
 
@@ -59,6 +60,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final notes = ref.watch(filteredNotesProvider);
     final allNotes = ref.watch(notesProvider);
     final viewMode = ref.watch(notesViewModeProvider);
@@ -67,26 +69,17 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
     final sortedNotes = _applySorting(notes);
 
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary =
-        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
-    final textSecondary =
-        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final borderColor =
-        isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         title: Text(
           'Заметки',
           style: TextStyle(
-            color: textPrimary,
-            fontWeight: FontWeight.bold,
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontWeight: FontWeight.w600,
             fontSize: 22,
           ),
         ),
@@ -95,7 +88,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
             child: Text(
               '${allNotes.length} шт.',
               style: TextStyle(
-                color: textSecondary,
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.6),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -105,28 +99,24 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           IconButton(
             icon: Icon(
               Icons.filter_list,
-              color:
-                  selectedTag != null ? const Color(0xFF38BDF8) : textSecondary,
+              color: selectedTag != null
+                  ? colors.accent
+                  : colors.text.withValues(alpha: 0.6),
             ),
             tooltip: 'Фильтр по тегам',
-            onPressed: () => _showTagsFilter(
-              context,
-              allTags,
-              selectedTag,
-              cardBg,
-              textPrimary,
-              textSecondary,
-            ),
+            onPressed: () =>
+                _showTagsFilter(context, allTags, selectedTag, colors),
           ),
           IconButton(
-            icon: Icon(Icons.settings_outlined, color: textSecondary),
+            icon: Icon(Icons.settings_outlined,
+                color: colors.text.withValues(alpha: 0.6)),
             tooltip: 'Настройки заметок',
             onPressed: () async {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                      NotesSettingsScreen(isDarkMode: widget.isDarkMode),
+                      NotesSettingsScreen(isDarkMode: colors.isDark),
                 ),
               );
               _loadPreferences();
@@ -143,28 +133,31 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               onChanged: (val) {
                 ref.read(notesSearchQueryProvider.notifier).setQuery(val);
               },
-              style: TextStyle(color: textPrimary, fontSize: 14),
+              style: TextStyle(
+                  fontFamily: 'Onest', color: colors.text, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Поиск по заголовку и содержанию...',
                 hintStyle: TextStyle(
-                  color: textSecondary.withValues(alpha: 0.6),
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.4),
                   fontSize: 14,
                 ),
-                prefixIcon: Icon(Icons.search, size: 20, color: textSecondary),
+                prefixIcon: Icon(Icons.search,
+                    size: 20, color: colors.text.withValues(alpha: 0.5)),
                 filled: true,
-                fillColor: cardBg,
+                fillColor: colors.card,
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: borderColor),
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: colors.nested),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: borderColor),
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: colors.nested),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF38BDF8)),
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: colors.accent, width: 1.5),
                 ),
               ),
             ),
@@ -177,13 +170,20 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   Chip(
                     label: Text(
                       selectedTag,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.isDark ? Colors.black : Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    backgroundColor: const Color(0xFF38BDF8),
-                    deleteIcon: const Icon(
+                    backgroundColor: colors.accent,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13)),
+                    deleteIcon: Icon(
                       Icons.close,
                       size: 16,
-                      color: Colors.white,
+                      color: colors.isDark ? Colors.black : Colors.white,
                     ),
                     onDeleted: () {
                       ref.read(notesSelectedTagProvider.notifier).setTag(null);
@@ -199,38 +199,30 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                       allNotes.isEmpty
                           ? 'Заметок пока нет'
                           : 'Ничего не найдено',
-                      style: TextStyle(color: textSecondary, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.5),
+                        fontSize: 14,
+                      ),
                     ),
                   )
                 : viewMode == NotesViewMode.grid
-                    ? _buildGridView(
-                        context,
-                        sortedNotes,
-                        cardBg,
-                        borderColor,
-                        textPrimary,
-                        textSecondary,
-                      )
-                    : _buildListView(
-                        context,
-                        sortedNotes,
-                        cardBg,
-                        borderColor,
-                        textPrimary,
-                        textSecondary,
-                      ),
+                    ? _buildGridView(context, sortedNotes, colors)
+                    : _buildListView(context, sortedNotes, colors),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF38BDF8),
-        foregroundColor: Colors.white,
+        backgroundColor: colors.accent,
+        foregroundColor: colors.isDark ? Colors.black : Colors.white,
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: const Icon(Icons.add, size: 28),
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => NoteEditScreen(isDarkMode: widget.isDarkMode),
+              builder: (_) => NoteEditScreen(isDarkMode: colors.isDark),
             ),
           );
         },
@@ -241,18 +233,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   Widget _buildGridView(
     BuildContext context,
     List<NoteItem> notes,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 84),
       itemCount: notes.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
         childAspectRatio: 0.85,
       ),
       itemBuilder: (context, index) {
@@ -260,26 +249,26 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         final preview = note.previewImage;
 
         return Material(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(12),
+          color: colors.card,
+          borderRadius: BorderRadius.circular(18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: borderColor),
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: colors.nested),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(18),
             onTap: () => _openNote(context, note),
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (preview != null && File(preview).existsSync())
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         child: Image.file(
                           File(preview),
                           height: 72,
@@ -291,9 +280,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   Text(
                     note.title,
                     style: TextStyle(
-                      color: textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -302,18 +292,24 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   Expanded(
                     child: Text(
                       note.body,
-                      style: TextStyle(color: textSecondary, fontSize: 12),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                        fontSize: 12,
+                        height: 1.35,
+                      ),
                       maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (_showDateOnCard) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       DateFormat('dd.MM.yyyy').format(note.updatedAt),
                       style: TextStyle(
-                        color: textSecondary.withValues(alpha: 0.6),
-                        fontSize: 10,
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.4),
+                        fontSize: 11,
                       ),
                     ),
                   ],
@@ -329,13 +325,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   Widget _buildListView(
     BuildContext context,
     List<NoteItem> notes,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 84),
       itemCount: notes.length,
       itemBuilder: (context, index) {
         final note = notes[index];
@@ -344,25 +337,26 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Material(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(12),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(18),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: borderColor),
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: colors.nested),
             ),
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 6,
+                horizontal: 16,
+                vertical: 8,
               ),
               onTap: () => _openNote(context, note),
               title: Text(
                 note.title,
                 style: TextStyle(
-                  color: textPrimary,
+                  fontFamily: 'Onest',
+                  color: colors.text,
                   fontSize: 15,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w600,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -373,7 +367,11 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                   const SizedBox(height: 4),
                   Text(
                     note.body,
-                    style: TextStyle(color: textSecondary, fontSize: 12),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -382,8 +380,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     Text(
                       DateFormat('dd.MM.yyyy HH:mm').format(note.updatedAt),
                       style: TextStyle(
-                        color: textSecondary.withValues(alpha: 0.5),
-                        fontSize: 10,
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.4),
+                        fontSize: 11,
                       ),
                     ),
                   ],
@@ -391,7 +390,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               ),
               trailing: preview != null && File(preview).existsSync()
                   ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       child: Image.file(
                         File(preview),
                         width: 56,
@@ -421,20 +420,18 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     BuildContext context,
     List<String> tags,
     String? currentTag,
-    Color cardBg,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: cardBg,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,18 +439,23 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 Text(
                   'Фильтр по тегам',
                   style: TextStyle(
-                    color: textPrimary,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Unbounded',
+                    color: colors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 if (tags.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Text(
                       'Теги пока не найдены. Добавляйте #теги прямо в текст заметок.',
-                      style: TextStyle(color: textSecondary, fontSize: 13),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.5),
+                        fontSize: 13,
+                      ),
                     ),
                   )
                 else
@@ -463,9 +465,27 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                     children: tags.map((t) {
                       final isSelected = t == currentTag;
                       return ChoiceChip(
-                        label: Text(t),
+                        label: Text(
+                          t,
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isSelected
+                                ? (colors.isDark ? Colors.black : Colors.white)
+                                : colors.text,
+                          ),
+                        ),
                         selected: isSelected,
-                        selectedColor: const Color(0xFF38BDF8),
+                        selectedColor: colors.accent,
+                        backgroundColor: colors.nested.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                          side: BorderSide(
+                              color:
+                                  isSelected ? colors.accent : colors.nested),
+                        ),
                         onSelected: (val) {
                           ref
                               .read(notesSelectedTagProvider.notifier)

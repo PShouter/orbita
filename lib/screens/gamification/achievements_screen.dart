@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/achievements_provider.dart';
+import '../../theme/app_theme.dart';
 
 class AchievementsScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
@@ -25,20 +26,8 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final achievements = ref.watch(achievementsProvider);
-    final isDark = widget.isDarkMode;
-
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
 
     final unlockedCount = achievements.where((a) => a.isUnlocked).length;
     final totalCount = achievements.length;
@@ -49,15 +38,17 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
+        iconTheme: IconThemeData(color: colors.text),
         title: Text(
           'Достижения',
           style: TextStyle(
-            color: textPrimary,
-            fontWeight: FontWeight.bold,
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontWeight: FontWeight.w600,
             fontSize: 18,
           ),
         ),
@@ -70,21 +61,21 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
+                color: colors.card,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.nested),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                      color: colors.warning.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.emoji_events,
-                      color: Color(0xFFF59E0B),
+                      color: colors.warning,
                       size: 28,
                     ),
                   ),
@@ -94,26 +85,26 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Открыто наград: $unlockedCount из $totalCount',
+                          'Открыто: $unlockedCount из $totalCount',
                           style: TextStyle(
+                            fontFamily: 'Onest',
                             fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: textPrimary,
+                            fontWeight: FontWeight.w600,
+                            color: colors.text,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(13),
                           child: LinearProgressIndicator(
                             value: totalCount > 0
                                 ? unlockedCount / totalCount
                                 : 0.0,
                             minHeight: 8,
-                            backgroundColor: isDark
-                                ? const Color(0xFF21262D)
-                                : const Color(0xFFE2E8F0),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFF59E0B),
+                            backgroundColor:
+                                colors.nested.withValues(alpha: 0.5),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              colors.warning,
                             ),
                           ),
                         ),
@@ -132,12 +123,14 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               children: [
-                _buildFilterChip('Все', AchievementCategory.all),
-                _buildFilterChip('Привычки', AchievementCategory.habits),
-                _buildFilterChip('Задачи', AchievementCategory.tasks),
-                _buildFilterChip('Дневник', AchievementCategory.diary),
-                _buildFilterChip('Бюджет', AchievementCategory.budget),
-                _buildFilterChip('Станция', AchievementCategory.station),
+                _buildFilterChip('Все', AchievementCategory.all, colors),
+                _buildFilterChip(
+                    'Привычки', AchievementCategory.habits, colors),
+                _buildFilterChip('Задачи', AchievementCategory.tasks, colors),
+                _buildFilterChip('Дневник', AchievementCategory.diary, colors),
+                _buildFilterChip('Бюджет', AchievementCategory.budget, colors),
+                _buildFilterChip(
+                    'Станция', AchievementCategory.station, colors),
               ],
             ),
           ),
@@ -154,16 +147,17 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isUnlocked
-                        ? item.color.withValues(alpha: isDark ? 0.08 : 0.04)
-                        : cardBg,
-                    borderRadius: BorderRadius.circular(16),
+                        ? item.color
+                            .withValues(alpha: colors.isDark ? 0.08 : 0.04)
+                        : colors.card,
+                    borderRadius: BorderRadius.circular(22),
                     border: Border.all(
                       color: isUnlocked
                           ? item.color.withValues(alpha: 0.4)
-                          : borderColor,
+                          : colors.nested,
                       width: isUnlocked ? 1.5 : 1,
                     ),
                   ),
@@ -176,12 +170,14 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                         decoration: BoxDecoration(
                           color: isUnlocked
                               ? item.color.withValues(alpha: 0.15)
-                              : Colors.grey.withValues(alpha: 0.1),
+                              : colors.nested.withValues(alpha: 0.4),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           isUnlocked ? item.icon : Icons.lock_outline,
-                          color: isUnlocked ? item.color : Colors.grey,
+                          color: isUnlocked
+                              ? item.color
+                              : colors.text.withValues(alpha: 0.4),
                           size: 24,
                         ),
                       ),
@@ -198,30 +194,32 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                                   child: Text(
                                     item.title,
                                     style: TextStyle(
+                                      fontFamily: 'Onest',
                                       fontSize: 15,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w600,
                                       color: isUnlocked
-                                          ? textPrimary
-                                          : textSecondary,
+                                          ? colors.text
+                                          : colors.text.withValues(alpha: 0.6),
                                     ),
                                   ),
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
+                                    horizontal: 8,
+                                    vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF38BDF8)
-                                        .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
+                                    color:
+                                        colors.accent.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(13),
                                   ),
                                   child: Text(
                                     '+${item.expReward} EXP',
-                                    style: const TextStyle(
+                                    style: TextStyle(
+                                      fontFamily: 'Unbounded',
                                       fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF38BDF8),
+                                      fontWeight: FontWeight.w600,
+                                      color: colors.accent,
                                     ),
                                   ),
                                 ),
@@ -231,8 +229,9 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                             Text(
                               item.description,
                               style: TextStyle(
+                                fontFamily: 'Onest',
                                 fontSize: 12,
-                                color: textSecondary,
+                                color: colors.text.withValues(alpha: 0.6),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -240,13 +239,12 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                             // Прогресс-бар
                             if (!isUnlocked) ...[
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(13),
                                 child: LinearProgressIndicator(
                                   value: item.progress,
                                   minHeight: 6,
-                                  backgroundColor: isDark
-                                      ? const Color(0xFF21262D)
-                                      : const Color(0xFFE2E8F0),
+                                  backgroundColor:
+                                      colors.nested.withValues(alpha: 0.5),
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                     item.color,
                                   ),
@@ -256,25 +254,27 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                               Text(
                                 '${item.currentValue.clamp(0, item.targetValue)} / ${item.targetValue}',
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  color: textSecondary,
+                                  fontFamily: 'Onest',
+                                  fontSize: 11,
+                                  color: colors.text.withValues(alpha: 0.5),
                                 ),
                               ),
                             ] else
                               Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.check,
                                     size: 14,
-                                    color: Color(0xFF10B981),
+                                    color: colors.success,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Получено',
                                     style: TextStyle(
+                                      fontFamily: 'Onest',
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF10B981),
+                                      color: colors.success,
                                     ),
                                   ),
                                 ],
@@ -293,13 +293,33 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, AchievementCategory category) {
+  Widget _buildFilterChip(
+    String label,
+    AchievementCategory category,
+    AppColorsExtension colors,
+  ) {
     final isSelected = _selectedCategory == category;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: FilterChip(
-        label: Text(label, style: const TextStyle(fontSize: 12)),
+        label: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Onest',
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected
+                ? (colors.isDark ? Colors.black : Colors.white)
+                : colors.text,
+          ),
+        ),
         selected: isSelected,
+        selectedColor: colors.accent,
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(13),
+          side: BorderSide(color: isSelected ? colors.accent : colors.nested),
+        ),
         onSelected: (_) => setState(() => _selectedCategory = category),
       ),
     );

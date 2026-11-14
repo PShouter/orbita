@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/habits_provider.dart';
+import '../../theme/app_theme.dart';
 
 class HabitEditScreen extends ConsumerStatefulWidget {
   final String type; // 'boolean' | 'numerical'
@@ -21,28 +22,25 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
   late TextEditingController _targetValueController;
   late TextEditingController _unitController;
 
-  // Контроллеры для гибкой настройки частоты
-  late TextEditingController _everyNDaysController; // Для "Каждые N дней"
-  late TextEditingController _timesCountController; // Число Z (раз)
-  late TextEditingController _windowDaysController; // Число N (дней)
+  late TextEditingController _everyNDaysController;
+  late TextEditingController _timesCountController;
+  late TextEditingController _windowDaysController;
 
   late Color _selectedColor;
   late String _frequencyType;
-  // Значения: 'daily', 'every_n_days', 'z_per_week', 'z_per_month', 'z_in_n_days', 'specific_days'
-
   late List<int> _frequencyDays;
   TimeOfDay? _reminderTime;
 
   static const List<Color> _palette = [
-    Color(0xFFEF4444), // red
-    Color(0xFFF97316), // orange
-    Color(0xFFF59E0B), // amber
-    Color(0xFF10B981), // emerald
-    Color(0xFF06B6D4), // cyan
-    Color(0xFF38BDF8), // sky blue
-    Color(0xFF6366F1), // indigo
-    Color(0xFF8B5CF6), // violet
-    Color(0xFFEC4899), // pink
+    Color(0xFFEF4444),
+    Color(0xFFF97316),
+    Color(0xFFF59E0B),
+    Color(0xFF10B981),
+    Color(0xFF06B6D4),
+    Color(0xFF38BDF8),
+    Color(0xFF6366F1),
+    Color(0xFF8B5CF6),
+    Color(0xFFEC4899),
   ];
 
   @override
@@ -64,7 +62,6 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
       text: h?.unit ?? (widget.type == 'numerical' ? 'мл' : ''),
     );
 
-    // Инициализация полей частоты
     int initialCount = h?.frequencyCount ?? 1;
     _everyNDaysController = TextEditingController(
       text: '${initialCount > 0 ? initialCount : 2}',
@@ -83,7 +80,6 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
 
     _selectedColor = h?.color ?? const Color(0xFF38BDF8);
 
-    // Нормализация типа частоты при старых сохраненных значениях
     if (h?.frequencyType == 'x_per_week') {
       _frequencyType = 'z_per_week';
     } else {
@@ -92,8 +88,8 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
 
     _frequencyDays =
         h?.frequencyDays != null && h!.frequencyType == 'specific_days'
-        ? List<int>.from(h.frequencyDays)
-        : [1, 2, 3, 4, 5];
+            ? List<int>.from(h.frequencyDays)
+            : [1, 2, 3, 4, 5];
 
     if (h?.reminderTime != null && h!.reminderTime!.contains(':')) {
       final parts = h.reminderTime!.split(':');
@@ -119,32 +115,35 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final isNumerical = widget.type == 'numerical';
     final isEdit = widget.initialHabit != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: colors.bg,
         elevation: 0,
         title: Text(
           isEdit
               ? 'Редактировать привычку'
               : (isNumerical ? 'Новая измеримая привычка' : 'Новая привычка'),
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: colors.text),
         actions: [
           TextButton(
             onPressed: _save,
-            child: const Text(
+            child: Text(
               'Сохранить',
               style: TextStyle(
-                color: Color(0xFF38BDF8),
+                fontFamily: 'Onest',
+                color: colors.accent,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -160,15 +159,16 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
             label: 'Название',
             hint: 'Например: Чтение, Вода, Зарядка',
             autofocus: !isEdit,
+            colors: colors,
           ),
           const SizedBox(height: 16),
           _buildTextField(
             controller: _questionController,
             label: 'Вопрос',
             hint: 'Например: Читал ли ты сегодня?',
+            colors: colors,
           ),
           const SizedBox(height: 16),
-
           if (isNumerical) ...[
             Row(
               children: [
@@ -180,6 +180,7 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    colors: colors,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -189,28 +190,27 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
                     controller: _unitController,
                     label: 'Единица измерения',
                     hint: 'мл, стр, минут',
+                    colors: colors,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
           ],
-
-          _buildColorPicker(),
+          _buildColorPicker(colors),
           const SizedBox(height: 20),
-
-          _buildFrequencySection(),
+          _buildFrequencySection(colors),
           const SizedBox(height: 20),
-
-          _buildReminderTile(),
+          _buildReminderTile(colors),
           const SizedBox(height: 16),
-
           _buildTextField(
             controller: _descriptionController,
             label: 'Заметки',
             hint: 'Дополнительные пояснения или мотивация',
             maxLines: 3,
+            colors: colors,
           ),
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -219,6 +219,7 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
+    required AppColorsExtension colors,
     String? hint,
     int maxLines = 1,
     TextInputType? keyboardType,
@@ -229,8 +230,9 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white70,
+          style: TextStyle(
+            fontFamily: 'Onest',
+            color: colors.text.withValues(alpha: 0.7),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
@@ -241,18 +243,34 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
           maxLines: maxLines,
           autofocus: autofocus,
           keyboardType: keyboardType,
-          style: const TextStyle(color: Colors.white, fontSize: 15),
+          style: TextStyle(
+            fontFamily: 'Onest',
+            color: colors.text,
+            fontSize: 15,
+          ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+            hintStyle: TextStyle(
+              fontFamily: 'Onest',
+              color: colors.text.withValues(alpha: 0.35),
+              fontSize: 14,
+            ),
             filled: true,
-            fillColor: const Color(0xFF1E293B),
+            fillColor: colors.card,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: colors.nested),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: colors.nested),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide(color: colors.accent, width: 1.5),
             ),
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
+              horizontal: 16,
               vertical: 12,
             ),
           ),
@@ -261,22 +279,23 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
     );
   }
 
-  Widget _buildColorPicker() {
+  Widget _buildColorPicker(AppColorsExtension colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Цвет',
           style: TextStyle(
-            color: Colors.white70,
+            fontFamily: 'Onest',
+            color: colors.text.withValues(alpha: 0.7),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Wrap(
-          spacing: 10,
-          runSpacing: 10,
+          spacing: 12,
+          runSpacing: 12,
           children: _palette.map((color) {
             final isSelected = _selectedColor.toARGB32() == color.toARGB32();
             return GestureDetector(
@@ -288,11 +307,18 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
                   color: color,
                   shape: BoxShape.circle,
                   border: isSelected
-                      ? Border.all(color: Colors.white, width: 3)
+                      ? Border.all(color: colors.text, width: 3)
                       : null,
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white, size: 20)
+                    ? Icon(
+                        Icons.check,
+                        color: ThemeData.estimateBrightnessForColor(color) ==
+                                Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
+                        size: 20,
+                      )
                     : null,
               ),
             );
@@ -302,43 +328,47 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
     );
   }
 
-  /// Секция частоты с выпадающим списком
-  Widget _buildFrequencySection() {
+  Widget _buildFrequencySection(AppColorsExtension colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Частота',
           style: TextStyle(
-            color: Colors.white70,
+            fontFamily: 'Onest',
+            color: colors.text.withValues(alpha: 0.7),
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(12),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Выпадающий список вариантов
               DropdownButtonFormField<String>(
                 initialValue: _frequencyType,
-                dropdownColor: const Color(0xFF1E293B),
-                style: const TextStyle(color: Colors.white, fontSize: 15),
+                dropdownColor: colors.card,
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text,
+                  fontSize: 15,
+                ),
                 decoration: InputDecoration(
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                    horizontal: 14,
+                    vertical: 10,
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF0F172A),
+                  fillColor: colors.nested.withValues(alpha: 0.5),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(13),
                     borderSide: BorderSide.none,
                   ),
                 ),
@@ -371,96 +401,114 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
                   }
                 },
               ),
-
-              // Динамические настройки под выбранный пункт:
               if (_frequencyType == 'every_n_days') ...[
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    const Text(
+                    Text(
                       'Каждые ',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
                     ),
                     SizedBox(
                       width: 65,
-                      child: _buildNumberInput(_everyNDaysController),
+                      child: _buildNumberInput(_everyNDaysController, colors),
                     ),
-                    const Text(
+                    Text(
                       ' дня / дней',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
               ],
-
               if (_frequencyType == 'z_per_week') ...[
                 const SizedBox(height: 14),
                 Row(
                   children: [
                     SizedBox(
                       width: 65,
-                      child: _buildNumberInput(_timesCountController),
+                      child: _buildNumberInput(_timesCountController, colors),
                     ),
-                    const Text(
+                    Text(
                       ' раз(а) в неделю',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
               ],
-
               if (_frequencyType == 'z_per_month') ...[
                 const SizedBox(height: 14),
                 Row(
                   children: [
                     SizedBox(
                       width: 65,
-                      child: _buildNumberInput(_timesCountController),
+                      child: _buildNumberInput(_timesCountController, colors),
                     ),
-                    const Text(
+                    Text(
                       ' раз(а) в месяц',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
               ],
-
               if (_frequencyType == 'z_in_n_days') ...[
                 const SizedBox(height: 14),
                 Row(
                   children: [
                     SizedBox(
                       width: 60,
-                      child: _buildNumberInput(_timesCountController),
+                      child: _buildNumberInput(_timesCountController, colors),
                     ),
-                    const Text(
+                    Text(
                       ' раз(а) каждые ',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
                     ),
                     SizedBox(
                       width: 60,
-                      child: _buildNumberInput(_windowDaysController),
+                      child: _buildNumberInput(_windowDaysController, colors),
                     ),
-                    const Text(
+                    Text(
                       ' дн.',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
                     ),
                   ],
                 ),
               ],
-
               if (_frequencyType == 'specific_days') ...[
                 const SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _dayChip(1, 'Пн'),
-                    _dayChip(2, 'Вт'),
-                    _dayChip(3, 'Ср'),
-                    _dayChip(4, 'Чт'),
-                    _dayChip(5, 'Пт'),
-                    _dayChip(6, 'Сб'),
-                    _dayChip(7, 'Вс'),
+                    _dayChip(1, 'Пн', colors),
+                    _dayChip(2, 'Вт', colors),
+                    _dayChip(3, 'Ср', colors),
+                    _dayChip(4, 'Чт', colors),
+                    _dayChip(5, 'Пт', colors),
+                    _dayChip(6, 'Сб', colors),
+                    _dayChip(7, 'Вс', colors),
                   ],
                 ),
               ],
@@ -471,31 +519,35 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
     );
   }
 
-  Widget _buildNumberInput(TextEditingController controller) {
+  Widget _buildNumberInput(
+    TextEditingController controller,
+    AppColorsExtension colors,
+  ) {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
       textAlign: TextAlign.center,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: const TextStyle(
-        color: Color(0xFF38BDF8),
-        fontWeight: FontWeight.bold,
-        fontSize: 16,
+      style: TextStyle(
+        fontFamily: 'Unbounded',
+        color: colors.accent,
+        fontWeight: FontWeight.w600,
+        fontSize: 15,
       ),
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         filled: true,
-        fillColor: const Color(0xFF0F172A),
+        fillColor: colors.nested.withValues(alpha: 0.6),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
       ),
     );
   }
 
-  Widget _dayChip(int dayIndex, String label) {
+  Widget _dayChip(int dayIndex, String label, AppColorsExtension colors) {
     final isSelected = _frequencyDays.contains(dayIndex);
     return GestureDetector(
       onTap: () {
@@ -508,15 +560,19 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF38BDF8) : Colors.white10,
-          borderRadius: BorderRadius.circular(6),
+          color:
+              isSelected ? colors.accent : colors.nested.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : Colors.white60,
+            fontFamily: 'Onest',
+            color: isSelected
+                ? (colors.isDark ? Colors.black : Colors.white)
+                : colors.text.withValues(alpha: 0.6),
             fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
@@ -525,32 +581,46 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
     );
   }
 
-  Widget _buildReminderTile() {
+  Widget _buildReminderTile(AppColorsExtension colors) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(10),
+        color: colors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.nested),
       ),
       child: ListTile(
-        leading: const Icon(Icons.notifications_none, color: Colors.white70),
-        title: const Text(
+        leading: Icon(
+          Icons.notifications_none,
+          color: colors.text.withValues(alpha: 0.7),
+        ),
+        title: Text(
           'Напоминание',
-          style: TextStyle(color: Colors.white, fontSize: 14),
+          style: TextStyle(
+            fontFamily: 'Onest',
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+            fontSize: 14,
+          ),
         ),
         subtitle: Text(
           _reminderTime != null
               ? '${_reminderTime!.hour.toString().padLeft(2, '0')}:${_reminderTime!.minute.toString().padLeft(2, '0')}'
               : 'Не установлено',
           style: TextStyle(
+            fontFamily: 'Onest',
             color: _reminderTime != null
-                ? const Color(0xFF38BDF8)
-                : Colors.white38,
+                ? colors.accent
+                : colors.text.withValues(alpha: 0.4),
             fontSize: 13,
           ),
         ),
         trailing: _reminderTime != null
             ? IconButton(
-                icon: const Icon(Icons.close, color: Colors.white54, size: 20),
+                icon: Icon(
+                  Icons.close,
+                  color: colors.text.withValues(alpha: 0.5),
+                  size: 20,
+                ),
                 onPressed: () => setState(() => _reminderTime = null),
               )
             : null,
@@ -591,16 +661,14 @@ class _HabitEditScreenState extends ConsumerState<HabitEditScreen> {
       case 'z_in_n_days':
         freqCount = int.tryParse(_timesCountController.text) ?? 2;
         final window = int.tryParse(_windowDaysController.text) ?? 7;
-        freqDays = [window]; // Сохраняем интервал N в freqDays
+        freqDays = [window];
         break;
       case 'specific_days':
         freqDays = List<int>.from(_frequencyDays);
         break;
     }
 
-    ref
-        .read(habitsProvider.notifier)
-        .saveHabit(
+    ref.read(habitsProvider.notifier).saveHabit(
           id: widget.initialHabit?.id,
           title: title,
           question: _questionController.text.trim().isEmpty

@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/vault_provider.dart';
+import '../../theme/app_theme.dart';
 import '../settings/sections/vault_settings_screen.dart';
 
 class VaultScreen extends ConsumerStatefulWidget {
@@ -27,7 +28,6 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
   final ImagePicker _picker = ImagePicker();
   bool _hasAutoTriggeredBio = false;
 
-  // Настройки
   bool _hideTextPreviewInGrid = false;
   String _defaultSort = 'Сначала новые';
   int _failedAttempts = 0;
@@ -78,30 +78,34 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
       case 'Сначала старые':
         copy.sort(
           (a, b) => (a['updated_at'] ?? '').toString().compareTo(
-                (b['updated_at'] ?? '').toString(),
-              ),
+            (b['updated_at'] ?? '').toString(),
+          ),
         );
         break;
       case 'По алфавиту':
         copy.sort(
           (a, b) => (a['title'] ?? '').toString().toLowerCase().compareTo(
-                (b['title'] ?? '').toString().toLowerCase(),
-              ),
+            (b['title'] ?? '').toString().toLowerCase(),
+          ),
         );
         break;
       case 'Сначала новые':
       default:
         copy.sort(
           (a, b) => (b['updated_at'] ?? '').toString().compareTo(
-                (a['updated_at'] ?? '').toString(),
-              ),
+            (a['updated_at'] ?? '').toString(),
+          ),
         );
         break;
     }
     return copy;
   }
 
-  Future<void> _handleUnlockAttempt(String pin, VaultNotifier notifier) async {
+  Future<void> _handleUnlockAttempt(
+    String pin,
+    VaultNotifier notifier,
+    AppColorsExtension colors,
+  ) async {
     final ok = await notifier.unlock(pin);
     if (!ok) {
       HapticFeedback.heavyImpact();
@@ -114,9 +118,12 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
           }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Превышен лимит попыток. Данные сейфа очищены.'),
-                backgroundColor: Colors.redAccent,
+              SnackBar(
+                content: const Text(
+                  'Превышен лимит попыток. Данные сейфа очищены.',
+                  style: TextStyle(fontFamily: 'Onest'),
+                ),
+                backgroundColor: colors.error,
               ),
             );
           }
@@ -126,8 +133,9 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
               SnackBar(
                 content: Text(
                   'Превышен лимит попыток ($_maxAttempts). Ввод временно ограничен.',
+                  style: const TextStyle(fontFamily: 'Onest'),
                 ),
-                backgroundColor: Colors.redAccent,
+                backgroundColor: colors.error,
               ),
             );
           }
@@ -140,6 +148,7 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final vault = ref.watch(vaultProvider);
     final notifier = ref.read(vaultProvider.notifier);
 
@@ -149,34 +158,24 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
       );
     }
 
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF07090E) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF131826) : Colors.white;
-    final textPrimary =
-        isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
-    final textSecondary =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.08)
-        : Colors.black.withValues(alpha: 0.08);
-
     final sortedDocs = _applySorting(vault.documents);
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       appBar: AppBar(
-        backgroundColor: bg,
+        backgroundColor: colors.bg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, size: 18, color: textPrimary),
+          icon: Icon(Icons.arrow_back_ios_new, size: 18, color: colors.text),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Сейф',
           style: TextStyle(
-            color: textPrimary,
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
+            fontFamily: 'Unbounded',
+            color: colors.text,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
           ),
         ),
         actions: [
@@ -184,9 +183,7 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
             tooltip: vault.isUnlocked ? 'Заблокировать сейф' : 'Разблокировать',
             icon: Icon(
               vault.isUnlocked ? Icons.lock_open_rounded : Icons.lock_rounded,
-              color: vault.isUnlocked
-                  ? const Color(0xFF8B5CF6)
-                  : Colors.orangeAccent,
+              color: vault.isUnlocked ? colors.accent : colors.warning,
             ),
             onPressed: () {
               if (vault.isUnlocked) {
@@ -199,14 +196,14 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.settings_outlined, color: textPrimary),
+            icon: Icon(Icons.settings_outlined, color: colors.text),
             tooltip: 'Настройки сейфа',
             onPressed: () async {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                      VaultSettingsScreen(isDarkMode: widget.isDarkMode),
+                      VaultSettingsScreen(isDarkMode: colors.isDark),
                 ),
               );
               _loadPreferences();
@@ -217,42 +214,26 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
       ),
       floatingActionButton: vault.isUnlocked
           ? FloatingActionButton(
-              backgroundColor: const Color(0xFF7C3AED),
-              foregroundColor: Colors.white,
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              elevation: 3,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(Icons.add, size: 28),
-              onPressed: () => _showAddOptions(notifier),
+              onPressed: () => _showAddOptions(notifier, colors),
             )
           : null,
       body: vault.isUnlocked
-          ? _buildUnlockedGrid(
-              sortedDocs,
-              notifier,
-              cardBg,
-              borderColor,
-              textPrimary,
-              textSecondary,
-            )
-          : _buildLockedView(
-              vault,
-              notifier,
-              cardBg,
-              borderColor,
-              textPrimary,
-              textSecondary,
-            ),
+          ? _buildUnlockedGrid(sortedDocs, notifier, colors)
+          : _buildLockedView(vault, notifier, colors),
     );
   }
 
   Widget _buildLockedView(
     VaultState vault,
     VaultNotifier notifier,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     final needsSetup = !vault.hasPin;
 
@@ -262,9 +243,9 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -273,31 +254,37 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+                  color: colors.accent.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.shield_outlined,
-                  color: Color(0xFF8B5CF6),
-                  size: 36,
+                  color: colors.accent,
+                  size: 34,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 needsSetup ? 'Создание мастер-PIN' : 'Сейф заблокирован',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: textPrimary,
+                  fontFamily: 'Unbounded',
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
                 ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 needsSetup
                     ? 'Придумайте PIN для шифрования документов и включения биометрии'
                     : 'Введите PIN или подтвердите вход отпечатком / Face ID',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: textSecondary),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontSize: 13,
+                  color: colors.text.withValues(alpha: 0.6),
+                ),
               ),
               const SizedBox(height: 20),
               Row(
@@ -310,16 +297,33 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                       textAlign: TextAlign.center,
                       maxLength: 6,
                       style: TextStyle(
-                        fontSize: 22,
+                        fontFamily: 'Unbounded',
+                        fontSize: 20,
                         letterSpacing: 8,
-                        fontWeight: FontWeight.bold,
-                        color: textPrimary,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
                       ),
                       decoration: InputDecoration(
                         counterText: '',
                         hintText: '••••',
+                        hintStyle: TextStyle(
+                          color: colors.text.withValues(alpha: 0.3),
+                          letterSpacing: 4,
+                        ),
+                        filled: true,
+                        fillColor: colors.nested.withValues(alpha: 0.4),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: colors.nested),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(color: colors.nested),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide:
+                              BorderSide(color: colors.accent, width: 1.5),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 12,
@@ -328,16 +332,19 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                     ),
                   ),
                   if (!needsSetup) ...[
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     IconButton.filledTonal(
                       style: IconButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xFF7C3AED).withValues(alpha: 0.2),
+                        backgroundColor: colors.accent.withValues(alpha: 0.15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                         padding: const EdgeInsets.all(12),
+                        minimumSize: const Size(48, 48),
                       ),
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.fingerprint,
-                        color: Color(0xFFC4B5FD),
+                        color: colors.accent,
                         size: 28,
                       ),
                       tooltip: 'Войти по биометрии',
@@ -355,27 +362,47 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                   textAlign: TextAlign.center,
                   maxLength: 6,
                   style: TextStyle(
-                    fontSize: 22,
+                    fontFamily: 'Unbounded',
+                    fontSize: 20,
                     letterSpacing: 8,
-                    fontWeight: FontWeight.bold,
-                    color: textPrimary,
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
                   ),
                   decoration: InputDecoration(
                     counterText: '',
                     hintText: 'Повторите PIN',
+                    hintStyle: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.35),
+                      fontSize: 14,
+                      letterSpacing: 0,
+                    ),
+                    filled: true,
+                    fillColor: colors.nested.withValues(alpha: 0.4),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.nested),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide:
+                          BorderSide(color: colors.accent, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ],
               if (vault.errorMessage != null) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Text(
                   vault.errorMessage!,
-                  style: const TextStyle(
-                    color: Colors.redAccent,
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.error,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -384,12 +411,14 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                height: 46,
+                height: 48,
                 child: FilledButton(
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
+                    backgroundColor: colors.accent,
+                    foregroundColor:
+                        colors.isDark ? Colors.black : Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   onPressed: () async {
@@ -400,20 +429,25 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                       final confirm = _confirmPinController.text.trim();
                       if (pin != confirm) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('PIN-коды не совпадают'),
+                          SnackBar(
+                            content: const Text(
+                              'PIN-коды не совпадают',
+                              style: TextStyle(fontFamily: 'Onest'),
+                            ),
+                            backgroundColor: colors.error,
                           ),
                         );
                         return;
                       }
                       await notifier.setupPin(pin);
                     } else {
-                      await _handleUnlockAttempt(pin, notifier);
+                      await _handleUnlockAttempt(pin, notifier, colors);
                     }
                   },
                   child: Text(
                     needsSetup ? 'Создать сейф' : 'Разблокировать',
                     style: const TextStyle(
+                      fontFamily: 'Onest',
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
                     ),
@@ -430,42 +464,48 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
   Widget _buildUnlockedGrid(
     List<Map<String, dynamic>> documents,
     VaultNotifier notifier,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     if (documents.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.shield_outlined,
-              size: 54,
-              color: Colors.grey.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'В сейфе пока пусто',
-              style: TextStyle(
-                color: textPrimary,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.shield_outlined,
+                size: 64,
+                color: colors.text.withValues(alpha: 0.2),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Нажмите «+», чтобы зашифровать файл, фото или заметку',
-              style: TextStyle(color: textSecondary, fontSize: 12),
-            ),
-          ],
+              const SizedBox(height: 14),
+              Text(
+                'В сейфе пока пусто',
+                style: TextStyle(
+                  fontFamily: 'Unbounded',
+                  color: colors.text,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Нажмите «+», чтобы зашифровать файл, фото или заметку',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.5),
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 84),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
@@ -492,21 +532,33 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
-              errorBuilder: (context, error, stackTrace) => const Center(
-                child: Icon(Icons.broken_image, color: Colors.grey, size: 36),
+              errorBuilder: (context, error, stackTrace) => Center(
+                child: Icon(
+                  Icons.broken_image,
+                  color: colors.text.withValues(alpha: 0.4),
+                  size: 36,
+                ),
               ),
             ),
           );
         } else if (isImage && !fileExists) {
-          previewWidget = const Center(
+          previewWidget = Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.broken_image_outlined, color: Colors.grey, size: 32),
-                SizedBox(height: 4),
+                Icon(
+                  Icons.broken_image_outlined,
+                  color: colors.text.withValues(alpha: 0.4),
+                  size: 32,
+                ),
+                const SizedBox(height: 4),
                 Text(
                   'Файл не найден',
-                  style: TextStyle(color: Colors.grey, fontSize: 10),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.4),
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
@@ -520,29 +572,30 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+                    color: colors.accent.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.insert_drive_file_outlined,
-                    color: Color(0xFFC4B5FD),
+                    color: colors.accent,
                     size: 32,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+                    horizontal: 8,
+                    vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(4),
+                    color: colors.accent.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     ext.length <= 4 ? ext : 'DOC',
-                    style: const TextStyle(
-                      color: Color(0xFFC4B5FD),
+                    style: TextStyle(
+                      fontFamily: 'Unbounded',
+                      color: colors.accent,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -561,13 +614,17 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                       children: [
                         Icon(
                           Icons.lock_outline,
-                          color: textSecondary,
+                          color: colors.text.withValues(alpha: 0.4),
                           size: 28,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Текст скрыт',
-                          style: TextStyle(fontSize: 10, color: textSecondary),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontSize: 11,
+                            color: colors.text.withValues(alpha: 0.4),
+                          ),
                         ),
                       ],
                     ),
@@ -575,9 +632,10 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                 : Text(
                     payload,
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontSize: 12,
-                      color: textSecondary,
-                      height: 1.3,
+                      color: colors.text.withValues(alpha: 0.7),
+                      height: 1.35,
                     ),
                     maxLines: 6,
                     overflow: TextOverflow.fade,
@@ -587,24 +645,27 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
 
         return Container(
           decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor),
+            color: colors.card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.nested),
           ),
           clipBehavior: Clip.antiAlias,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
+              borderRadius: BorderRadius.circular(22),
               onTap: () {
                 if (isImage) {
                   if (fileExists) {
-                    _openImageFullscreen(file, title, doc['id'].toString());
+                    _openImageFullscreen(file, title, doc['id'].toString(), colors);
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
+                      SnackBar(
+                        content: const Text(
                           'Файл изображения недоступен на устройстве',
+                          style: TextStyle(fontFamily: 'Onest'),
                         ),
+                        backgroundColor: colors.error,
                       ),
                     );
                   }
@@ -613,13 +674,17 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                     OpenFilex.open(file.path);
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Файл документа не найден на устройстве'),
+                      SnackBar(
+                        content: const Text(
+                          'Файл документа не найден на устройстве',
+                          style: TextStyle(fontFamily: 'Onest'),
+                        ),
+                        backgroundColor: colors.error,
                       ),
                     );
                   }
                 } else {
-                  _openTextDocFullscreen(title, payload);
+                  _openTextDocFullscreen(title, payload, colors);
                 }
               },
               child: Column(
@@ -628,12 +693,12 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      color: Colors.black.withValues(alpha: 0.15),
+                      color: colors.nested.withValues(alpha: 0.3),
                       child: previewWidget,
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
                     child: Row(
                       children: [
                         Expanded(
@@ -644,9 +709,10 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                               Text(
                                 title,
                                 style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: textPrimary,
+                                  fontFamily: 'Onest',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                  color: colors.text,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -657,23 +723,24 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                                     ? 'Фото'
                                     : (isDocument ? 'Документ' : 'Заметка'),
                                 style: TextStyle(
-                                  fontSize: 10,
-                                  color: textSecondary,
+                                  fontFamily: 'Onest',
+                                  fontSize: 11,
+                                  color: colors.text.withValues(alpha: 0.5),
                                 ),
                               ),
                             ],
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.delete_outline,
-                            size: 18,
-                            color: Colors.redAccent,
+                            size: 20,
+                            color: colors.error,
                           ),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
+                            minWidth: 36,
+                            minHeight: 36,
                           ),
                           onPressed: () =>
                               notifier.deleteDocument(doc['id'].toString()),
@@ -690,7 +757,12 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
     );
   }
 
-  void _openImageFullscreen(File file, String title, String tagId) {
+  void _openImageFullscreen(
+    File file,
+    String title,
+    String tagId,
+    AppColorsExtension colors,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -702,7 +774,12 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
             iconTheme: const IconThemeData(color: Colors.white),
             title: Text(
               title,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+              style: const TextStyle(
+                fontFamily: 'Onest',
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           body: Center(
@@ -726,16 +803,24 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
     );
   }
 
-  void _openTextDocFullscreen(String title, String content) {
+  void _openTextDocFullscreen(
+    String title,
+    String content,
+    AppColorsExtension colors,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            color: colors.text,
+          ),
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -746,92 +831,148 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
             child: SingleChildScrollView(
               child: SelectableText(
                 content,
-                style: const TextStyle(fontSize: 14, height: 1.5),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  fontSize: 14,
+                  height: 1.5,
+                  color: colors.text,
+                ),
               ),
             ),
           ),
         ),
         actions: [
           TextButton.icon(
-            icon: const Icon(Icons.copy, size: 16),
-            label: const Text('Скопировать'),
+            icon: Icon(Icons.copy, size: 16, color: colors.accent),
+            label: Text(
+              'Скопировать',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.w600,
+                color: colors.accent,
+              ),
+            ),
             onPressed: () {
               Clipboard.setData(ClipboardData(text: content));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Скопировано в буфер')),
+                SnackBar(
+                  content: const Text(
+                    'Скопировано в буфер',
+                    style: TextStyle(fontFamily: 'Onest'),
+                  ),
+                  backgroundColor: colors.accent,
+                ),
               );
             },
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Закрыть'),
+            child: const Text(
+              'Закрыть',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showAddOptions(VaultNotifier notifier) {
+  void _showAddOptions(VaultNotifier notifier, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          widget.isDarkMode ? const Color(0xFF131826) : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.photo_camera_back_outlined,
-                  color: Color(0xFF8B5CF6),
+                  color: colors.accent,
                 ),
-                title: const Text('Добавить фото из галереи'),
+                title: Text(
+                  'Добавить фото из галереи',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickPhoto(notifier, ImageSource.gallery);
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.camera_alt_outlined,
-                  color: Color(0xFF38BDF8),
+                  color: colors.accent,
                 ),
-                title: const Text('Сделать снимок камерой'),
+                title: Text(
+                  'Сделать снимок камерой',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickPhoto(notifier, ImageSource.camera);
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.picture_as_pdf_outlined,
-                  color: Colors.amberAccent,
+                  color: colors.warning,
                 ),
-                title: const Text('Загрузить документ (PDF, DOC и др.)'),
+                title: Text(
+                  'Загрузить документ (PDF, DOC и др.)',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickDocument(notifier);
                 },
               ),
               ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.notes_outlined,
-                  color: Color(0xFF10B981),
+                  color: colors.success,
                 ),
-                title: const Text('Защищенная заметка / пароль'),
+                title: Text(
+                  'Защищенная заметка / пароль',
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.w600,
+                    color: colors.text,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _openAddTextDialog(notifier);
+                  _openAddTextDialog(notifier, colors);
                 },
               ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -872,8 +1013,8 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
     final appDir = await getApplicationDocumentsDirectory();
     final fileName =
         'vault_doc_${DateTime.now().millisecondsSinceEpoch}_${pickedFile.name}';
-    final savedDoc =
-        await File(pickedFile.path!).copy('${appDir.path}/$fileName');
+    final savedDoc = await File(pickedFile.path!)
+        .copy('${appDir.path}/$fileName');
 
     await notifier.addDocument(
       title: pickedFile.name,
@@ -882,33 +1023,63 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
     );
   }
 
-  void _openAddTextDialog(VaultNotifier notifier) {
+  void _openAddTextDialog(VaultNotifier notifier, AppColorsExtension colors) {
     final titleCtrl = TextEditingController();
     final payloadCtrl = TextEditingController();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
-        title: const Text('Новая защищенная заметка'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Новая защищенная заметка',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: titleCtrl,
-                decoration: const InputDecoration(
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                decoration: InputDecoration(
                   labelText: 'Название',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.nested),
+                  ),
                   isDense: true,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextField(
                 controller: payloadCtrl,
                 maxLines: 4,
-                decoration: const InputDecoration(
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+                decoration: InputDecoration(
                   labelText: 'Текст заметки / пароль',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
+                  filled: true,
+                  fillColor: colors.nested.withValues(alpha: 0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.nested),
+                  ),
                   isDense: true,
                 ),
               ),
@@ -918,11 +1089,21 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Отмена'),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                color: colors.text.withValues(alpha: 0.6),
+              ),
+            ),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
+              backgroundColor: colors.accent,
+              foregroundColor: colors.isDark ? Colors.black : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             onPressed: () {
               final t = titleCtrl.text.trim();
@@ -932,7 +1113,13 @@ class _VaultScreenState extends ConsumerState<VaultScreen> {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Сохранить'),
+            child: const Text(
+              'Сохранить',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),

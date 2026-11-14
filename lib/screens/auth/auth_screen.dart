@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../theme/app_theme.dart';
+
 class AuthScreen extends StatefulWidget {
   final bool isDarkMode;
   final VoidCallback onAuthenticated;
@@ -35,17 +37,17 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(AppColorsExtension colors) async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      _showMessage('Пожалуйста, заполните email и пароль');
+      _showMessage('Пожалуйста, заполните email и пароль', colors.error);
       return;
     }
 
     if (password.length < 6) {
-      _showMessage('Пароль должен содержать минимум 6 символов');
+      _showMessage('Пароль должен содержать минимум 6 символов', colors.error);
       return;
     }
 
@@ -69,9 +71,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
         if (response.user != null) {
           final effectiveName = name.isEmpty ? 'Пользователь' : name;
-          final effectiveUsername = username.isEmpty
-              ? email.split('@').first
-              : username;
+          final effectiveUsername =
+              username.isEmpty ? email.split('@').first : username;
 
           await prefs.setString('user_full_name', effectiveName);
           await prefs.setString('user_custom_username', effectiveUsername);
@@ -86,7 +87,7 @@ class _AuthScreenState extends State<AuthScreen> {
             });
           } catch (_) {}
 
-          _showMessage('Регистрация успешна!');
+          _showMessage('Регистрация успешна!', colors.success);
           widget.onAuthenticated();
         }
       } else {
@@ -119,28 +120,19 @@ class _AuthScreenState extends State<AuthScreen> {
         }
       }
     } on AuthException catch (e) {
-      _showMessage(e.message);
+      _showMessage(e.message, colors.error);
     } catch (e) {
-      _showMessage('Ошибка подключения: $e');
+      _showMessage('Ошибка подключения: $e', colors.error);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _showForgotPasswordDialog() {
+  void _showForgotPasswordDialog(AppColorsExtension colors) {
     final resetEmailController = TextEditingController(
       text: _emailController.text.trim(),
     );
     bool isSending = false;
-
-    final isDark = widget.isDarkMode;
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
 
     showDialog(
       context: context,
@@ -148,21 +140,21 @@ class _AuthScreenState extends State<AuthScreen> {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
             return AlertDialog(
-              backgroundColor: cardBg,
+              backgroundColor: colors.card,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(22),
               ),
               title: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2C69D1).withValues(alpha: 0.15),
+                      color: colors.accent.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.lock_reset,
-                      color: Color(0xFF38BDF8),
+                      color: colors.accent,
                       size: 22,
                     ),
                   ),
@@ -170,9 +162,10 @@ class _AuthScreenState extends State<AuthScreen> {
                   Text(
                     'Сброс пароля',
                     style: TextStyle(
-                      color: textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Unbounded',
+                      color: colors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -184,21 +177,42 @@ class _AuthScreenState extends State<AuthScreen> {
                   Text(
                     'Укажите email вашей учетной записи. Мы отправим ссылку для восстановления доступа.',
                     style: TextStyle(
+                      fontFamily: 'Onest',
                       fontSize: 13,
-                      color: textSecondary,
-                      height: 1.4,
+                      color: colors.text.withValues(alpha: 0.65),
+                      height: 1.45,
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: resetEmailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: TextStyle(color: textPrimary),
+                    style: TextStyle(fontFamily: 'Onest', color: colors.text),
                     decoration: InputDecoration(
                       labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                      labelStyle: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.6),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.email_outlined,
+                        size: 20,
+                        color: colors.text.withValues(alpha: 0.5),
+                      ),
+                      filled: true,
+                      fillColor: colors.nested.withValues(alpha: 0.3),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.nested),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide:
+                            BorderSide(color: colors.accent, width: 1.5),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -211,21 +225,32 @@ class _AuthScreenState extends State<AuthScreen> {
               actions: [
                 TextButton(
                   onPressed: isSending ? null : () => Navigator.pop(dialogCtx),
-                  child: Text('Отмена', style: TextStyle(color: textSecondary)),
+                  child: Text(
+                    'Отмена',
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 FilledButton(
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C69D1),
+                    backgroundColor: colors.accent,
+                    foregroundColor:
+                        colors.isDark ? Colors.black : Colors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(16),
                     ),
+                    minimumSize: const Size(100, 44),
                   ),
                   onPressed: isSending
                       ? null
                       : () async {
                           final email = resetEmailController.text.trim();
                           if (email.isEmpty || !email.contains('@')) {
-                            _showMessage('Введите корректный email');
+                            _showMessage(
+                                'Введите корректный email', colors.error);
                             return;
                           }
 
@@ -234,19 +259,21 @@ class _AuthScreenState extends State<AuthScreen> {
                           try {
                             await Supabase.instance.client.auth
                                 .resetPasswordForEmail(
-                                  email,
-                                  redirectTo: 'https://apporbita.ru',
-                                );
+                              email,
+                              redirectTo: 'https://apporbita.ru',
+                            );
                             if (mounted) {
                               Navigator.pop(dialogCtx);
                               _showMessage(
                                 'Письмо со ссылкой для сброса пароля отправлено на $email',
+                                colors.success,
                               );
                             }
                           } on AuthException catch (e) {
-                            _showMessage(e.message);
+                            _showMessage(e.message, colors.error);
                           } catch (e) {
-                            _showMessage('Не удалось отправить письмо: $e');
+                            _showMessage('Не удалось отправить письмо: $e',
+                                colors.error);
                           } finally {
                             if (dialogCtx.mounted) {
                               setDialogState(() => isSending = false);
@@ -254,15 +281,21 @@ class _AuthScreenState extends State<AuthScreen> {
                           }
                         },
                   child: isSending
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: colors.isDark ? Colors.black : Colors.white,
                           ),
                         )
-                      : const Text('Отправить'),
+                      : const Text(
+                          'Отправить',
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ],
             );
@@ -278,29 +311,22 @@ class _AuthScreenState extends State<AuthScreen> {
     widget.onAuthenticated();
   }
 
-  void _showMessage(String text) {
+  void _showMessage(String text, [Color? backgroundColor]) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text, style: const TextStyle(fontFamily: 'Onest')),
+        backgroundColor: backgroundColor,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = widget.isDarkMode;
-    final Color textPrimary = isDark
-        ? const Color(0xFFF0F6FC)
-        : const Color(0xFF24292F);
-    final Color textSecondary = isDark
-        ? const Color(0xFF8B949E)
-        : const Color(0xFF57606A);
-    final Color cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final Color borderColor = isDark
-        ? const Color(0xFF30363D)
-        : const Color(0xFFD0D7DE);
+    final colors = context.colors;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0D1117)
-          : const Color(0xFFF6F8FA),
+      backgroundColor: colors.bg,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -312,29 +338,34 @@ class _AuthScreenState extends State<AuthScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2C69D1).withValues(alpha: 0.12),
+                    color: colors.accent.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.rocket_launch,
                     size: 48,
-                    color: Colors.orangeAccent,
+                    color: colors.accent,
                   ),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Орбита',
                   style: TextStyle(
+                    fontFamily: 'Unbounded',
                     fontSize: 28,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 0.5,
-                    color: textPrimary,
+                    color: colors.text,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Твой персональный второй мозг',
-                  style: TextStyle(fontSize: 14, color: textSecondary),
+                  style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontSize: 14,
+                    color: colors.text.withValues(alpha: 0.6),
+                  ),
                 ),
                 const SizedBox(height: 28),
 
@@ -342,13 +373,13 @@ class _AuthScreenState extends State<AuthScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: borderColor),
+                    color: colors.card,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: colors.nested),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: isDark ? 0.3 : 0.05,
+                        color: colors.nested.withValues(
+                          alpha: colors.isDark ? 0.3 : 0.08,
                         ),
                         blurRadius: 16,
                         offset: const Offset(0, 8),
@@ -362,10 +393,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF0D1117)
-                              : const Color(0xFFF0F2F5),
-                          borderRadius: BorderRadius.circular(12),
+                          color: colors.nested.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(13),
                         ),
                         child: Row(
                           children: [
@@ -379,7 +408,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: !_isSignUp
-                                        ? const Color(0xFF2C69D1)
+                                        ? colors.accent
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -387,9 +416,12 @@ class _AuthScreenState extends State<AuthScreen> {
                                   child: Text(
                                     'Вход',
                                     style: TextStyle(
+                                      fontFamily: 'Onest',
                                       color: !_isSignUp
-                                          ? Colors.white
-                                          : textSecondary,
+                                          ? (colors.isDark
+                                              ? Colors.black
+                                              : Colors.white)
+                                          : colors.text.withValues(alpha: 0.6),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
@@ -407,7 +439,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: _isSignUp
-                                        ? const Color(0xFF2C69D1)
+                                        ? colors.accent
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -415,9 +447,12 @@ class _AuthScreenState extends State<AuthScreen> {
                                   child: Text(
                                     'Регистрация',
                                     style: TextStyle(
+                                      fontFamily: 'Onest',
                                       color: _isSignUp
-                                          ? Colors.white
-                                          : textSecondary,
+                                          ? (colors.isDark
+                                              ? Colors.black
+                                              : Colors.white)
+                                          : colors.text.withValues(alpha: 0.6),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
@@ -434,31 +469,80 @@ class _AuthScreenState extends State<AuthScreen> {
                       if (_isSignUp) ...[
                         TextField(
                           controller: _nameController,
-                          style: TextStyle(color: textPrimary),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text,
+                          ),
                           decoration: InputDecoration(
                             labelText: 'Ваше имя',
-                            prefixIcon: const Icon(
+                            labelStyle: TextStyle(
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.6),
+                            ),
+                            prefixIcon: Icon(
                               Icons.badge_outlined,
                               size: 20,
+                              color: colors.text.withValues(alpha: 0.5),
                             ),
+                            filled: true,
+                            fillColor: colors.nested.withValues(alpha: 0.3),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: colors.nested),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: colors.nested),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: colors.accent,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _usernameController,
-                          style: TextStyle(color: textPrimary),
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text,
+                          ),
                           decoration: InputDecoration(
                             labelText: 'Юзернейм (ID)',
+                            labelStyle: TextStyle(
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.6),
+                            ),
                             prefixText: '@',
-                            prefixIcon: const Icon(
+                            prefixStyle: TextStyle(
+                              fontFamily: 'Onest',
+                              color: colors.accent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            prefixIcon: Icon(
                               Icons.alternate_email,
                               size: 20,
+                              color: colors.text.withValues(alpha: 0.5),
                             ),
+                            filled: true,
+                            fillColor: colors.nested.withValues(alpha: 0.3),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: colors.nested),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(color: colors.nested),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: colors.accent,
+                                width: 1.5,
+                              ),
                             ),
                           ),
                         ),
@@ -469,15 +553,37 @@ class _AuthScreenState extends State<AuthScreen> {
                       TextField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        style: TextStyle(color: textPrimary),
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          color: colors.text,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Email',
-                          prefixIcon: const Icon(
+                          labelStyle: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.6),
+                          ),
+                          prefixIcon: Icon(
                             Icons.email_outlined,
                             size: 20,
+                            color: colors.text.withValues(alpha: 0.5),
                           ),
+                          filled: true,
+                          fillColor: colors.nested.withValues(alpha: 0.3),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: colors.nested),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: colors.nested),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: colors.accent,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -487,23 +593,49 @@ class _AuthScreenState extends State<AuthScreen> {
                       TextField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        style: TextStyle(color: textPrimary),
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          color: colors.text,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Пароль',
-                          prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                          labelStyle: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text.withValues(alpha: 0.6),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.lock_outline,
+                            size: 20,
+                            color: colors.text.withValues(alpha: 0.5),
+                          ),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
                               size: 20,
+                              color: colors.text.withValues(alpha: 0.5),
                             ),
                             onPressed: () => setState(
                               () => _obscurePassword = !_obscurePassword,
                             ),
                           ),
+                          filled: true,
+                          fillColor: colors.nested.withValues(alpha: 0.3),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: colors.nested),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: colors.nested),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: colors.accent,
+                              width: 1.5,
+                            ),
                           ),
                         ),
                       ),
@@ -513,16 +645,16 @@ class _AuthScreenState extends State<AuthScreen> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: TextButton(
-                            onPressed: _showForgotPasswordDialog,
+                            onPressed: () => _showForgotPasswordDialog(colors),
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.only(top: 4, bottom: 4),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.only(top: 8, bottom: 4),
+                              minimumSize: const Size(44, 44),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Забыли пароль?',
                               style: TextStyle(
-                                color: Color(0xFF38BDF8),
+                                fontFamily: 'Onest',
+                                color: colors.accent,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -530,30 +662,36 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
 
                       // Кнопка подтверждения
                       FilledButton(
-                        onPressed: _isLoading ? null : _submit,
+                        onPressed: _isLoading ? null : () => _submit(colors),
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF2C69D1),
+                          backgroundColor: colors.accent,
+                          foregroundColor:
+                              colors.isDark ? Colors.black : Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                           ),
+                          minimumSize: const Size(double.infinity, 48),
                         ),
                         child: _isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: colors.isDark
+                                      ? Colors.black
+                                      : Colors.white,
                                 ),
                               )
                             : Text(
                                 _isSignUp ? 'Зарегистрироваться' : 'Войти',
                                 style: const TextStyle(
+                                  fontFamily: 'Onest',
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
                                 ),
@@ -567,10 +705,14 @@ class _AuthScreenState extends State<AuthScreen> {
                 // Вход как гость
                 TextButton(
                   onPressed: _continueAsGuest,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                  ),
                   child: Text(
                     'Продолжить без аккаунта (локально)',
                     style: TextStyle(
-                      color: textSecondary,
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.6),
                       fontSize: 13,
                       decoration: TextDecoration.underline,
                     ),

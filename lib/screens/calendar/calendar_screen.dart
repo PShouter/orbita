@@ -7,6 +7,7 @@ import '../../providers/calendar_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/tasks_provider.dart';
 import '../../services/google_calendar_service.dart';
+import '../../theme/app_theme.dart';
 import '../settings/sections/calendar_settings_screen.dart';
 import 'create_event_screen.dart';
 import 'manage_calendars_screen.dart';
@@ -118,7 +119,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return ((days + firstDayOfYear.weekday - 1) / 7).ceil();
   }
 
-  Future<void> _handleGoogleSync() async {
+  Future<void> _handleGoogleSync(AppColorsExtension colors) async {
     setState(() => _isSyncingGoogle = true);
     try {
       final count =
@@ -132,16 +133,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             count > 0
                 ? 'Синхронизировано $count событий Google ($email)'
                 : 'События Google актуальны или авторизация отменена',
+            style: const TextStyle(fontFamily: 'Onest'),
           ),
-          backgroundColor: const Color(0xFF4285F4),
+          backgroundColor: colors.accent,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ошибка синхронизации: $e'),
-          backgroundColor: Colors.redAccent,
+          content: Text('Ошибка синхронизации: $e',
+              style: const TextStyle(fontFamily: 'Onest')),
+          backgroundColor: colors.error,
         ),
       );
     } finally {
@@ -151,6 +154,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final calendars = ref.watch(userCalendarsProvider);
     final allEvents = ref.watch(calendarProvider);
     final allTasks = ref.watch(tasksProvider);
@@ -171,61 +175,40 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       return t['date'] is DateTime;
     }).toList();
 
-    final isDark = widget.isDarkMode;
-    final bg = isDark ? const Color(0xFF0D1117) : const Color(0xFFF6F8FA);
-    final cardBg = isDark ? const Color(0xFF161B22) : Colors.white;
-    final textPrimary =
-        isDark ? const Color(0xFFF0F6FC) : const Color(0xFF24292F);
-    final textSecondary =
-        isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    final borderColor =
-        isDark ? const Color(0xFF30363D) : const Color(0xFFD0D7DE);
-
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: colors.bg,
       body: SafeArea(
         child: Stack(
           children: [
             Column(
               children: [
-                _buildHeader(textPrimary, textSecondary, borderColor),
+                _buildHeader(colors),
                 if (_isSyncingGoogle)
-                  const LinearProgressIndicator(
+                  LinearProgressIndicator(
                     backgroundColor: Colors.transparent,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF4285F4),
-                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
                   ),
                 if (_currentView == CalendarViewType.month) ...[
-                  _buildWeekHeader(textSecondary),
-                  Divider(height: 1, color: borderColor),
+                  _buildWeekHeader(colors),
+                  Divider(height: 1, color: colors.nested),
                 ],
                 Expanded(
-                  child: _buildCurrentView(
-                    events,
-                    datedTasks,
-                    cardBg,
-                    borderColor,
-                    textPrimary,
-                    textSecondary,
-                  ),
+                  child: _buildCurrentView(events, datedTasks, colors),
                 ),
-                _buildBottomCalendarBar(
-                  calendars,
-                  cardBg,
-                  borderColor,
-                  textPrimary,
-                ),
+                _buildBottomCalendarBar(calendars, colors),
               ],
             ),
             Positioned(
               right: 16,
-              bottom: 60,
+              bottom: 64,
               child: FloatingActionButton(
-                backgroundColor: const Color(0xFF38BDF8),
-                elevation: 4,
-                onPressed: _openAddMenu,
-                child: const Icon(Icons.add, color: Colors.white, size: 28),
+                backgroundColor: colors.accent,
+                foregroundColor: colors.isDark ? Colors.black : Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                onPressed: () => _openAddMenu(colors),
+                child: const Icon(Icons.add, size: 28),
               ),
             ),
           ],
@@ -237,47 +220,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget _buildCurrentView(
     List<JsonMap> events,
     List<JsonMap> tasks,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     switch (_currentView) {
       case CalendarViewType.month:
-        return _buildContinuousWeekList(
-          events,
-          tasks,
-          cardBg,
-          borderColor,
-          textPrimary,
-          textSecondary,
-        );
+        return _buildContinuousWeekList(events, tasks, colors);
       case CalendarViewType.week:
-        return _buildWeekView(
-          events,
-          tasks,
-          cardBg,
-          borderColor,
-          textPrimary,
-          textSecondary,
-        );
+        return _buildWeekView(events, tasks, colors);
       case CalendarViewType.day:
-        return _buildDayView(
-          events,
-          tasks,
-          cardBg,
-          borderColor,
-          textPrimary,
-          textSecondary,
-        );
+        return _buildDayView(events, tasks, colors);
     }
   }
 
-  Widget _buildHeader(
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
-  ) {
+  Widget _buildHeader(AppColorsExtension colors) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -286,18 +241,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           Text(
             '${_monthName(_visibleDate.month)} ${_visibleDate.year}',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: textPrimary,
+              fontFamily: 'Unbounded',
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: colors.text,
             ),
           ),
           Row(
             children: [
               IconButton(
                 tooltip: 'Сегодня',
-                icon: const Icon(
+                icon: Icon(
                   Icons.today,
-                  color: Color(0xFF38BDF8),
+                  color: colors.accent,
                   size: 22,
                 ),
                 onPressed: _scrollToToday,
@@ -306,13 +262,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               // Переключатель режимов: Месяц / Неделя / День
               PopupMenuButton<CalendarViewType>(
                 tooltip: 'Режим отображения',
+                color: colors.card,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: colors.nested),
+                ),
                 icon: Icon(
                   _currentView == CalendarViewType.month
                       ? Icons.calendar_view_month
                       : (_currentView == CalendarViewType.week
                           ? Icons.calendar_view_week
                           : Icons.calendar_view_day),
-                  color: textPrimary,
+                  color: colors.text,
                   size: 22,
                 ),
                 onSelected: (view) {
@@ -321,33 +282,42 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   });
                 },
                 itemBuilder: (ctx) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: CalendarViewType.month,
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_view_month, size: 18),
-                        SizedBox(width: 8),
-                        Text('Месяц'),
+                        Icon(Icons.calendar_view_month,
+                            size: 18, color: colors.text),
+                        const SizedBox(width: 8),
+                        Text('Месяц',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text)),
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: CalendarViewType.week,
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_view_week, size: 18),
-                        SizedBox(width: 8),
-                        Text('Неделя'),
+                        Icon(Icons.calendar_view_week,
+                            size: 18, color: colors.text),
+                        const SizedBox(width: 8),
+                        Text('Неделя',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text)),
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: CalendarViewType.day,
                     child: Row(
                       children: [
-                        Icon(Icons.calendar_view_day, size: 18),
-                        SizedBox(width: 8),
-                        Text('День'),
+                        Icon(Icons.calendar_view_day,
+                            size: 18, color: colors.text),
+                        const SizedBox(width: 8),
+                        Text('День',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text)),
                       ],
                     ),
                   ),
@@ -355,18 +325,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ),
 
               PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert, color: textPrimary, size: 22),
+                icon: Icon(Icons.more_vert, color: colors.text, size: 22),
+                color: colors.card,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: colors.nested),
+                ),
                 onSelected: (val) async {
                   if (val == 'google_sync') {
-                    _handleGoogleSync();
+                    _handleGoogleSync(colors);
                   } else if (val == 'invites') {
-                    _showInvitesDialog();
+                    _showInvitesDialog(colors);
                   } else if (val == 'calendars') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => ManageCalendarsScreen(
-                          isDarkMode: widget.isDarkMode,
+                          isDarkMode: colors.isDark,
                         ),
                       ),
                     );
@@ -375,7 +350,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => CalendarSettingsScreen(
-                          isDarkMode: widget.isDarkMode,
+                          isDarkMode: colors.isDark,
                         ),
                       ),
                     );
@@ -383,48 +358,56 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   }
                 },
                 itemBuilder: (ctx) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'google_sync',
                     child: Row(
                       children: [
-                        Icon(Icons.sync, color: Color(0xFF4285F4), size: 18),
-                        SizedBox(width: 8),
-                        Text('Синхронизировать Google'),
+                        Icon(Icons.sync, color: colors.accent, size: 18),
+                        const SizedBox(width: 8),
+                        Text('Синхронизировать Google',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text)),
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'invites',
                     child: Row(
                       children: [
-                        Icon(Icons.mail_outline, size: 18),
-                        SizedBox(width: 8),
-                        Text('Приглашения'),
+                        Icon(Icons.mail_outline, size: 18, color: colors.text),
+                        const SizedBox(width: 8),
+                        Text('Приглашения',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text)),
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'calendars',
                     child: Row(
                       children: [
-                        Icon(Icons.tune, size: 18),
-                        SizedBox(width: 8),
-                        Text('Календари'),
+                        Icon(Icons.tune, size: 18, color: colors.text),
+                        const SizedBox(width: 8),
+                        Text('Календари',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text)),
                       ],
                     ),
                   ),
                   const PopupMenuDivider(),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'settings',
                     child: Row(
                       children: [
                         Icon(
                           Icons.settings_outlined,
-                          color: Color(0xFF38BDF8),
+                          color: colors.accent,
                           size: 18,
                         ),
-                        SizedBox(width: 8),
-                        Text('Настройки'),
+                        const SizedBox(width: 8),
+                        Text('Настройки',
+                            style: TextStyle(
+                                fontFamily: 'Onest', color: colors.text)),
                       ],
                     ),
                   ),
@@ -437,19 +420,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  Widget _buildWeekHeader(Color textSecondary) {
+  Widget _buildWeekHeader(AppColorsExtension colors) {
     const weekDays = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       child: Row(
         children: [
           if (_showWeekNumbers)
-            const SizedBox(
+            SizedBox(
               width: 24,
               child: Center(
                 child: Text(
                   '#',
-                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                  style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontSize: 10,
+                      color: colors.text.withValues(alpha: 0.4)),
                 ),
               ),
             ),
@@ -459,11 +445,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 child: Text(
                   wd,
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     color: (wd == 'СБ' || wd == 'ВС')
-                        ? Colors.redAccent.withValues(alpha: 0.8)
-                        : textSecondary,
+                        ? colors.error.withValues(alpha: 0.85)
+                        : colors.text.withValues(alpha: 0.6),
                   ),
                 ),
               ),
@@ -477,10 +464,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget _buildContinuousWeekList(
     List<JsonMap> events,
     List<JsonMap> tasks,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     return NotificationListener<ScrollNotification>(
       onNotification: (scrollInfo) {
@@ -513,8 +497,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     child: Text(
                       '$weekNum',
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 9,
-                        color: textSecondary.withValues(alpha: 0.7),
+                        color: colors.text.withValues(alpha: 0.4),
                       ),
                     ),
                   ),
@@ -524,14 +509,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   children: List.generate(7, (d) {
                     final date = startOfWeek.add(Duration(days: d));
                     return Expanded(
-                      child: _buildDayCell(
-                        date,
-                        events,
-                        tasks,
-                        borderColor,
-                        textPrimary,
-                        textSecondary,
-                      ),
+                      child: _buildDayCell(date, events, tasks, colors),
                     );
                   }),
                 ),
@@ -547,9 +525,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     DateTime date,
     List<JsonMap> events,
     List<JsonMap> tasks,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     final now = DateTime.now();
     final isToday =
@@ -576,17 +552,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final List<Widget> cellItems = [];
 
     for (final ev in dayEvents) {
-      final c = ev['color'] as Color? ?? const Color(0xFF2C69D1);
+      final c = ev['color'] as Color? ?? colors.accent;
       final isShift = ev['calendar'] == 'Смены';
       final isGoogle = ev['calendar'] == 'Google';
 
       cellItems.add(
         Container(
           margin: const EdgeInsets.only(top: 1, left: 1, right: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
           decoration: BoxDecoration(
             color: c.withValues(alpha: 0.9),
-            borderRadius: BorderRadius.circular(2),
+            borderRadius: BorderRadius.circular(4),
             border: isShift || isGoogle
                 ? Border.all(color: Colors.white70, width: 0.5)
                 : null,
@@ -594,9 +570,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           child: Text(
             (isGoogle ? 'G: ' : '') + (ev['title'] ?? ''),
             style: const TextStyle(
+              fontFamily: 'Onest',
               fontSize: 8,
               color: Colors.white,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -610,14 +587,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       cellItems.add(
         Container(
           margin: const EdgeInsets.only(top: 1, left: 1, right: 1),
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+          padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
           decoration: BoxDecoration(
             color: isDone
-                ? Colors.grey.withValues(alpha: 0.3)
-                : const Color(0xFF0284C7).withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(2),
+                ? colors.nested.withValues(alpha: 0.5)
+                : colors.accent.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(4),
             border: Border.all(
-              color: isDone ? Colors.grey : const Color(0xFF38BDF8),
+              color:
+                  isDone ? colors.nested : colors.accent.withValues(alpha: 0.5),
               width: 0.5,
             ),
           ),
@@ -626,8 +604,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               Text(
                 isDone ? '✓ ' : '□ ',
                 style: TextStyle(
+                  fontFamily: 'Onest',
                   fontSize: 7,
-                  color: isDone ? Colors.grey : const Color(0xFF38BDF8),
+                  color: isDone
+                      ? colors.text.withValues(alpha: 0.4)
+                      : colors.accent,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -635,8 +616,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 child: Text(
                   t['title'] ?? '',
                   style: TextStyle(
+                    fontFamily: 'Onest',
                     fontSize: 8,
-                    color: isDone ? textSecondary : textPrimary,
+                    color: isDone
+                        ? colors.text.withValues(alpha: 0.4)
+                        : colors.text,
                     decoration: isDone ? TextDecoration.lineThrough : null,
                   ),
                   maxLines: 1,
@@ -654,7 +638,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return GestureDetector(
       onTap: () {
         setState(() => _selectedDate = date);
-        _showDayPopup(date, dayEvents, dayTasks);
+        _showDayPopup(date, dayEvents, dayTasks, colors);
       },
       onDoubleTap: () {
         setState(() {
@@ -666,16 +650,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         margin: const EdgeInsets.all(0.5),
         decoration: BoxDecoration(
           color: isSel
-              ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
+              ? colors.accent.withValues(alpha: 0.18)
               : (isToday
-                  ? Colors.blue.withValues(alpha: 0.05)
+                  ? colors.accent.withValues(alpha: 0.08)
                   : Colors.transparent),
           border: Border.all(
             color: isSel
-                ? const Color(0xFF38BDF8)
+                ? colors.accent
                 : (isToday
-                    ? Colors.blueAccent
-                    : borderColor.withValues(alpha: 0.2)),
+                    ? colors.accent
+                    : colors.nested.withValues(alpha: 0.4)),
             width: isSel || isToday ? 1.5 : 0.5,
           ),
         ),
@@ -683,19 +667,20 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 1, right: 3),
+              padding: const EdgeInsets.only(top: 2, right: 4),
               child: Text(
                 '${date.day}',
                 textAlign: TextAlign.right,
                 style: TextStyle(
+                  fontFamily: isToday || isSel ? 'Unbounded' : 'Onest',
                   fontSize: 10,
                   fontWeight:
-                      isToday || isSel ? FontWeight.bold : FontWeight.normal,
+                      isToday || isSel ? FontWeight.w600 : FontWeight.normal,
                   color: isToday
-                      ? const Color(0xFF38BDF8)
+                      ? colors.accent
                       : (isCurrentMonth
-                          ? textPrimary
-                          : textSecondary.withValues(alpha: 0.5)),
+                          ? colors.text
+                          : colors.text.withValues(alpha: 0.35)),
                 ),
               ),
             ),
@@ -710,9 +695,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 '+${totalCount - 2}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 7,
-                  color: textSecondary,
-                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Onest',
+                  fontSize: 8,
+                  color: colors.text.withValues(alpha: 0.6),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
           ],
@@ -725,20 +711,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget _buildWeekView(
     List<JsonMap> events,
     List<JsonMap> tasks,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
-    final startOfWeek =
-        _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
+    final startOfWeek = _selectedDate.subtract(
+      Duration(days: _selectedDate.weekday - 1),
+    );
 
     return Column(
       children: [
-        // Горизонтальный стрип 7 дней недели
         Container(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-          color: cardBg,
+          color: colors.card,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(7, (i) {
@@ -754,23 +737,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
               return InkWell(
                 onTap: () => setState(() => _selectedDate = d),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
+                    horizontal: 10,
+                    vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: isSel
-                        ? const Color(0xFF38BDF8).withValues(alpha: 0.2)
+                        ? colors.accent.withValues(alpha: 0.2)
                         : (isToday
-                            ? Colors.blue.withValues(alpha: 0.08)
+                            ? colors.accent.withValues(alpha: 0.08)
                             : Colors.transparent),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSel
-                          ? const Color(0xFF38BDF8)
-                          : (isToday ? Colors.blueAccent : Colors.transparent),
+                          ? colors.accent
+                          : (isToday ? colors.accent : Colors.transparent),
                     ),
                   ),
                   child: Column(
@@ -778,21 +761,24 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       Text(
                         wds[i],
                         style: TextStyle(
+                          fontFamily: 'Onest',
                           fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: (i >= 5) ? Colors.redAccent : textSecondary,
+                          fontWeight: FontWeight.w600,
+                          color: (i >= 5)
+                              ? colors.error
+                              : colors.text.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '${d.day}',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontFamily: isToday || isSel ? 'Unbounded' : 'Onest',
+                          fontSize: 13,
                           fontWeight: isSel || isToday
-                              ? FontWeight.bold
+                              ? FontWeight.w600
                               : FontWeight.w500,
-                          color:
-                              isToday ? const Color(0xFF38BDF8) : textPrimary,
+                          color: isToday ? colors.accent : colors.text,
                         ),
                       ),
                     ],
@@ -802,18 +788,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             }),
           ),
         ),
-        const Divider(height: 1),
-
-        // Список событий выбранного дня недели
+        Divider(height: 1, color: colors.nested),
         Expanded(
-          child: _buildDayView(
-            events,
-            tasks,
-            cardBg,
-            borderColor,
-            textPrimary,
-            textSecondary,
-          ),
+          child: _buildDayView(events, tasks, colors),
         ),
       ],
     );
@@ -823,13 +800,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     DateTime date,
     List<JsonMap> dayEvents,
     List<JsonMap> dayTasks,
+    AppColorsExtension colors,
   ) {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => Consumer(
         builder: (ctx, ref, _) {
@@ -843,9 +820,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   children: [
                     Text(
                       '${date.day} ${_monthNameGenitive(date.month)} ${date.year}',
-                      style: const TextStyle(
+                      style: TextStyle(
+                        fontFamily: 'Unbounded',
                         fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
                       ),
                     ),
                     TextButton(
@@ -853,28 +832,42 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         Navigator.pop(ctx);
                         setState(() => _currentView = CalendarViewType.day);
                       },
-                      child: const Text('Открыть день'),
+                      child: Text(
+                        'Открыть день',
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          fontWeight: FontWeight.w600,
+                          color: colors.accent,
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 if (dayEvents.isEmpty && dayTasks.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      'Событий и задач нет',
-                      style: TextStyle(color: Colors.grey),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                      child: Text(
+                        'Событий и задач нет',
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          color: colors.text.withValues(alpha: 0.5),
+                        ),
+                      ),
                     ),
                   ),
                 if (dayEvents.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Text(
-                      'События:',
+                      'СОБЫТИЯ',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.grey,
+                        fontFamily: 'Onest',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        letterSpacing: 0.8,
+                        color: colors.text.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -885,33 +878,43 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
                           radius: 6,
-                          backgroundColor: ev['color'] as Color? ?? Colors.blue,
+                          backgroundColor:
+                              ev['color'] as Color? ?? colors.accent,
                         ),
                         title: Text(
                           ev['title'] ?? '',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: colors.text,
                           ),
                         ),
                         subtitle: Text(
                           ev['isAllDay'] == true
                               ? 'Весь день (${ev['calendar']})'
                               : '${ev['startTime'] ?? ''} - ${ev['endTime'] ?? ''} (${ev['calendar']})',
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            fontSize: 12,
+                            color: colors.text.withValues(alpha: 0.6),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ],
                 if (dayTasks.isNotEmpty) ...[
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10, bottom: 6),
                     child: Text(
-                      'Задачи:',
+                      'ЗАДАЧИ',
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.grey,
+                        fontFamily: 'Onest',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        letterSpacing: 0.8,
+                        color: colors.text.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
@@ -923,6 +926,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         contentPadding: EdgeInsets.zero,
                         leading: Checkbox(
                           value: isDone,
+                          activeColor: colors.accent,
+                          checkColor:
+                              colors.isDark ? Colors.black : Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(5)),
                           onChanged: (v) {
                             ref
                                 .read(tasksProvider.notifier)
@@ -933,8 +941,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         title: Text(
                           t['title'] ?? '',
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Onest',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isDone
+                                ? colors.text.withValues(alpha: 0.45)
+                                : colors.text,
                             decoration:
                                 isDone ? TextDecoration.lineThrough : null,
                           ),
@@ -942,7 +954,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         subtitle: t['time'] != null
                             ? Text(
                                 'Время: ${t['time']}',
-                                style: const TextStyle(fontSize: 11),
+                                style: TextStyle(
+                                  fontFamily: 'Onest',
+                                  fontSize: 12,
+                                  color: colors.accent,
+                                ),
                               )
                             : null,
                       ),
@@ -957,15 +973,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  void _openAddMenu() {
+  void _openAddMenu(AppColorsExtension colors) {
     final templates = ref.read(eventTemplatesProvider);
 
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => SafeArea(
         child: Column(
@@ -975,13 +990,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             Material(
               color: Colors.transparent,
               child: ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.add_circle_outline,
-                  color: Color(0xFF38BDF8),
+                  color: colors.accent,
                 ),
-                title: const Text(
+                title: Text(
                   'Создать событие',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontWeight: FontWeight.w600,
+                      color: colors.text),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -989,7 +1007,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => CreateEventScreen(
-                        isDarkMode: widget.isDarkMode,
+                        isDarkMode: colors.isDark,
                         initialDate: _selectedDate,
                       ),
                     ),
@@ -1000,24 +1018,28 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             Material(
               color: Colors.transparent,
               child: ListTile(
-                leading: const Icon(
+                leading: Icon(
                   Icons.bookmark_outline,
-                  color: Colors.orangeAccent,
+                  color: colors.warning,
                 ),
-                title: const Text(
+                title: Text(
                   'Загрузить из шаблона',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontWeight: FontWeight.w600,
+                      color: colors.text),
                 ),
                 onTap: () {
                   Navigator.pop(ctx);
                   if (templates.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Сохраненных шаблонов пока нет'),
+                        content: Text('Сохраненных шаблонов пока нет',
+                            style: TextStyle(fontFamily: 'Onest')),
                       ),
                     );
                   } else {
-                    _showSelectTemplateDialog(templates);
+                    _showSelectTemplateDialog(templates, colors);
                   }
                 },
               ),
@@ -1028,13 +1050,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  void _showSelectTemplateDialog(List<JsonMap> templates) {
+  void _showSelectTemplateDialog(
+      List<JsonMap> templates, AppColorsExtension colors) {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
+      backgroundColor: colors.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (ctx) => ListView.builder(
         shrinkWrap: true,
@@ -1044,19 +1066,27 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           return Material(
             color: Colors.transparent,
             child: ListTile(
-              leading: const Icon(Icons.bookmark, color: Color(0xFF38BDF8)),
+              leading: Icon(Icons.bookmark, color: colors.accent),
               title: Text(
                 tpl['title'] ?? '',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    fontFamily: 'Onest',
+                    fontWeight: FontWeight.w600,
+                    color: colors.text),
               ),
-              subtitle: Text(tpl['calendar'] ?? 'Основной'),
+              subtitle: Text(
+                tpl['calendar'] ?? 'Основной',
+                style: TextStyle(
+                    fontFamily: 'Onest',
+                    color: colors.text.withValues(alpha: 0.6)),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => CreateEventScreen(
-                      isDarkMode: widget.isDarkMode,
+                      isDarkMode: colors.isDark,
                       initialDate: _selectedDate,
                       templateData: tpl,
                     ),
@@ -1070,25 +1100,35 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  void _showInvitesDialog() {
+  void _showInvitesDialog(AppColorsExtension colors) {
     final invites = ref.watch(eventInvitesProvider);
     final notifier = ref.read(eventInvitesProvider.notifier);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor:
-            widget.isDarkMode ? const Color(0xFF161B22) : Colors.white,
-        title: const Text('Приглашения'),
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Приглашения',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: invites.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Text(
                     'Приглашений пока нет',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                        fontFamily: 'Onest',
+                        color: colors.text.withValues(alpha: 0.5)),
                   ),
                 )
               : ListView.builder(
@@ -1099,23 +1139,36 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     return Material(
                       color: Colors.transparent,
                       child: ListTile(
-                        title: Text(item['title'] ?? ''),
-                        subtitle: Text('От: ${item['sender'] ?? 'Друг'}'),
+                        title: Text(
+                          item['title'] ?? '',
+                          style: TextStyle(
+                              fontFamily: 'Onest',
+                              fontWeight: FontWeight.w600,
+                              color: colors.text),
+                        ),
+                        subtitle: Text(
+                          'От: ${item['sender'] ?? 'Друг'}',
+                          style: TextStyle(
+                              fontFamily: 'Onest',
+                              color: colors.text.withValues(alpha: 0.6)),
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon:
-                                  const Icon(Icons.check, color: Colors.green),
+                              icon: Icon(
+                                Icons.check,
+                                color: colors.success,
+                              ),
                               onPressed: () {
                                 notifier.acceptInvite(item['id'].toString());
                                 Navigator.pop(ctx);
                               },
                             ),
                             IconButton(
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.close,
-                                color: Colors.redAccent,
+                                color: colors.error,
                               ),
                               onPressed: () {
                                 notifier.declineInvite(item['id'].toString());
@@ -1132,7 +1185,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Закрыть'),
+            child: Text(
+              'Закрыть',
+              style: TextStyle(
+                fontFamily: 'Onest',
+                fontWeight: FontWeight.w600,
+                color: colors.accent,
+              ),
+            ),
           ),
         ],
       ),
@@ -1142,10 +1202,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget _buildDayView(
     List<JsonMap> events,
     List<JsonMap> tasks,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
-    Color textSecondary,
+    AppColorsExtension colors,
   ) {
     final dayEvents = events.where((e) {
       final ed = e['date'] as DateTime;
@@ -1164,37 +1221,45 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.all(12),
-          color: cardBg,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          color: colors.card,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 '${_selectedDate.day} ${_monthNameGenitive(_selectedDate.month)} ${_selectedDate.year}',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: textPrimary,
+                  fontFamily: 'Unbounded',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: colors.text,
                 ),
               ),
               Text(
                 '${dayEvents.length} соб. • ${dayTasks.length} зад.',
-                style: TextStyle(color: textSecondary, fontSize: 13),
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+        Divider(height: 1, color: colors.nested),
         Expanded(
           child: (dayEvents.isEmpty && dayTasks.isEmpty)
               ? Center(
                   child: Text(
                     'На этот день ничего не запланировано',
-                    style: TextStyle(color: textSecondary),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text.withValues(alpha: 0.5),
+                    ),
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   children: [
                     if (dayEvents.isNotEmpty) ...[
                       Padding(
@@ -1202,22 +1267,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         child: Text(
                           'События',
                           style: TextStyle(
+                            fontFamily: 'Onest',
                             fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: textSecondary,
+                            fontWeight: FontWeight.w600,
+                            color: colors.text.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
                       ...dayEvents.map((ev) {
-                        final c =
-                            ev['color'] as Color? ?? const Color(0xFF2C69D1);
+                        final c = ev['color'] as Color? ?? colors.accent;
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: cardBg,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: borderColor),
+                            color: colors.card,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: colors.nested),
                           ),
                           child: Row(
                             children: [
@@ -1237,28 +1302,32 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                     Text(
                                       ev['title'] ?? '',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Onest',
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 14,
-                                        color: textPrimary,
+                                        color: colors.text,
                                       ),
                                     ),
+                                    const SizedBox(height: 2),
                                     Text(
                                       ev['isAllDay'] == true
                                           ? 'Весь день'
                                           : '${ev['startTime'] ?? ''} - ${ev['endTime'] ?? ''}',
                                       style: TextStyle(
+                                        fontFamily: 'Onest',
                                         fontSize: 12,
-                                        color: textSecondary,
+                                        color:
+                                            colors.text.withValues(alpha: 0.6),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.delete_outline,
                                   size: 20,
-                                  color: Colors.redAccent,
+                                  color: colors.error,
                                 ),
                                 onPressed: () => ref
                                     .read(calendarProvider.notifier)
@@ -1275,9 +1344,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         child: Text(
                           'Задачи',
                           style: TextStyle(
+                            fontFamily: 'Onest',
                             fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: textSecondary,
+                            fontWeight: FontWeight.w600,
+                            color: colors.text.withValues(alpha: 0.6),
                           ),
                         ),
                       ),
@@ -1286,18 +1356,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
+                            horizontal: 12,
+                            vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: cardBg,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: borderColor),
+                            color: colors.card,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: colors.nested),
                           ),
                           child: Row(
                             children: [
                               Checkbox(
                                 value: isDone,
+                                activeColor: colors.accent,
+                                checkColor:
+                                    colors.isDark ? Colors.black : Colors.white,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(5)),
                                 onChanged: (v) {
                                   ref.read(tasksProvider.notifier).toggleTask(
                                         t['id'].toString(),
@@ -1305,7 +1380,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                       );
                                 },
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1313,11 +1388,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                     Text(
                                       t['title'] ?? '',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'Onest',
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 14,
                                         color: isDone
-                                            ? textSecondary
-                                            : textPrimary,
+                                            ? colors.text
+                                                .withValues(alpha: 0.45)
+                                            : colors.text,
                                         decoration: isDone
                                             ? TextDecoration.lineThrough
                                             : null,
@@ -1327,10 +1404,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                       Text(
                                         '⏱ ${t['time']}',
                                         style: TextStyle(
+                                          fontFamily: 'Onest',
                                           fontSize: 11,
+                                          fontWeight: FontWeight.w500,
                                           color: isDone
-                                              ? textSecondary
-                                              : const Color(0xFF38BDF8),
+                                              ? colors.text
+                                                  .withValues(alpha: 0.45)
+                                              : colors.accent,
                                         ),
                                       ),
                                   ],
@@ -1350,23 +1430,21 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   Widget _buildBottomCalendarBar(
     List<UserCalendar> calendars,
-    Color cardBg,
-    Color borderColor,
-    Color textPrimary,
+    AppColorsExtension colors,
   ) {
     final notifier = ref.read(userCalendarsProvider.notifier);
 
     return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: cardBg,
-        border: Border(top: BorderSide(color: borderColor)),
+        color: colors.card,
+        border: Border(top: BorderSide(color: colors.nested)),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: calendars.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) {
           final cal = calendars[i];
           return Center(
@@ -1379,21 +1457,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 HapticFeedback.heavyImpact();
                 notifier.isolateCalendar(cal.id);
               },
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(13),
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                  horizontal: 12,
+                  vertical: 7,
                 ),
                 decoration: BoxDecoration(
                   color: cal.isVisible
                       ? cal.color.withValues(alpha: 0.2)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(13),
                   border: Border.all(
-                    color: cal.isVisible
-                        ? cal.color
-                        : Colors.grey.withValues(alpha: 0.4),
+                    color: cal.isVisible ? cal.color : colors.nested,
                   ),
                 ),
                 child: Row(
@@ -1401,15 +1477,20 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   children: [
                     CircleAvatar(
                       radius: 4,
-                      backgroundColor: cal.isVisible ? cal.color : Colors.grey,
+                      backgroundColor: cal.isVisible
+                          ? cal.color
+                          : colors.text.withValues(alpha: 0.3),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       cal.title,
                       style: TextStyle(
+                        fontFamily: 'Onest',
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: cal.isVisible ? textPrimary : Colors.grey,
+                        fontWeight: FontWeight.w600,
+                        color: cal.isVisible
+                            ? colors.text
+                            : colors.text.withValues(alpha: 0.4),
                       ),
                     ),
                   ],
