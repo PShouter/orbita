@@ -521,6 +521,9 @@ class ShiftNotifier extends Notifier<ShiftState> {
     final newOverrides = Map<String, ShiftOverride>.from(active.overrides);
     final db = await DatabaseService.instance.database;
 
+    final batch = db.batch();
+    final removedEventIds = <String>[];
+
     for (final d in dates) {
       final key = DateFormat('yyyy-MM-dd').format(d);
       newOverrides[key] = ShiftOverride(shiftId: 'empty');
@@ -532,20 +535,25 @@ class ShiftNotifier extends Notifier<ShiftState> {
       );
       for (final r in rows) {
         final evId = r['id'] as String;
-        await db.delete('calendar_events', where: 'id = ?', whereArgs: [evId]);
-        await db.insert('delete_queue', {
+        removedEventIds.add(evId);
+        batch.delete('calendar_events', where: 'id = ?', whereArgs: [evId]);
+        batch.insert('delete_queue', {
           'table_name': 'calendar_events',
           'record_id': evId,
           'created_at': DateTime.now().toIso8601String(),
         });
-
-        await NotificationService.instance.cancelNotification(
-          ('eve_$evId').hashCode,
-        );
-        await NotificationService.instance.cancelNotification(
-          ('warn_$evId').hashCode,
-        );
       }
+    }
+
+    await batch.commit(noResult: true);
+
+    for (final evId in removedEventIds) {
+      await NotificationService.instance.cancelNotification(
+        ('eve_$evId').hashCode,
+      );
+      await NotificationService.instance.cancelNotification(
+        ('warn_$evId').hashCode,
+      );
     }
 
     final updatedSchedule = active.copyWith(overrides: newOverrides);
@@ -563,15 +571,12 @@ class ShiftNotifier extends Notifier<ShiftState> {
     final db = await DatabaseService.instance.database;
 
     final rows = await db.query('calendar_events', where: "calendar = 'Смены'");
+    final batch = db.batch();
+    final removedEventIds = <String>[];
     for (final r in rows) {
       final evId = r['id'] as String;
-      await NotificationService.instance.cancelNotification(
-        ('eve_$evId').hashCode,
-      );
-      await NotificationService.instance.cancelNotification(
-        ('warn_$evId').hashCode,
-      );
-      await db.insert('delete_queue', {
+      removedEventIds.add(evId);
+      batch.insert('delete_queue', {
         'table_name': 'calendar_events',
         'record_id': evId,
         'created_at': DateTime.now().toIso8601String(),
@@ -579,6 +584,16 @@ class ShiftNotifier extends Notifier<ShiftState> {
     }
 
     await db.delete('calendar_events', where: "calendar = 'Смены'");
+    await batch.commit(noResult: true);
+
+    for (final evId in removedEventIds) {
+      await NotificationService.instance.cancelNotification(
+        ('eve_$evId').hashCode,
+      );
+      await NotificationService.instance.cancelNotification(
+        ('warn_$evId').hashCode,
+      );
+    }
 
     final updatedSchedule = active.copyWith(cycleShiftIds: [], overrides: {});
 

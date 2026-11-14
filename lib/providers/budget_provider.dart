@@ -133,11 +133,14 @@ class BudgetNotifier extends Notifier<BudgetState> {
         .toList();
 
     final txRows = await db.query('budget_transactions', orderBy: 'date DESC');
-    final transactions = txRows.map((r) {
+
+    Map<String, dynamic> mapTx(Map<String, Object?> r) {
       final m = Map<String, dynamic>.from(r);
       m['date'] = DateTime.parse(m['date'] as String);
       return m;
-    }).toList();
+    }
+
+    final transactions = txRows.map(mapTx).toList();
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -164,59 +167,66 @@ class BudgetNotifier extends Notifier<BudgetState> {
       }
     }
 
-    final List<Map<String, dynamic>> recentExp = [];
-    final List<Map<String, dynamic>> recentInc = [];
-    final List<Map<String, dynamic>> planExp = [];
-    final List<Map<String, dynamic>> planInc = [];
+    // Проход по всей истории не нужен: для расчётов достаточно
+    // незавершённых плановых операций и последних завершённых по типу.
+    final plannedRows = await db.query(
+      'budget_transactions',
+      where: 'is_planned = 1 AND is_completed = 0',
+      orderBy: 'date ASC',
+    );
+    final recentExpenseRows = await db.query(
+      'budget_transactions',
+      where: 'is_planned = 0 AND is_completed = 1 AND type = ?',
+      whereArgs: ['expense'],
+      orderBy: 'date DESC',
+      limit: 10,
+    );
+    final recentIncomeRows = await db.query(
+      'budget_transactions',
+      where: 'is_planned = 0 AND is_completed = 1 AND type = ?',
+      whereArgs: ['income'],
+      orderBy: 'date DESC',
+      limit: 10,
+    );
 
-    final List<Map<String, dynamic>> todayList = [];
-    final List<Map<String, dynamic>> missedList = [];
-    final List<Map<String, dynamic>> futureList = [];
+    final recentExp = recentExpenseRows.map(mapTx).toList();
+    final recentInc = recentIncomeRows.map(mapTx).toList();
+    final planExp = <Map<String, dynamic>>[];
+    final planInc = <Map<String, dynamic>>[];
+
+    final todayList = <Map<String, dynamic>>[];
+    final missedList = <Map<String, dynamic>>[];
+    final futureList = <Map<String, dynamic>>[];
 
     double expIncome = 0;
     double planExpense = 0;
 
-    for (final t in transactions) {
-      final isPlanned = (t['is_planned'] == 1);
-      final isCompleted = (t['is_completed'] == 1);
+    for (final row in plannedRows) {
+      final t = mapTx(row);
       final isExpense = (t['type'] == 'expense');
       final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
       final date = t['date'] as DateTime;
       final itemDay = DateTime(date.year, date.month, date.day);
 
-      if (!isPlanned && isCompleted) {
-        if (isExpense) {
-          recentExp.add(t);
-        } else {
-          recentInc.add(t);
-        }
-      } else if (isPlanned) {
-        if (itemDay == today && !isCompleted) {
-          todayList.add(t);
-        } else if (itemDay.isBefore(today) && !isCompleted) {
-          missedList.add(t);
-        } else if (itemDay.isAfter(today)) {
-          futureList.add(t);
-        }
+      if (itemDay == today) {
+        todayList.add(t);
+      } else if (itemDay.isBefore(today)) {
+        missedList.add(t);
+      } else {
+        futureList.add(t);
+      }
 
-        if (date.year == now.year && date.month == now.month && !isCompleted) {
-          if (isExpense) {
-            planExpense += amount;
-            planExp.add(t);
-          } else {
-            expIncome += amount;
-            planInc.add(t);
-          }
+      if (date.year == now.year && date.month == now.month) {
+        if (isExpense) {
+          planExpense += amount;
+          planExp.add(t);
+        } else {
+          expIncome += amount;
+          planInc.add(t);
         }
       }
     }
 
-    recentExp.sort(
-      (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
-    );
-    recentInc.sort(
-      (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
-    );
     planExp.sort(
       (a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime),
     );
@@ -335,14 +345,17 @@ class BudgetNotifier extends Notifier<BudgetState> {
       },
     ];
 
+    final batch = db.batch();
+    final nowIso = DateTime.now().toIso8601String();
     for (final c in defCats) {
-      await db.insert('budget_categories', {
+      batch.insert('budget_categories', {
         ...c,
         'monthly_limit': 0.0,
         'is_synced': 0,
-        'updated_at': DateTime.now().toIso8601String(),
+        'updated_at': nowIso,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
+    await batch.commit(noResult: true);
   }
 
   Future<void> addAccount({

@@ -20,9 +20,16 @@ class DatabaseService {
     return await openDatabase(
       path,
       version: 18, // Повышено до 18 для оптимизации индексов и очистки
+      onConfigure: _configureDB,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
+  }
+
+  Future<void> _configureDB(Database db) async {
+    await db.execute('PRAGMA journal_mode=WAL');
+    await db.execute('PRAGMA synchronous=NORMAL');
+    await db.execute('PRAGMA temp_store=MEMORY');
   }
 
   Future<void> _createDB(Database db, int version) async {

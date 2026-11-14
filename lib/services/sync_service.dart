@@ -313,14 +313,16 @@ class SyncService {
         }
 
         if (invalidIds.isNotEmpty) {
+          final invalidBatch = db.batch();
           for (final invId in invalidIds) {
-            await db.update(
+            invalidBatch.update(
               'calendar_events',
               {'is_synced': 1},
               where: 'id = ?',
               whereArgs: [invId],
             );
           }
+          await invalidBatch.commit(noResult: true);
         }
 
         if (validEvents.isNotEmpty) {
@@ -684,6 +686,87 @@ class SyncService {
     }
   }
 
+  static const String _watermarkPrefix = 'sync_wm_';
+
+  Future<Map<String, String>> _loadWatermarks(
+    Database db,
+    String userId,
+  ) async {
+    final prefix = '$_watermarkPrefix${userId}_';
+    final rows = await db.query(
+      'app_settings',
+      where: 'key LIKE ?',
+      whereArgs: ['$prefix%'],
+    );
+    return {
+      for (final r in rows)
+        (r['key'] as String).substring(prefix.length): r['value'] as String,
+    };
+  }
+
+  String? _maxUpdatedAt(List<dynamic> rows) {
+    DateTime? max;
+    for (final r in rows) {
+      if (r is! Map) continue;
+      final raw = r['updated_at'];
+      if (raw == null) continue;
+      final parsed = DateTime.tryParse(raw.toString());
+      if (parsed != null && (max == null || parsed.isAfter(max))) {
+        max = parsed;
+      }
+    }
+    return max?.toUtc().toIso8601String();
+  }
+
+  Future<void> _saveWatermarks(
+    Database db,
+    String userId,
+    Map<String, List<dynamic>> rowsByTable,
+  ) async {
+    final batch = db.batch();
+    rowsByTable.forEach((table, rows) {
+      final max = _maxUpdatedAt(rows);
+      if (max == null) return;
+      batch.insert(
+        'app_settings',
+        {'key': '$_watermarkPrefix${userId}_$table', 'value': max},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    });
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<dynamic>> _pullTable(
+    String table,
+    String userId,
+    String? since,
+  ) async {
+    if (since != null && since.isNotEmpty) {
+      final filtered = await _retryOperation<List<dynamic>>(
+        () => _supabase
+            .from(table)
+            .select()
+            .eq('user_id', userId)
+            .gt('updated_at', since)
+            .timeout(const Duration(seconds: 10)),
+        opName: 'Pull $table',
+      );
+      if (filtered != null) return filtered;
+      debugPrint(
+        'SyncService: инкрементальная загрузка $table недоступна, полная загрузка',
+      );
+    }
+    final full = await _retryOperation<List<dynamic>>(
+      () => _supabase
+          .from(table)
+          .select()
+          .eq('user_id', userId)
+          .timeout(const Duration(seconds: 10)),
+      opName: 'Pull $table (full)',
+    );
+    return full ?? [];
+  }
+
   Future<void> pullAllFromCloud({bool forceReplace = false}) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -691,55 +774,17 @@ class SyncService {
     final db = await DatabaseService.instance.database;
 
     try {
+      final watermarks = forceReplace
+          ? <String, String>{}
+          : await _loadWatermarks(db, user.id);
+
       final results = await Future.wait<dynamic>([
-        _retryOperation(
-          () => _supabase
-              .from('tasks')
-              .select()
-              .eq('user_id', user.id)
-              .timeout(const Duration(seconds: 10)),
-          opName: 'Pull Tasks',
-        ),
-        _retryOperation(
-          () => _supabase
-              .from('calendar_events')
-              .select()
-              .eq('user_id', user.id)
-              .timeout(const Duration(seconds: 10)),
-          opName: 'Pull Events',
-        ),
-        _retryOperation(
-          () => _supabase
-              .from('habits')
-              .select()
-              .eq('user_id', user.id)
-              .timeout(const Duration(seconds: 10)),
-          opName: 'Pull Habits',
-        ),
-        _retryOperation(
-          () => _supabase
-              .from('notes')
-              .select()
-              .eq('user_id', user.id)
-              .timeout(const Duration(seconds: 10)),
-          opName: 'Pull Notes',
-        ),
-        _retryOperation(
-          () => _supabase
-              .from('diary_entries')
-              .select()
-              .eq('user_id', user.id)
-              .timeout(const Duration(seconds: 10)),
-          opName: 'Pull Diary',
-        ),
-        _retryOperation(
-          () => _supabase
-              .from('shift_schedules')
-              .select()
-              .eq('user_id', user.id)
-              .timeout(const Duration(seconds: 10)),
-          opName: 'Pull Shifts',
-        ),
+        _pullTable('tasks', user.id, watermarks['tasks']),
+        _pullTable('calendar_events', user.id, watermarks['calendar_events']),
+        _pullTable('habits', user.id, watermarks['habits']),
+        _pullTable('notes', user.id, watermarks['notes']),
+        _pullTable('diary_entries', user.id, watermarks['diary_entries']),
+        _pullTable('shift_schedules', user.id, watermarks['shift_schedules']),
         _retryOperation(
           () => _supabase
               .from('user_gamification')
@@ -1004,6 +1049,22 @@ class SyncService {
 
         await batch.commit(noResult: true);
       });
+
+      final fetchedByTable = <String, List<dynamic>>{
+        'tasks': remoteTasks,
+        'calendar_events': remoteEvents,
+        'habits': remoteHabits,
+        'notes': remoteNotes,
+        'diary_entries': remoteDiary,
+        'shift_schedules': remoteShifts,
+      };
+      final nonEmpty = {
+        for (final entry in fetchedByTable.entries)
+          if (entry.value.isNotEmpty) entry.key: entry.value,
+      };
+      if (nonEmpty.isNotEmpty) {
+        await _saveWatermarks(db, user.id, nonEmpty);
+      }
 
       if (remoteGamification != null) onGamificationPulled?.call();
       if (remoteAchievements.isNotEmpty) onAchievementsPulled?.call();
