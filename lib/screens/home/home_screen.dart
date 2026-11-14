@@ -327,14 +327,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final today = DateTime.now();
     final colors = context.colors;
 
-    final profile = ref.watch(profileProvider);
+    final userName = ref.watch(profileProvider.select((p) => p.userName));
+    final daysWithOrbita = ref.watch(
+      profileProvider.select((p) => p.daysWithOrbita),
+    );
     final allTasks = ref.watch(tasksProvider);
     final allEvents = ref.watch(calendarProvider);
     final habits = ref.watch(habitsProvider);
-    final budgetState = ref.watch(budgetProvider);
-    final shiftState = ref.watch(shiftProvider);
+    final freeMoney = ref.watch(budgetProvider.select((b) => b.freeMoney));
+    final dailySafeLimit = ref.watch(
+      budgetProvider.select((b) => b.dailySafeLimit),
+    );
+    final totalAccountsBalance = ref.watch(
+      budgetProvider.select((b) => b.totalAccountsBalance),
+    );
 
-    final activeSchedule = shiftState.activeSchedule;
+    final activeSchedule = ref.watch(
+      shiftProvider.select((s) => s.activeSchedule),
+    );
     final todayShift = activeSchedule?.getShiftForDate(today);
 
     final todayTasks = allTasks.where((t) {
@@ -382,7 +392,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Привет, ${profile.userName}',
+                    'Привет, ${userName}',
                     style: TextStyle(
                       fontFamily: 'Unbounded',
                       fontSize: 22,
@@ -394,7 +404,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Дней с Орбитой: ${profile.daysWithOrbita}',
+                    'Дней с Орбитой: ${daysWithOrbita}',
                     style: TextStyle(
                       fontFamily: 'Onest',
                       fontSize: 13,
@@ -863,20 +873,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Свободно: ${budgetState.freeMoney.toStringAsFixed(0)} ₽',
+                'Свободно: ${freeMoney.toStringAsFixed(0)} ₽',
                 style: TextStyle(
                   fontFamily: 'Unbounded',
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color:
-                      budgetState.freeMoney >= 0 ? colors.accent : colors.error,
+                      freeMoney >= 0 ? colors.accent : colors.error,
                 ),
               ),
               const SizedBox(height: 6),
               Row(
                 children: [
                   Text(
-                    'На счетах: ${budgetState.totalAccountsBalance.toStringAsFixed(0)} ₽',
+                    'На счетах: ${totalAccountsBalance.toStringAsFixed(0)} ₽',
                     style: TextStyle(
                       fontFamily: 'Onest',
                       fontSize: 12,
@@ -886,7 +896,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(width: 14),
                   Text(
-                    'В день: ~${budgetState.dailySafeLimit.toStringAsFixed(0)} ₽',
+                    'В день: ~${dailySafeLimit.toStringAsFixed(0)} ₽',
                     style: TextStyle(
                       fontFamily: 'Onest',
                       fontSize: 12,

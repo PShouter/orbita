@@ -56,49 +56,120 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ProviderScope(child: OrbitaBootstrap()));
+}
 
-  // 1. Загрузка переменных окружения из .env
-  try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint('DotEnv load notice: $e');
+/// Показывает сплэш, пока идёт инициализация сервисов,
+/// чтобы приложение не открывалось с пустым белым экраном.
+class OrbitaBootstrap extends StatefulWidget {
+  const OrbitaBootstrap({super.key});
+
+  @override
+  State<OrbitaBootstrap> createState() => _OrbitaBootstrapState();
+}
+
+class _OrbitaBootstrapState extends State<OrbitaBootstrap> {
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
   }
 
-  // 2. Инициализация уведомлений
-  try {
-    await NotificationService.instance.init(
-      onSelectNotification: (payload) {
-        _handleNotificationNavigation(payload);
-      },
-    );
-  } catch (e) {
-    debugPrint('Notification init notice: $e');
-  }
-
-  // 3. Инициализация Supabase через переменные окружения
-  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-
-  try {
-    if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
-      await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-    } else {
-      debugPrint(
-        'Supabase init warning: SUPABASE_URL или SUPABASE_ANON_KEY не найдены в .env',
-      );
+  Future<void> _bootstrap() async {
+    // 1. Загрузка переменных окружения из .env
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      debugPrint('DotEnv load notice: $e');
     }
-  } catch (e) {
-    debugPrint('Supabase init notice: $e');
+
+    // 2. Инициализация уведомлений
+    try {
+      await NotificationService.instance.init(
+        onSelectNotification: (payload) {
+          _handleNotificationNavigation(payload);
+        },
+      );
+    } catch (e) {
+      debugPrint('Notification init notice: $e');
+    }
+
+    // 3. Инициализация Supabase через переменные окружения
+    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+    try {
+      if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+        await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+      } else {
+        debugPrint(
+          'Supabase init warning: SUPABASE_URL или SUPABASE_ANON_KEY не найдены в .env',
+        );
+      }
+    } catch (e) {
+      debugPrint('Supabase init notice: $e');
+    }
+
+    // 4. Инициализация фоновой синхронизации
+    try {
+      SyncService.instance.initListener();
+    } catch (e) {
+      debugPrint('SyncService init notice: $e');
+    }
+
+    if (mounted) setState(() => _ready = true);
   }
 
-  // 4. Инициализация фоновой синхронизации
-  try {
-    SyncService.instance.initListener();
-  } catch (e) {
-    debugPrint('SyncService init notice: $e');
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const OrbitaApp();
+    return const OrbitaSplashScreen();
   }
+}
 
-  runApp(const ProviderScope(child: OrbitaApp()));
+class OrbitaSplashScreen extends StatelessWidget {
+  const OrbitaSplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF0D1117),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.rocket_launch_rounded,
+              size: 56,
+              color: Color(0xFF5B8DEF),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Орбита',
+              style: TextStyle(
+                fontFamily: 'Unbounded',
+                fontSize: 26,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFE6EDF3),
+                letterSpacing: 1.5,
+              ),
+            ),
+            SizedBox(height: 22),
+            SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF5B8DEF),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 void _handleNotificationNavigation(String payload) {
