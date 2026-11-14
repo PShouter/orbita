@@ -48,3 +48,8 @@ app.*.map.json
 .widget_preview/
 
 .env
+
+# Подпись релизной сборки
+android/key.properties
+*.jks
+*.keystore
