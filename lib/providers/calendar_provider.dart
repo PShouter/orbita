@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -191,6 +193,15 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
         m['startTime'] = m['start_time'];
         m['endTime'] = m['end_time'];
         m['isAllDay'] = m['is_all_day'] == 1;
+        final ext = m['reminder_minutes_extended'];
+        if (ext is String && ext.isNotEmpty) {
+          try {
+            final parsed = jsonDecode(ext);
+            if (parsed is List) {
+              m['reminderMinutesList'] = parsed.cast<int>();
+            }
+          } catch (_) {}
+        }
         if (m['color'] != null) {
           m['color'] = Color(m['color'] as int);
         }
@@ -215,6 +226,7 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
     String? location,
     String? description,
     int reminderMinutes = -1,
+    List<int> reminderMinutesList = const [],
     String recurrence = 'none',
   }) async {
     final db = await DatabaseService.instance.database;
@@ -222,6 +234,11 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
     final nowIso = DateTime.now().toIso8601String();
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final reminders = (reminderMinutesList.isEmpty &&
+            reminderMinutes >= 0)
+        ? [reminderMinutes]
+        : reminderMinutesList;
 
     final row = {
       'id': id,
@@ -235,7 +252,10 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
       'color': color.toARGB32(),
       'location': location,
       'description': description,
-      'reminder_minutes': reminderMinutes,
+      'reminder_minutes': reminders.isNotEmpty ? reminders.first : -1,
+      'reminder_minutes_extended': reminders.isEmpty
+          ? null
+          : jsonEncode(reminders),
       'recurrence': recurrence,
       'is_synced': 0,
       'updated_at': nowIso,
@@ -247,31 +267,131 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    if (reminderMinutes >= 0 && !isAllDay && startTime != null) {
-      try {
-        final parts = startTime.split(':');
-        final evTime = DateTime(
-          date.year,
-          date.month,
-          date.day,
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-        );
-        final notifyTime = evTime.subtract(Duration(minutes: reminderMinutes));
+    await _scheduleEventReminders(
+      eventId: id,
+      title: title,
+      date: date,
+      startTime: startTime,
+      isAllDay: isAllDay,
+      calendar: calendar,
+      reminders: reminders,
+    );
+
+    await loadEvents();
+    SyncService.instance.syncAll();
+  }
+
+  Future<void> updateEvent({
+    required String id,
+    required String title,
+    required DateTime date,
+    required DateTime endDate,
+    String? startTime,
+    String? endTime,
+    bool isAllDay = false,
+    String calendar = 'Основной',
+    Color color = const Color(0xFF2C69D1),
+    String? location,
+    String? description,
+    int reminderMinutes = -1,
+    List<int> reminderMinutesList = const [],
+    String recurrence = 'none',
+  }) async {
+    final db = await DatabaseService.instance.database;
+    final nowIso = DateTime.now().toIso8601String();
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final endDateStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final reminders = (reminderMinutesList.isEmpty &&
+            reminderMinutes >= 0)
+        ? [reminderMinutes]
+        : reminderMinutesList;
+
+    final row = {
+      'title': title,
+      'date': dateStr,
+      'end_date': endDateStr,
+      'start_time': startTime,
+      'end_time': endTime,
+      'is_all_day': isAllDay ? 1 : 0,
+      'calendar': calendar,
+      'color': color.toARGB32(),
+      'location': location,
+      'description': description,
+      'reminder_minutes': reminders.isNotEmpty ? reminders.first : -1,
+      'reminder_minutes_extended': reminders.isEmpty
+          ? null
+          : jsonEncode(reminders),
+      'recurrence': recurrence,
+      'updated_at': nowIso,
+    };
+
+    await db.update(
+      'calendar_events',
+      row,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    await NotificationService.instance.cancelNotification(id.hashCode);
+    await _scheduleEventReminders(
+      eventId: id,
+      title: title,
+      date: date,
+      startTime: startTime,
+      isAllDay: isAllDay,
+      calendar: calendar,
+      reminders: reminders,
+    );
+
+    // Запись изменений обратно в Google, если событие из Google-календаря.
+    try {
+      await GoogleCalendarService.instance.updateEventLocalChanges(
+        eventId: id,
+        title: title,
+      );
+    } catch (_) {}
+
+    await loadEvents();
+    SyncService.instance.syncAll();
+  }
+
+  Future<void> _scheduleEventReminders({
+    required String eventId,
+    required String title,
+    required DateTime date,
+    String? startTime,
+    required bool isAllDay,
+    required String calendar,
+    required List<int> reminders,
+  }) async {
+    if (isAllDay || startTime == null) return;
+    if (reminders.isEmpty) return;
+    try {
+      final parts = startTime.split(':');
+      final evTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+      );
+      var i = 0;
+      for (final minutes in reminders) {
+        if (minutes < 0) continue;
+        final notifyTime = evTime.subtract(Duration(minutes: minutes));
         if (notifyTime.isAfter(DateTime.now())) {
           await NotificationService.instance.scheduleNotification(
-            id: id.hashCode,
+            id: eventId.hashCode + i,
             title: 'Событие: $title',
             body: 'Начало в $startTime ($calendar)',
             scheduledDate: notifyTime,
             payload: 'screen_calendar',
           );
         }
-      } catch (_) {}
-    }
-
-    await loadEvents();
-    SyncService.instance.syncAll();
+        i++;
+      }
+    } catch (_) {}
   }
 
   Future<void> deleteEvent(String id) async {
@@ -393,6 +513,8 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
           'description': ev.description,
           'reminder_minutes': -1,
           'recurrence': 'none',
+          'google_event_id': ev.id,
+          'google_calendar_id': ge.calendarId,
           'is_synced': 0,
           'updated_at': nowIso,
         }, conflictAlgorithm: ConflictAlgorithm.replace);

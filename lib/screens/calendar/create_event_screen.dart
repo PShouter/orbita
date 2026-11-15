@@ -8,12 +8,14 @@ class CreateEventScreen extends ConsumerStatefulWidget {
   final bool isDarkMode;
   final DateTime initialDate;
   final Map<String, dynamic>? templateData;
+  final Map<String, dynamic>? eventToEdit;
 
   const CreateEventScreen({
     super.key,
     required this.isDarkMode,
     required this.initialDate,
     this.templateData,
+    this.eventToEdit,
   });
 
   @override
@@ -34,6 +36,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   UserCalendar? _selectedCalendar;
 
   int _reminderMinutes = -1;
+  final Set<int> _reminderMinutesList = {};
   String _recurrence = 'none';
 
   final Map<int, String> _presetReminders = {
@@ -63,7 +66,63 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       _locationCtrl.text = t['location'] ?? '';
       _isAllDay = t['isAllDay'] == true;
       _reminderMinutes = t['reminderMinutes'] ?? -1;
+      final ext = t['reminderMinutesList'];
+      if (ext is List) {
+        _reminderMinutesList.addAll(ext.cast<int>());
+      }
       _recurrence = t['recurrence'] ?? 'none';
+    }
+
+    if (widget.eventToEdit != null) {
+      final e = widget.eventToEdit!;
+      _titleCtrl.text = e['title']?.toString() ?? '';
+      _descCtrl.text = e['description']?.toString() ?? '';
+      _locationCtrl.text = e['location']?.toString() ?? '';
+      _isAllDay = e['isAllDay'] == true;
+      final start = e['date'] as DateTime?;
+      if (start != null) {
+        _startDate = start;
+        _endDate = e['endDate'] as DateTime? ?? start;
+        final st = e['startTime']?.toString();
+        if (st != null && st.isNotEmpty) {
+          final p = st.split(':');
+          if (p.length == 2) {
+            _startTime = TimeOfDay(
+              hour: int.tryParse(p[0]) ?? 0,
+              minute: int.tryParse(p[1]) ?? 0,
+            );
+          }
+        }
+        final et = e['endTime']?.toString();
+        if (et != null && et.isNotEmpty) {
+          final p = et.split(':');
+          if (p.length == 2) {
+            _endTime = TimeOfDay(
+              hour: int.tryParse(p[0]) ?? 0,
+              minute: int.tryParse(p[1]) ?? 0,
+            );
+          }
+        }
+      }
+      final calTitle = e['calendar']?.toString();
+      final calColor = e['color'];
+      if (calTitle != null) {
+        _selectedCalendar = UserCalendar(
+          id: e['id']?.toString() ?? 'edit',
+          title: calTitle,
+          color: calColor is Color
+              ? calColor
+              : const Color(0xFF2C69D1),
+          accountType: 'local',
+        );
+      }
+      final ext = e['reminderMinutesList'];
+      if (ext is List) {
+        _reminderMinutesList.addAll(ext.cast<int>());
+      } else if (e['reminderMinutes'] is int && (e['reminderMinutes'] as int) >= 0) {
+        _reminderMinutesList.add(e['reminderMinutes'] as int);
+      }
+      _recurrence = e['recurrence']?.toString() ?? 'none';
     }
   }
 
@@ -397,8 +456,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                     ),
                   ),
                   trailing: Text(
-                    _presetReminders[_reminderMinutes] ??
-                        '$_reminderMinutes мин.',
+                    _formatReminders(),
                     style: TextStyle(
                       fontFamily: 'Onest',
                       color: colors.accent,
@@ -550,117 +608,73 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: colors.card,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      builder: (ctx) => ListView(
-        shrinkWrap: true,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Установить напоминание',
-              style: TextStyle(
-                fontFamily: 'Unbounded',
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: colors.text,
-              ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheet) {
+          return SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: 16),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Напоминания (можно выбрать несколько)',
+                    style: TextStyle(
+                      fontFamily: 'Unbounded',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: colors.text,
+                    ),
+                  ),
+                ),
+                // «Нет напоминания» очищает список
+                ListTile(
+                  title: Text(
+                    'Нет напоминания',
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      color: colors.text,
+                    ),
+                  ),
+                  trailing: _reminderMinutesList.isEmpty
+                      ? Icon(Icons.check, color: colors.accent)
+                      : null,
+                  onTap: () {
+                    setSheet(() => _reminderMinutesList.clear());
+                  },
+                ),
+                ..._presetReminders.entries
+                    .where((e) => e.key >= 0)
+                    .map(
+                      (e) => CheckboxListTile(
+                        value: _reminderMinutesList.contains(e.key),
+                        activeColor: colors.accent,
+                        title: Text(
+                          e.value,
+                          style: TextStyle(
+                            fontFamily: 'Onest',
+                            color: colors.text,
+                          ),
+                        ),
+                        onChanged: (checked) {
+                          setSheet(() {
+                            if (checked == true) {
+                              _reminderMinutesList.add(e.key);
+                            } else {
+                              _reminderMinutesList.remove(e.key);
+                            }
+                          });
+                        },
+                      ),
+                    ),
+              ],
             ),
-          ),
-          ..._presetReminders.entries.map(
-            (e) => ListTile(
-              title: Text(
-                e.value,
-                style: TextStyle(fontFamily: 'Onest', color: colors.text),
-              ),
-              trailing: _reminderMinutes == e.key
-                  ? Icon(Icons.check, color: colors.accent)
-                  : null,
-              onTap: () {
-                setState(() => _reminderMinutes = e.key);
-                Navigator.pop(ctx);
-              },
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.edit, color: colors.accent),
-            title: Text(
-              'Другой интервал...',
-              style: TextStyle(
-                fontFamily: 'Onest',
-                color: colors.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            onTap: () {
-              Navigator.pop(ctx);
-              _pickCustomReminder(colors);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _pickCustomReminder(AppColorsExtension colors) {
-    final ctrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: colors.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: Text(
-          'Свой интервал (в минутах)',
-          style: TextStyle(
-            fontFamily: 'Unbounded',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: colors.text,
-          ),
-        ),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          style: TextStyle(fontFamily: 'Onest', color: colors.text),
-          decoration: InputDecoration(
-            hintText: 'Например, 15',
-            hintStyle: TextStyle(
-              fontFamily: 'Onest',
-              color: colors.text.withValues(alpha: 0.4),
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Отмена',
-              style: TextStyle(
-                  fontFamily: 'Onest',
-                  color: colors.text.withValues(alpha: 0.6)),
-            ),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.accent,
-              foregroundColor: colors.isDark ? Colors.black : Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-            ),
-            onPressed: () {
-              final val = int.tryParse(ctrl.text.trim());
-              if (val != null && val >= 0) {
-                setState(() => _reminderMinutes = val);
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('ОК',
-                style: TextStyle(
-                    fontFamily: 'Onest', fontWeight: FontWeight.bold)),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -730,6 +744,19 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     }
   }
 
+  String _formatReminders() {
+    final chosen = _presetReminders.entries
+        .where((e) => e.key >= 0 && _reminderMinutesList.contains(e.key))
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    if (chosen.isEmpty) return 'Нет напоминания';
+    final labels = chosen.map((e) => e.value).toList();
+    if (labels.length > 2) {
+      return '${labels.length} напоминания';
+    }
+    return labels.join(' + ');
+  }
+
   void _saveAsTemplate(AppColorsExtension colors) {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
@@ -777,26 +804,50 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     final fullDesc =
         attendee.isNotEmpty ? '$desc\nУчастник: $attendee'.trim() : desc;
 
-    ref.read(calendarProvider.notifier).addEvent(
-          title: title,
-          date: _startDate,
-          endDate: _endDate,
-          startTime: _isAllDay
-              ? null
-              : '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}',
-          endTime: _isAllDay
-              ? null
-              : '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}',
-          isAllDay: _isAllDay,
-          calendar: _selectedCalendar?.title ?? 'Основной',
-          color: _selectedCalendar?.color ?? colors.accent,
-          location: _locationCtrl.text.trim().isNotEmpty
-              ? _locationCtrl.text.trim()
-              : null,
-          description: fullDesc.isNotEmpty ? fullDesc : null,
-          reminderMinutes: _reminderMinutes,
-          recurrence: _recurrence,
-        );
+    final startTimeStr = _isAllDay
+        ? null
+        : '${_startTime.hour.toString().padLeft(2, '0')}:${_startTime.minute.toString().padLeft(2, '0')}';
+    final endTimeStr = _isAllDay
+        ? null
+        : '${_endTime.hour.toString().padLeft(2, '0')}:${_endTime.minute.toString().padLeft(2, '0')}';
+
+    final notifier = ref.read(calendarProvider.notifier);
+    if (widget.eventToEdit != null) {
+      notifier.updateEvent(
+        id: widget.eventToEdit!['id'].toString(),
+        title: title,
+        date: _startDate,
+        endDate: _endDate,
+        startTime: startTimeStr,
+        endTime: endTimeStr,
+        isAllDay: _isAllDay,
+        calendar: _selectedCalendar?.title ?? 'Основной',
+        color: _selectedCalendar?.color ?? colors.accent,
+        location: _locationCtrl.text.trim().isNotEmpty
+            ? _locationCtrl.text.trim()
+            : null,
+        description: fullDesc.isNotEmpty ? fullDesc : null,
+        reminderMinutesList: _reminderMinutesList.toList(),
+        recurrence: _recurrence,
+      );
+    } else {
+      notifier.addEvent(
+        title: title,
+        date: _startDate,
+        endDate: _endDate,
+        startTime: startTimeStr,
+        endTime: endTimeStr,
+        isAllDay: _isAllDay,
+        calendar: _selectedCalendar?.title ?? 'Основной',
+        color: _selectedCalendar?.color ?? colors.accent,
+        location: _locationCtrl.text.trim().isNotEmpty
+            ? _locationCtrl.text.trim()
+            : null,
+        description: fullDesc.isNotEmpty ? fullDesc : null,
+        reminderMinutesList: _reminderMinutesList.toList(),
+        recurrence: _recurrence,
+      );
+    }
 
     Navigator.pop(context);
   }

@@ -19,7 +19,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 18, // Повышено до 18 для оптимизации индексов и очистки
+      version: 19, // v19: несколько напоминаний для события (JSON-список)
       onConfigure: _configureDB,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
@@ -92,6 +92,9 @@ class DatabaseService {
         description TEXT,
         location TEXT,
         reminder_minutes INTEGER DEFAULT -1,
+        reminder_minutes_extended TEXT,
+        google_event_id TEXT,
+        google_calendar_id TEXT,
         recurrence TEXT DEFAULT 'none',
         is_synced INTEGER DEFAULT 0,
         updated_at TEXT NOT NULL
@@ -430,6 +433,22 @@ class DatabaseService {
     if (oldVersion < 18) {
       // Накатываем новые оптимизированные индексы
       await _createIndexes(db);
+    }
+    if (oldVersion < 19) {
+      final calCols = await db.rawQuery('PRAGMA table_info(calendar_events)');
+      final calNames = calCols.map((c) => c['name'] as String).toSet();
+      if (!calNames.contains('reminder_minutes_extended')) {
+        await db.execute(
+            'ALTER TABLE calendar_events ADD COLUMN reminder_minutes_extended TEXT;');
+      }
+      if (!calNames.contains('google_event_id')) {
+        await db.execute(
+            'ALTER TABLE calendar_events ADD COLUMN google_event_id TEXT;');
+      }
+      if (!calNames.contains('google_calendar_id')) {
+        await db.execute(
+            'ALTER TABLE calendar_events ADD COLUMN google_calendar_id TEXT;');
+      }
     }
   }
 

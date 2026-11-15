@@ -178,7 +178,7 @@ class GoogleCalendarService {
       }
     }
 
-    debugPrint(
+debugPrint(
       'Google Calendar: всего собрано уникальных событий со всех календарей: ${result.length}',
     );
     return result;
@@ -193,6 +193,24 @@ class GoogleCalendarService {
     }
     if (cleaned.length != 6) return 0xFF4285F4;
     return int.parse('FF$cleaned', radix: 16);
+  }
+
+  /// Обновление локальной копии события уже попало в БД приложения.
+  /// Полная синхронизация изменений обратно в Google Calendar (название,
+  /// время) выполняется через API. Здесь — заглушка-хук для обратной записи.
+  Future<void> updateEventLocalChanges({
+    required String eventId,
+    required String title,
+  }) async {
+    try {
+      // В текущей версии события Google импортируются локально,
+      // изменение локальной копии достаточно. Обратная запись в Google
+      // недоступна без серверного refresh-токена; при его появлении
+      // реализация добавляется здесь.
+      debugPrint('Google Calendar: локальное обновление "$title" ($eventId)');
+    } catch (e) {
+      debugPrint('Google Calendar: ошибка обратной записи: $e');
+    }
   }
 }
 

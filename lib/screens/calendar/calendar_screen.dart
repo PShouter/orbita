@@ -967,6 +967,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
+  void _openEventForEdit(
+    Map<String, dynamic> ev,
+    AppColorsExtension colors,
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateEventScreen(
+          isDarkMode: colors.isDark,
+          initialDate: ev['date'] as DateTime? ?? _selectedDate,
+          eventToEdit: ev,
+        ),
+      ),
+    );
+  }
+
   void _openAddMenu(AppColorsExtension colors) {
     final templates = ref.read(eventTemplatesProvider);
 
@@ -1279,15 +1295,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       ),
                       ...dayEvents.map((ev) {
                         final c = ev['color'] as Color? ?? colors.accent;
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: colors.card,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: colors.nested),
-                          ),
-                          child: Row(
+                        return GestureDetector(
+                          onTap: () => _openEventForEdit(ev, colors),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: colors.card,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: colors.nested),
+                            ),
+                            child: Row(
                             children: [
                               Container(
                                 width: 4,
@@ -1337,6 +1355,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                     .deleteEvent(ev['id'].toString()),
                               ),
                             ],
+                          ),
                           ),
                         );
                       }),
