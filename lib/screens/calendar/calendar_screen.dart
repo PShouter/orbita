@@ -29,7 +29,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   late final ScrollController _scrollController;
   CalendarViewType _currentView = CalendarViewType.month;
   bool _showWeekNumbers = false;
-  bool _isSyncingGoogle = false;
 
   static const int _initialWeekOffset = 520;
   late final DateTime _baseMonday;
@@ -58,17 +57,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       try {
         final hasSession = await GoogleCalendarService.instance.init();
         if (hasSession && mounted) {
-          setState(() => _isSyncingGoogle = true);
           await ref.read(calendarProvider.notifier).syncWithGoogleCalendar();
-          if (mounted) {
-            setState(() => _isSyncingGoogle = false);
-          }
         }
       } catch (e) {
         debugPrint('Ошибка автоматической фоновой синхронизации: $e');
-        if (mounted) {
-          setState(() => _isSyncingGoogle = false);
-        }
       }
     });
 
@@ -120,7 +112,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   Future<void> _handleGoogleSync(AppColorsExtension colors) async {
-    setState(() => _isSyncingGoogle = true);
     try {
       final count =
           await ref.read(calendarProvider.notifier).syncWithGoogleCalendar();
@@ -147,8 +138,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           backgroundColor: colors.error,
         ),
       );
-    } finally {
-      if (mounted) setState(() => _isSyncingGoogle = false);
     }
   }
 
@@ -183,11 +172,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             Column(
               children: [
                 _buildHeader(colors),
-                if (_isSyncingGoogle)
-                  LinearProgressIndicator(
-                    backgroundColor: Colors.transparent,
-                    valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
-                  ),
                 if (_currentView == CalendarViewType.month) ...[
                   _buildWeekHeader(colors),
                   Divider(height: 1, color: colors.nested),

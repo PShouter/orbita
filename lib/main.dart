@@ -49,7 +49,7 @@ import 'screens/habits/habits_screen.dart';
 import 'screens/diary/diary_screen.dart';
 import 'screens/vault/vault_screen.dart';
 import 'screens/settings/settings_screen.dart';
-import 'screens/settings/sections/theme_settings_screen.dart';
+
 import 'screens/gamification/orbital_station_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -125,7 +125,10 @@ class _OrbitaBootstrapState extends State<OrbitaBootstrap> {
   @override
   Widget build(BuildContext context) {
     if (_ready) return const OrbitaApp();
-    return const OrbitaSplashScreen();
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: OrbitaSplashScreen(),
+    );
   }
 }
 
@@ -681,7 +684,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     // 1. Главная
     navItems.add(
       BottomNavigationBarItem(
-        icon: _buildSvgNavIcon('assets/icons/home.svg', _navIndex == 0, colors),
+        icon: _buildSvgNavIcon(
+            'assets/icons/norm/home.svg',
+            _navIndex == 0,
+            colors,
+          ),
         label: 'Главная',
       ),
     );
@@ -701,7 +708,11 @@ class _MainShellState extends ConsumerState<MainShell> {
     // 3. Еще (открывает Drawer)
     navItems.add(
       BottomNavigationBarItem(
-        icon: _buildSvgNavIcon('assets/icons/more.svg', false, colors),
+        icon: _buildSvgNavIcon(
+            'assets/icons/norm/more.svg',
+            false,
+            colors,
+          ),
         label: 'Еще',
       ),
     );
@@ -725,28 +736,21 @@ class _MainShellState extends ConsumerState<MainShell> {
           ),
         ),
         actions: [
-          // 3-й справа налево: Переключатель темы
-          IconButton(
-            tooltip: 'Оформление',
-            icon: Icon(Icons.palette_outlined, color: colors.text, size: 22),
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ThemeSettingsScreen()),
-              );
-            },
-          ),
-
           // 2-й справа налево: Уведомления
           Builder(
             builder: (btnContext) {
               return IconButton(
                 tooltip: 'Уведомления',
-                icon: Icon(
-                  Icons.notifications_none_outlined,
-                  color: colors.text,
-                  size: 22,
+                icon: SvgPicture.asset(
+                  'assets/icons/norm/Notification.svg',
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(colors.text, BlendMode.srcIn),
+                  placeholderBuilder: (_) => Icon(
+                    Icons.notifications_none_outlined,
+                    color: colors.text,
+                    size: 22,
+                  ),
                 ),
                 onPressed: () {
                   HapticFeedback.lightImpact();
@@ -777,7 +781,15 @@ class _MainShellState extends ConsumerState<MainShell> {
                     : CircleAvatar(
                         radius: 17,
                         backgroundColor: colors.accent.withValues(alpha: 0.2),
-                        child: Icon(Icons.person, size: 20, color: colors.text),
+                        child: SvgPicture.asset(
+                          'assets/icons/norm/profile.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter:
+                              ColorFilter.mode(colors.text, BlendMode.srcIn),
+                          placeholderBuilder: (_) =>
+                              Icon(Icons.person, size: 20, color: colors.text),
+                        ),
                       ),
               ),
             ),
@@ -865,7 +877,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                               ),
                             )
                           : SvgPicture.asset(
-                              'assets/icons/avatar.svg',
+                              'assets/icons/norm/profile.svg',
                               width: 52,
                               height: 52,
                               colorFilter: ColorFilter.mode(
@@ -933,7 +945,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                   // 1. Профиль
                   ListTile(
                     leading: buildDrawerIcon(
-                      'assets/icons/avatar.svg',
+                      'assets/icons/norm/profile.svg',
                       Icons.person_outline,
                     ),
                     title: Text(
@@ -981,7 +993,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                   // 3. Друзья
                   ListTile(
                     leading: buildDrawerIcon(
-                      'assets/icons/friends.svg',
+                      'assets/icons/svg-icons/profiles-and-users-filled/users-profiles-01.svg',
                       Icons.people_outline,
                     ),
                     title: Text(
@@ -1008,10 +1020,9 @@ class _MainShellState extends ConsumerState<MainShell> {
 
                   // 4. Сообщения
                   ListTile(
-                    leading: const Icon(
+                    leading: buildDrawerIcon(
+                      'assets/icons/norm/message.svg',
                       Icons.chat_bubble_outline_rounded,
-                      color: Colors.grey,
-                      size: 22,
                     ),
                     title: Row(
                       children: [
@@ -1092,7 +1103,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                   // 13. Настройки
                   ListTile(
                     leading: buildDrawerIcon(
-                      'assets/icons/settings.svg',
+                      'assets/icons/norm/settings.svg',
                       Icons.settings_outlined,
                     ),
                     title: Text(
@@ -1134,7 +1145,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Demo 0.4.1',
+                    'Версия: Demo 0.4.2',
                     style: TextStyle(
                       fontFamily: 'Onest',
                       color: colors.text.withValues(alpha: 0.5),

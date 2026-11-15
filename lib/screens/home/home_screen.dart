@@ -62,6 +62,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  static const List<String> _weekdays = [
+    'Понедельник',
+    'Вторник',
+    'Среда',
+    'Четверг',
+    'Пятница',
+    'Суббота',
+    'Воскресенье',
+  ];
+
+  static const List<String> _months = [
+    'января',
+    'февраля',
+    'марта',
+    'апреля',
+    'мая',
+    'июня',
+    'июля',
+    'августа',
+    'сентября',
+    'октября',
+    'ноября',
+    'декабря',
+  ];
+
+  String _formatToday() {
+    final now = DateTime.now();
+    final weekday =
+        _weekdays[now.weekday - DateTime.monday]; // weekday: 1..7
+    final month = _months[now.month - 1];
+    return '$weekday, ${now.day} $month';
+  }
+
   Widget _buildShiftBadge(ShiftType? todayShift, AppColorsExtension colors) {
     if (todayShift == null) return const SizedBox.shrink();
 
@@ -403,6 +436,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
+                  Text(
+                    _formatToday(),
+                    style: TextStyle(
+                      fontFamily: 'Onest',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: colors.text.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
                   Text(
                     'Дней с Орбитой: ${daysWithOrbita}',
                     style: TextStyle(
@@ -876,20 +919,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 'Свободно: ${freeMoney.toStringAsFixed(0)} ₽',
                 style: TextStyle(
                   fontFamily: 'Unbounded',
-                  fontSize: 18,
+                  fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color:
                       freeMoney >= 0 ? colors.accent : colors.error,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Text(
                     'На счетах: ${totalAccountsBalance.toStringAsFixed(0)} ₽',
                     style: TextStyle(
                       fontFamily: 'Onest',
-                      fontSize: 12,
+                      fontSize: 14,
                       color: colors.text.withValues(alpha: 0.6),
                       fontWeight: FontWeight.w500,
                     ),
@@ -899,7 +942,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     'В день: ~${dailySafeLimit.toStringAsFixed(0)} ₽',
                     style: TextStyle(
                       fontFamily: 'Onest',
-                      fontSize: 12,
+                      fontSize: 14,
                       color: colors.warning,
                       fontWeight: FontWeight.w600,
                     ),

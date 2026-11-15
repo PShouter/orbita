@@ -121,7 +121,8 @@ class _FriendsScreenState extends State<FriendsScreen>
       final data = await _supabase
           .from('friendships')
           .select('id, user_id, friend_id, status, created_at')
-          .or('user_id.eq.$uid,friend_id.eq.$uid');
+          .or('user_id.eq.$uid,friend_id.eq.$uid')
+          .timeout(const Duration(seconds: 12));
 
       final List accepted = [];
       final List incoming = [];
@@ -152,7 +153,8 @@ class _FriendsScreenState extends State<FriendsScreen>
         final profilesData = await _supabase
             .from('profiles')
             .select('id, full_name, username')
-            .filter('id', 'in', profileIdsToFetch.toList());
+            .filter('id', 'in', profileIdsToFetch.toList())
+            .timeout(const Duration(seconds: 12));
 
         for (final p in (profilesData as List)) {
           profilesMap[p['id'] as String] = Map<String, dynamic>.from(p);

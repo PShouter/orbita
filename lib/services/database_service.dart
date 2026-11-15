@@ -27,9 +27,11 @@ class DatabaseService {
   }
 
   Future<void> _configureDB(Database db) async {
-    await db.execute('PRAGMA journal_mode=WAL');
-    await db.execute('PRAGMA synchronous=NORMAL');
-    await db.execute('PRAGMA temp_store=MEMORY');
+    // PRAGMA-запросы возвращают строку результата, поэтому выполняются
+    // через rawQuery: execute() на Android для них падает с DatabaseException.
+    await db.rawQuery('PRAGMA journal_mode=WAL');
+    await db.rawQuery('PRAGMA synchronous=NORMAL');
+    await db.rawQuery('PRAGMA temp_store=MEMORY');
   }
 
   Future<void> _createDB(Database db, int version) async {
