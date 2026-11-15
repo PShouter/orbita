@@ -58,7 +58,42 @@ class UserCalendarsNotifier extends Notifier<List<UserCalendar>> {
   }
 
   Future<void> loadCalendars() async {
-    // При необходимости можно подгружать кастомные списки календарей из локальной БД
+    try {
+      final db = await DatabaseService.instance.database;
+      final rows = await db.query('user_calendars');
+      final googleCals = rows.map((r) {
+        final m = Map<String, dynamic>.from(r);
+        return UserCalendar(
+          id: m['id'] as String,
+          title: m['title'] as String,
+          color: Color((m['color'] as int?) ?? 0xFF2C69D1),
+          isVisible: (m['is_visible'] as int? ?? 1) == 1,
+          accountType: m['account_type'] as String? ?? 'local',
+        );
+      }).toList();
+
+      final defaults = const [
+        UserCalendar(
+          id: 'cal_main',
+          title: 'Основной',
+          color: Color(0xFF2C69D1),
+        ),
+        UserCalendar(
+          id: 'cal_work',
+          title: 'Работа',
+          color: Color(0xFFF97316),
+        ),
+        UserCalendar(
+          id: 'cal_shifts',
+          title: 'Смены',
+          color: Color(0xFF10B981),
+        ),
+      ];
+
+      state = [...defaults, ...googleCals];
+    } catch (e) {
+      debugPrint('Ошибка загрузки списка календарей: $e');
+    }
   }
 
   void toggleVisibility(String id) {
@@ -281,7 +316,33 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
       final db = await DatabaseService.instance.database;
       int importedCount = 0;
 
-      for (final ev in events) {
+      // Карта созданных календарей приложения под каждый Google-календарь.
+      final existingCalendars =
+          (await db.query('user_calendars')).map((r) => Map<String, dynamic>.from(r)).toList();
+      final googleCalTitles = <String,String>{};
+      for (final ge in events) {
+        googleCalTitles[ge.calendarId] = ge.calendarTitle;
+      }
+      for (final entry in googleCalTitles.entries) {
+        final exists = existingCalendars.any((c) => c['title'] == entry.value && c['account_type'] == 'google');
+        if (!exists) {
+          await db.insert('user_calendars', {
+            'id': 'gcal_${_uuid.v4()}',
+            'user_id': null,
+            'title': entry.value,
+            'color': events.firstWhere((e) => e.calendarId == entry.key).colorArgb,
+            'is_visible': 1,
+            'account_type': 'google',
+            'is_synced': 0,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        }
+      }
+
+      for (final ge in events) {
+        final ev = ge.event;
+        final calTitle = ge.calendarTitle;
+        final calColor = ge.colorArgb;
         final title = ev.summary ?? 'Без названия';
 
         DateTime? startDt;
@@ -326,8 +387,8 @@ class CalendarNotifier extends Notifier<List<Map<String, dynamic>>> {
           'start_time': startTime,
           'end_time': endTime,
           'is_all_day': isAllDay ? 1 : 0,
-          'calendar': 'Google',
-          'color': const Color(0xFF4285F4).toARGB32(),
+          'calendar': calTitle,
+          'color': calColor,
           'location': ev.location,
           'description': ev.description,
           'reminder_minutes': -1,

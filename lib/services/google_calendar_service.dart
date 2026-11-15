@@ -120,21 +120,36 @@ class GoogleCalendarService {
     }
   }
 
-  /// Сквозная выгрузка всех событий из ВСЕХ доступных календарей аккаунта
-  Future<List<gcal.Event>> fetchAllEventsFromAllCalendars({
+  /// Сквозная выгрузка событий со всех доступных календарей аккаунта,
+  /// с сохранением привязки события к его календарю.
+  Future<List<GCalEvent>> fetchAllEventsFromAllCalendars({
     required DateTime timeMin,
     required DateTime timeMax,
   }) async {
     final calendars = await fetchUserCalendars();
-    final List<gcal.Event> allEvents = [];
+    final List<GCalEvent> result = [];
     final Set<String> processedEventIds = {};
 
     if (calendars.isEmpty) {
-      return fetchEvents(
+      final events = await fetchEvents(
         calendarId: 'primary',
         timeMin: timeMin,
         timeMax: timeMax,
       );
+      for (final ev in events) {
+        final evId =
+            ev.id ?? '${ev.summary}_${ev.start?.dateTime ?? ev.start?.date}';
+        result.add(
+          GCalEvent(
+            event: ev,
+            calendarId: 'primary',
+            calendarTitle: 'Google',
+            colorArgb: 0xFF4285F4,
+          ),
+        );
+        processedEventIds.add(evId);
+      }
+      return result;
     }
 
     for (final cal in calendars) {
@@ -150,16 +165,48 @@ class GoogleCalendarService {
       for (final ev in events) {
         final evId =
             ev.id ?? '${ev.summary}_${ev.start?.dateTime ?? ev.start?.date}';
-        if (!processedEventIds.contains(evId)) {
-          processedEventIds.add(evId);
-          allEvents.add(ev);
-        }
+        if (processedEventIds.contains(evId)) continue;
+        processedEventIds.add(evId);
+        result.add(
+          GCalEvent(
+            event: ev,
+            calendarId: calId,
+            calendarTitle: cal.summaryOverride ?? cal.summary ?? 'Google',
+            colorArgb: _parseHexColor(cal.backgroundColor),
+          ),
+        );
       }
     }
 
     debugPrint(
-      'Google Calendar: всего собрано уникальных событий со всех календарей: ${allEvents.length}',
+      'Google Calendar: всего собрано уникальных событий со всех календарей: ${result.length}',
     );
-    return allEvents;
+    return result;
   }
+
+  /// Преобразует hex-строку (#RRGGBB / #AARRGGBB) в ARGB int.
+  static int _parseHexColor(String? hex) {
+    if (hex == null || hex.isEmpty) return 0xFF4285F4;
+    var cleaned = hex.replaceFirst('#', '');
+    if (cleaned.length == 3) {
+      cleaned = '${cleaned[0]}${cleaned[0]}${cleaned[1]}${cleaned[1]}${cleaned[2]}${cleaned[2]}';
+    }
+    if (cleaned.length != 6) return 0xFF4285F4;
+    return int.parse('FF$cleaned', radix: 16);
+  }
+}
+
+/// Событие Google вместе с календарём, из которого оно пришло.
+class GCalEvent {
+  final gcal.Event event;
+  final String calendarId;
+  final String calendarTitle;
+  final int colorArgb;
+
+  GCalEvent({
+    required this.event,
+    required this.calendarId,
+    required this.calendarTitle,
+    this.colorArgb = 0xFF4285F4,
+  });
 }
