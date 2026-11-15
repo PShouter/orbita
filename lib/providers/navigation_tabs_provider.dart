@@ -60,13 +60,13 @@ const List<AppTabMeta> kAllAvailableTabs = [
   AppTabMeta(
     key: AppTabKey.diary,
     title: 'Дневник',
-    assetIcon: 'assets/icons/svg-icons/education-filled/book-01.svg',
+    assetIcon: 'assets/icons/norm/Diary.svg',
     fallbackIconName: 'book',
   ),
   AppTabMeta(
     key: AppTabKey.shifts,
     title: 'График смен',
-    assetIcon: 'assets/icons/svg-icons/finance-outline/bag-01.svg',
+    assetIcon: 'assets/icons/norm/bag.svg',
     fallbackIconName: 'work',
   ),
   AppTabMeta(
@@ -84,7 +84,7 @@ const List<AppTabMeta> kAllAvailableTabs = [
   AppTabMeta(
     key: AppTabKey.station,
     title: 'Орбитальная станция',
-    assetIcon: 'assets/icons/rocket.svg',
+    assetIcon: 'assets/icons/norm/orbital.svg',
     fallbackIconName: 'radar',
   ),
 ];
