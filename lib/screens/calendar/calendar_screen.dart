@@ -701,17 +701,26 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       Duration(days: _selectedDate.weekday - 1),
     );
 
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-          color: colors.card,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(7, (i) {
-              final d = startOfWeek.add(Duration(days: i));
-              final isSel = d.year == _selectedDate.year &&
-                  d.month == _selectedDate.month &&
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -200) {
+          setState(() => _selectedDate = _selectedDate.add(const Duration(days: 7)));
+        } else if (velocity > 200) {
+          setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 7)));
+        }
+      },
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+            color: colors.card,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(7, (i) {
+                final d = startOfWeek.add(Duration(days: i));
+                final isSel = d.year == _selectedDate.year &&
+                    d.month == _selectedDate.month &&
                   d.day == _selectedDate.day;
               final now = DateTime.now();
               final isToday = d.year == now.year &&
@@ -777,6 +786,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           child: _buildDayView(events, tasks, colors),
         ),
       ],
+      ),
     );
   }
 
@@ -1202,7 +1212,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           td.day == _selectedDate.day;
     }).toList();
 
-    return Column(
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -200) {
+          setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1)));
+        } else if (velocity > 200) {
+          setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)));
+        }
+      },
+      child: Column(
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1409,6 +1428,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
         ),
       ],
+      ),
     );
   }
 
