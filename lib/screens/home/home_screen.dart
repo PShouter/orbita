@@ -919,20 +919,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 'Свободно: ${freeMoney.toStringAsFixed(0)} ₽',
                 style: TextStyle(
                   fontFamily: 'Unbounded',
-                  fontSize: 22,
+                  fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color:
                       freeMoney >= 0 ? colors.accent : colors.error,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Text(
                     'На счетах: ${totalAccountsBalance.toStringAsFixed(0)} ₽',
                     style: TextStyle(
                       fontFamily: 'Onest',
-                      fontSize: 14,
+                      fontSize: 12,
                       color: colors.text.withValues(alpha: 0.6),
                       fontWeight: FontWeight.w500,
                     ),
@@ -942,7 +942,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     'В день: ~${dailySafeLimit.toStringAsFixed(0)} ₽',
                     style: TextStyle(
                       fontFamily: 'Onest',
-                      fontSize: 14,
+                      fontSize: 12,
                       color: colors.warning,
                       fontWeight: FontWeight.w600,
                     ),
