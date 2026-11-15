@@ -37,9 +37,11 @@ class _FriendsScreenState extends State<FriendsScreen>
   List<JsonMap> _incomingRequests = [];
   List<JsonMap> _outgoingRequests = [];
   bool _isLoading = true;
+  bool _loadFailed = false;
 
   String? _myInviteCode;
   RealtimeChannel? _friendshipsSubscription;
+  RealtimeChannel? _cheersSubscription;
 
   @override
   void initState() {
@@ -47,11 +49,13 @@ class _FriendsScreenState extends State<FriendsScreen>
     _tabController = TabController(length: 2, vsync: this);
     _loadMyProfileAndFriends();
     _setupRealtimeSubscription();
+    _setupCheersSubscription();
   }
 
   @override
   void dispose() {
     _friendshipsSubscription?.unsubscribe();
+    _cheersSubscription?.unsubscribe();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -101,6 +105,45 @@ class _FriendsScreenState extends State<FriendsScreen>
         .subscribe();
   }
 
+  void _setupCheersSubscription() {
+    final uid = _currentUserId;
+    if (uid == null) return;
+
+    _cheersSubscription = _supabase
+        .channel('public:friend_cheers_user_$uid')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'friend_cheers',
+          callback: (payload) async {
+            final newRecord = payload.newRecord;
+            final toUserId = newRecord['to_user_id'];
+            final fromUserId = newRecord['from_user_id'];
+            if (toUserId != uid || fromUserId == null) return;
+
+            String giverName = 'Твой друг';
+            try {
+              final prof = await _supabase
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('id', fromUserId)
+                  .maybeSingle();
+              if (prof != null && prof['full_name'] != null) {
+                giverName = prof['full_name'] as String;
+              }
+            } catch (_) {}
+
+            NotificationService.instance.showNotification(
+              id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+              title: 'Поддержка! 🙌',
+              body: '$giverName поддержал тебя! Так держать!',
+              payload: 'screen_friends',
+            );
+          },
+        )
+        .subscribe();
+  }
+
   Future<void> _loadMyProfileAndFriends({bool showLoading = true}) async {
     final uid = _currentUserId;
     if (uid == null) {
@@ -109,7 +152,10 @@ class _FriendsScreenState extends State<FriendsScreen>
     }
 
     if (showLoading && mounted) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _loadFailed = false;
+      });
     }
 
     try {
@@ -152,7 +198,7 @@ class _FriendsScreenState extends State<FriendsScreen>
       if (profileIdsToFetch.isNotEmpty) {
         final profilesData = await _supabase
             .from('profiles')
-            .select('id, full_name, username')
+            .select('id, full_name, username, avatar_url')
             .filter('id', 'in', profileIdsToFetch.toList())
             .timeout(const Duration(seconds: 12));
 
@@ -170,6 +216,8 @@ class _FriendsScreenState extends State<FriendsScreen>
           'userId': otherId,
           'name': prof['full_name'] ?? prof['username'] ?? 'Пользователь',
           'username': prof['username'] ?? 'user',
+          'avatarUrl': prof['avatar_url'] as String?,
+          'friendSince': item['created_at'],
         };
       }).toList();
 
@@ -181,6 +229,7 @@ class _FriendsScreenState extends State<FriendsScreen>
           'userId': otherId,
           'name': prof['full_name'] ?? prof['username'] ?? 'Пользователь',
           'username': prof['username'] ?? 'user',
+          'avatarUrl': prof['avatar_url'] as String?,
         };
       }).toList();
 
@@ -192,10 +241,12 @@ class _FriendsScreenState extends State<FriendsScreen>
           'userId': otherId,
           'name': prof['full_name'] ?? prof['username'] ?? 'Пользователь',
           'username': prof['username'] ?? 'user',
+          'avatarUrl': prof['avatar_url'] as String?,
         };
       }).toList();
     } catch (e) {
       debugPrint('Ошибка загрузки списка друзей: $e');
+      if (mounted) setState(() => _loadFailed = true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -325,6 +376,79 @@ class _FriendsScreenState extends State<FriendsScreen>
     );
   }
 
+  Widget _buildLoadError(
+    BuildContext context,
+    Color textPrimary,
+    Color textSecondary,
+    Color cardBg,
+    bool isDark,
+  ) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.wifi_off_rounded,
+                color: Color(0xFFC4B5FD),
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Не удалось загрузить друзей',
+              style: TextStyle(
+                color: textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Проверьте интернет. Если включён частный DNS — попробуйте отключить его или сменить сервер.',
+              style: TextStyle(
+                color: textSecondary,
+                fontSize: 12,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              onPressed: () =>
+                  _loadMyProfileAndFriends(showLoading: true),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text(
+                'Повторить',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _openFriendProfile(JsonMap friend) {
     Navigator.push(
       context,
@@ -335,6 +459,8 @@ class _FriendsScreenState extends State<FriendsScreen>
           friendUserId: friend['userId'],
           friendName: friend['name'],
           friendUsername: friend['username'],
+          friendAvatarUrl: friend['avatarUrl'] as String?,
+          friendSince: friend['friendSince'] as String?,
           onFriendRemoved: _loadMyProfileAndFriends,
         ),
       ),
@@ -612,16 +738,21 @@ class _FriendsScreenState extends State<FriendsScreen>
                     leading: CircleAvatar(
                       radius: 16,
                       backgroundColor: const Color(0xFF7C3AED),
-                      child: Text(
-                        user.displayName.isNotEmpty
-                            ? user.displayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
+                      backgroundImage: (user.avatarUrl.isNotEmpty)
+                          ? NetworkImage(user.avatarUrl)
+                          : null,
+                      child: user.avatarUrl.isNotEmpty
+                          ? null
+                          : Text(
+                              user.displayName.isNotEmpty
+                                  ? user.displayName[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
                     ),
                     title: Text(
                       user.displayName,
@@ -644,7 +775,9 @@ class _FriendsScreenState extends State<FriendsScreen>
                 ? const Center(
                     child: CircularProgressIndicator(color: Color(0xFF8B5CF6)),
                   )
-                : TabBarView(
+                : _loadFailed
+                    ? _buildLoadError(context, textPrimary, textSecondary, cardBg, isDark)
+                    : TabBarView(
                     controller: _tabController,
                     children: [
                       // Вкладка 1: Принятые друзья
@@ -703,16 +836,30 @@ class _FriendsScreenState extends State<FriendsScreen>
                                           backgroundColor: const Color(
                                             0xFF1E293B,
                                           ),
-                                          child: Text(
-                                            f['name'].isNotEmpty
-                                                ? f['name'][0].toUpperCase()
-                                                : '?',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
+                                          backgroundImage:
+                                              (f['avatarUrl'] != null &&
+                                                      (f['avatarUrl'] as String)
+                                                          .isNotEmpty)
+                                                  ? NetworkImage(
+                                                      f['avatarUrl'] as String,
+                                                    )
+                                                  : null,
+                                          child: (f['avatarUrl'] == null ||
+                                                  (f['avatarUrl'] as String)
+                                                      .isEmpty)
+                                              ? Text(
+                                                  f['name'].isNotEmpty
+                                                      ? f['name'][0]
+                                                          .toUpperCase()
+                                                      : '?',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight:
+                                                        FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                )
+                                              : null,
                                         ),
                                         const SizedBox(width: 14),
                                         Expanded(
@@ -814,11 +961,23 @@ class _FriendsScreenState extends State<FriendsScreen>
                                     CircleAvatar(
                                       backgroundColor: const Color(0xFF8B5CF6)
                                           .withValues(alpha: 0.2),
-                                      child: const Icon(
-                                        Icons.person_add,
-                                        color: Color(0xFF8B5CF6),
-                                        size: 18,
-                                      ),
+                                      backgroundImage:
+                                          (req['avatarUrl'] != null &&
+                                                  (req['avatarUrl'] as String)
+                                                      .isNotEmpty)
+                                              ? NetworkImage(
+                                                  req['avatarUrl'] as String,
+                                                )
+                                              : null,
+                                      child: (req['avatarUrl'] == null ||
+                                              (req['avatarUrl'] as String)
+                                                  .isEmpty)
+                                          ? const Icon(
+                                              Icons.person_add,
+                                              color: Color(0xFF8B5CF6),
+                                              size: 18,
+                                            )
+                                          : null,
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(

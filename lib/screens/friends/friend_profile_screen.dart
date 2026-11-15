@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 class FriendProfileScreen extends StatefulWidget {
   final bool isDarkMode;
@@ -10,6 +11,8 @@ class FriendProfileScreen extends StatefulWidget {
   final String friendUserId;
   final String friendName;
   final String friendUsername;
+  final String? friendAvatarUrl;
+  final String? friendSince;
   final VoidCallback onFriendRemoved;
 
   const FriendProfileScreen({
@@ -19,6 +22,8 @@ class FriendProfileScreen extends StatefulWidget {
     required this.friendUserId,
     required this.friendName,
     required this.friendUsername,
+    this.friendAvatarUrl,
+    this.friendSince,
     required this.onFriendRemoved,
   });
 
@@ -27,14 +32,31 @@ class FriendProfileScreen extends StatefulWidget {
 }
 
 class _FriendProfileScreenState extends State<FriendProfileScreen> {
+  static const _uuid = Uuid();
   final SupabaseClient _supabase = Supabase.instance.client;
   int _cheersCount = 0;
   bool _canCheerToday = true;
+  late int _friendshipDays;
 
   @override
   void initState() {
     super.initState();
+    _friendshipDays = _calcFriendshipDays();
     _loadCheerState();
+  }
+
+  int _calcFriendshipDays() {
+    final sinceStr = widget.friendSince;
+    if (sinceStr == null || sinceStr.isEmpty) return 0;
+
+    final since = DateTime.tryParse(sinceStr);
+    if (since == null) return 0;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(since.year, since.month, since.day);
+    final diff = today.difference(day).inDays;
+    return diff >= 0 ? diff + 1 : 1;
   }
 
   Future<void> _loadCheerState() async {
@@ -76,6 +98,9 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
       _canCheerToday = false;
     });
 
+    // Уведомить друга о поддержке через realtime-запись в таблицу friend_cheers
+    _notifyFriendOfCheer();
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -84,6 +109,22 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           duration: const Duration(seconds: 2),
         ),
       );
+    }
+  }
+
+  Future<void> _notifyFriendOfCheer() async {
+    try {
+      final me = _supabase.auth.currentUser;
+      if (me == null) return;
+
+      await _supabase.from('friend_cheers').insert({
+        'id': _uuid.v4(),
+        'from_user_id': me.id,
+        'to_user_id': widget.friendUserId,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Ошибка отправки уведомления о поддержке: $e');
     }
   }
 
@@ -242,16 +283,23 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                   child: CircleAvatar(
                     radius: 30,
                     backgroundColor: const Color(0xFF1E293B),
-                    child: Text(
-                      widget.friendName.isNotEmpty
-                          ? widget.friendName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    backgroundImage: (widget.friendAvatarUrl != null &&
+                            widget.friendAvatarUrl!.isNotEmpty)
+                        ? NetworkImage(widget.friendAvatarUrl!)
+                        : null,
+                    child: widget.friendAvatarUrl == null ||
+                            widget.friendAvatarUrl!.isEmpty
+                        ? Text(
+                            widget.friendName.isNotEmpty
+                                ? widget.friendName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -325,7 +373,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
           Row(
             children: [
               _buildCounterTile(
-                '0',
+                '$_friendshipDays',
                 'Дней в орбите',
                 const Color(0xFF06B6D4),
                 cardBg,

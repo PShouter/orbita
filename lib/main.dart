@@ -1145,7 +1145,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Demo 0.4.2',
+                    'Версия: Demo 0.4.3',
                     style: TextStyle(
                       fontFamily: 'Onest',
                       color: colors.text.withValues(alpha: 0.5),

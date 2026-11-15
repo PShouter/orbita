@@ -41,6 +41,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController _usernameController;
   String? _avatarPath;
   bool _isSaving = false;
+  bool _avatarUploading = false;
+  int _cheersFromFriends = 0;
+  bool _cheersLoading = true;
 
   @override
   void initState() {
@@ -48,6 +51,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     _nameController = TextEditingController(text: widget.userName);
     _usernameController = TextEditingController(text: widget.customUsername);
     _avatarPath = widget.userAvatarPath;
+    _loadCheersFromFriends();
+  }
+
+  Future<void> _loadCheersFromFriends() async {
+    try {
+      final me = Supabase.instance.client.auth.currentUser;
+      if (me == null) {
+        if (mounted) setState(() => _cheersLoading = false);
+        return;
+      }
+      final res = await Supabase.instance.client
+          .from('friend_cheers')
+          .select('id')
+          .eq('to_user_id', me.id);
+      final count = (res as List).length;
+      if (mounted) {
+        setState(() {
+          _cheersFromFriends = count;
+          _cheersLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Ошибка загрузки поддержек: $e');
+      if (mounted) setState(() => _cheersLoading = false);
+    }
   }
 
   @override
@@ -68,7 +96,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (pickedFile != null) {
       setState(() {
         _avatarPath = pickedFile.path;
+        _avatarUploading = true;
       });
+      await _uploadAvatarToCloud(pickedFile.path);
+      setState(() => _avatarUploading = false);
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_avatar_path', pickedFile.path);
       widget.onProfileUpdated(
@@ -76,6 +108,41 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _usernameController.text.trim(),
         _avatarPath,
       );
+    }
+  }
+
+  Future<void> _uploadAvatarToCloud(String path) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final file = File(path);
+      if (!file.existsSync()) return;
+
+      final bytes = await file.readAsBytes();
+      final ext = path.split('.').last.toLowerCase().replaceAll(RegExp(r'[^\w]'), '');
+      final safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'].contains(ext)
+          ? ext
+          : 'png';
+
+      final objectPath = '${user.id}.$safeExt';
+      await Supabase.instance.client.storage.from('avatars').uploadBinary(
+            objectPath,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      final publicUrl = Supabase.instance.client.storage
+          .from('avatars')
+          .getPublicUrl(objectPath);
+
+      await Supabase.instance.client.from('profiles').upsert({
+        'id': user.id,
+        'avatar_url': publicUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Ошибка загрузки аватара в облако: $e');
     }
   }
 
@@ -307,7 +374,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       bottom: 0,
                       right: 0,
                       child: InkWell(
-                        onTap: _pickAvatar,
+                        onTap: _avatarUploading ? null : _pickAvatar,
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
                           padding: const EdgeInsets.all(8),
@@ -316,11 +383,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             shape: BoxShape.circle,
                             border: Border.all(color: colors.bg, width: 2),
                           ),
-                          child: Icon(
-                            Icons.camera_alt,
-                            color: colors.isDark ? Colors.black : Colors.white,
-                            size: 18,
-                          ),
+                          child: _avatarUploading
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colors.isDark
+                                        ? Colors.black
+                                        : Colors.white,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.camera_alt,
+                                  color: colors.isDark
+                                      ? Colors.black
+                                      : Colors.white,
+                                  size: 18,
+                                ),
                         ),
                       ),
                     ),
@@ -418,6 +498,75 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colors.card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.nested),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '🙌',
+                      style: TextStyle(fontSize: 22),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _cheersLoading
+                            ? 'Поддержки от друзей'
+                            : 'Поддержки от друзей: $_cheersFromFriends',
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: colors.text,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _cheersLoading
+                            ? 'Загрузка…'
+                            : (_cheersFromFriends == 0
+                                ? 'Друзья ещё не поддержали вас. Поддержите их первыми!'
+                                : 'Так держать! Друзья рядом с вами 🚀'),
+                        style: TextStyle(
+                          fontFamily: 'Onest',
+                          fontSize: 12,
+                          color: colors.text.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!_cheersLoading && _cheersFromFriends > 0)
+                  Text(
+                    '$_cheersFromFriends',
+                    style: TextStyle(
+                      fontFamily: 'Unbounded',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFF59E0B),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(

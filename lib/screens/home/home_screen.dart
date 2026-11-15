@@ -11,6 +11,7 @@ import '../../providers/habits_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/shift_provider.dart';
 import '../../providers/tasks_provider.dart';
+import '../../data/motivation_quotes.dart';
 import '../../theme/app_theme.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -36,19 +37,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late String _randomQuote;
 
-  static const List<String> _quotes = [
-    'Фокусируйся на процессе сегодня, и результат не заставит себя ждать.',
-    'Маленькие шаги каждый день приводят к большим целям.',
-    'Порядок в мыслях начинается с порядка в планах.',
-    'Дисциплина — это мост между целями и достижениями.',
-    'Каждый новый день — это чистый лист на твоей Орбите.',
-    'Секрет продуктивности — не делать больше, а убирать лишнее.',
-  ];
-
   @override
   void initState() {
     super.initState();
-    _randomQuote = _quotes[Random().nextInt(_quotes.length)];
+    _randomQuote = kMotivationQuotes[Random().nextInt(kMotivationQuotes.length)];
   }
 
   Widget _buildSvgIcon(String path, {double size = 18, Color? color}) {

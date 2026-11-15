@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -29,6 +30,36 @@ const List<DiaryMood> defaultMoods = [
   DiaryMood(id: 'love', emoji: '🥰', label: 'Влюблен'),
   DiaryMood(id: 'anxious', emoji: '😰', label: 'Тревожно'),
 ];
+
+const List<DiaryMood> minimalMoods = [
+  DiaryMood(id: 'great', emoji: '😀', label: 'Отлично'),
+  DiaryMood(id: 'good', emoji: '🙂', label: 'Хорошо'),
+  DiaryMood(id: 'neutral', emoji: '😶', label: 'Нормально'),
+  DiaryMood(id: 'tired', emoji: '😴', label: 'Устал'),
+  DiaryMood(id: 'sad', emoji: '😢', label: 'Грустно'),
+  DiaryMood(id: 'angry', emoji: '😠', label: 'Злость'),
+];
+
+const List<DiaryMood> vividMoods = [
+  DiaryMood(id: 'great', emoji: '🤩', label: 'Восторг'),
+  DiaryMood(id: 'good', emoji: '😃', label: 'Отлично'),
+  DiaryMood(id: 'neutral', emoji: '😌', label: 'Спокойно'),
+  DiaryMood(id: 'tired', emoji: '😪', label: 'Устал'),
+  DiaryMood(id: 'sad', emoji: '😭', label: 'Грустно'),
+  DiaryMood(id: 'angry', emoji: '😤', label: 'Злость'),
+  DiaryMood(id: 'love', emoji: '😍', label: 'Влюблен'),
+  DiaryMood(id: 'anxious', emoji: '😨', label: 'Тревожно'),
+];
+
+const Map<String, List<DiaryMood>> diaryMoodStyles = {
+  'classic': defaultMoods,
+  'minimal': minimalMoods,
+  'vivid': vividMoods,
+};
+
+List<DiaryMood> getDiaryMoodStyle(String styleId) {
+  return diaryMoodStyles[styleId] ?? defaultMoods;
+}
 
 class DiaryItem {
   final String id;
@@ -286,19 +317,28 @@ class DiaryNotifier extends Notifier<List<DiaryItem>> {
     }
   }
 
-  void _checkTodayDiaryNotification(List<DiaryItem> items) {
+  Future<void> _checkTodayDiaryNotification(List<DiaryItem> items) async {
     final now = DateTime.now();
     final hasEntryToday = items.any(
       (d) => !d.isDraft && _isSameDay(d.date, now),
     );
 
     if (!hasEntryToday) {
-      NotificationService.instance.scheduleDailyNotification(
+      final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('diary_reminder_enabled') ?? true;
+      if (!enabled) return;
+
+      final timeStr = prefs.getString('diary_reminder_time') ?? '21:00';
+      final parts = timeStr.split(':');
+      final hour = int.tryParse(parts[0]) ?? 21;
+      final minute = int.tryParse(parts[1]) ?? 0;
+
+      await NotificationService.instance.scheduleDailyNotification(
         id: _diaryNotificationId,
         title: 'Дневник Орбиты',
         body: 'Как прошел твой день? Зафиксируй важные мысли и события.',
-        hour: 21,
-        minute: 30,
+        hour: hour,
+        minute: minute,
         payload: 'screen_diary',
       );
     }

@@ -20,6 +20,7 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
   bool _eveningReminder = true;
   TimeOfDay _reminderTime = const TimeOfDay(hour: 21, minute: 0);
   String _soundTitle = 'По умолчанию (системный)';
+  String _moodStyle = 'classic';
 
   @override
   void initState() {
@@ -43,6 +44,8 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
 
       _soundTitle = prefs.getString('diary_notif_sound_title') ??
           'По умолчанию (системный)';
+
+      _moodStyle = prefs.getString('diary_mood_style') ?? 'classic';
     });
   }
 
@@ -65,6 +68,91 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
         '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}',
       );
       setState(() => _reminderTime = picked);
+      HapticFeedback.selectionClick();
+    }
+  }
+
+  Future<void> _pickMoodStyle(AppColorsExtension colors) async {
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colors.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Стиль настроения',
+          style: TextStyle(
+            fontFamily: 'Unbounded',
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: colors.text,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: Text(
+                'Классический',
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
+              subtitle: Text(
+                'Стандартный набор смайлов',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
+              ),
+              value: 'classic',
+              groupValue: _moodStyle,
+              activeColor: colors.accent,
+              onChanged: (val) => Navigator.pop(ctx, val),
+            ),
+            RadioListTile<String>(
+              title: Text(
+                'Минимализм',
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
+              subtitle: Text(
+                'Более сдержанные смайлы',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
+              ),
+              value: 'minimal',
+              groupValue: _moodStyle,
+              activeColor: colors.accent,
+              onChanged: (val) => Navigator.pop(ctx, val),
+            ),
+            RadioListTile<String>(
+              title: Text(
+                'Яркий',
+                style: TextStyle(fontFamily: 'Onest', color: colors.text),
+              ),
+              subtitle: Text(
+                'Насыщенные и эмоциональные смайлы',
+                style: TextStyle(
+                  fontFamily: 'Onest',
+                  color: colors.text.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
+              ),
+              value: 'vivid',
+              groupValue: _moodStyle,
+              activeColor: colors.accent,
+              onChanged: (val) => Navigator.pop(ctx, val),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selected != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('diary_mood_style', selected);
+      setState(() => _moodStyle = selected);
       HapticFeedback.selectionClick();
     }
   }
@@ -175,16 +263,7 @@ class _DiarySettingsScreenState extends State<DiarySettingsScreen> {
                   ),
                   trailing:
                       Icon(Icons.chevron_right, size: 20, color: textSecondary),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Выбор стиля настроения будет доступен в следующем обновлении',
-                          style: TextStyle(fontFamily: 'Onest'),
-                        ),
-                      ),
-                    );
-                  },
+                  onTap: () => _pickMoodStyle(colors),
                 ),
                 Divider(height: 1, color: borderColor),
                 ListTile(

@@ -74,7 +74,7 @@ class AppInfoScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Версия: Demo 0.4.2',
+                  'Версия: Demo 0.4.3',
                   style: TextStyle(fontSize: 13, color: textSecondary),
                 ),
                 const SizedBox(height: 4),

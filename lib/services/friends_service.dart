@@ -7,12 +7,14 @@ class FriendProfile {
   final String username;
   final String displayName;
   final String inviteCode;
+  final String avatarUrl;
 
   FriendProfile({
     required this.id,
     required this.username,
     required this.displayName,
     required this.inviteCode,
+    this.avatarUrl = '',
   });
 
   factory FriendProfile.fromMap(Map<String, dynamic> map) {
@@ -23,6 +25,7 @@ class FriendProfile {
           (map['full_name'] ?? map['display_name']) as String? ??
           'Пользователь',
       inviteCode: map['invite_code'] as String? ?? '',
+      avatarUrl: map['avatar_url'] as String? ?? '',
     );
   }
 }

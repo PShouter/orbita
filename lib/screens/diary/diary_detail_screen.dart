@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/diary_provider.dart';
 import '../../theme/app_theme.dart';
@@ -36,12 +37,14 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
 
   bool _isSavedManually = false;
   String? _currentDiaryId;
+  List<DiaryMood> _moodList = defaultMoods;
 
   @override
   void initState() {
     super.initState();
     _currentDiaryId = widget.diaryId;
     _isViewMode = widget.isInitialViewMode && widget.diaryId != null;
+    _loadMoodStyle();
 
     final all = ref.read(diaryProvider);
     final item = all.where((d) => d.id == _currentDiaryId).firstOrNull;
@@ -53,6 +56,14 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
 
     if (item != null) {
       _images.addAll(item.images);
+    }
+  }
+
+  Future<void> _loadMoodStyle() async {
+    final prefs = await SharedPreferences.getInstance();
+    final style = prefs.getString('diary_mood_style') ?? 'classic';
+    if (mounted) {
+      setState(() => _moodList = getDiaryMoodStyle(style));
     }
   }
 
@@ -237,9 +248,9 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
   Future<void> _exportToPdf() async {
     final pdf = pw.Document();
     final dateFormat = DateFormat('d MMMM yyyy', 'ru');
-    final mood = defaultMoods.firstWhere(
+    final mood = _moodList.firstWhere(
       (m) => m.id == _selectedMood,
-      orElse: () => defaultMoods.first,
+      orElse: () => _moodList.first,
     );
 
     pdf.addPage(
@@ -462,10 +473,10 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                       ),
                       if (_isViewMode)
                         Text(
-                          defaultMoods
+                          _moodList
                               .firstWhere(
                                 (m) => m.id == _selectedMood,
-                                orElse: () => defaultMoods.first,
+                                orElse: () => _moodList.first,
                               )
                               .emoji,
                           style: const TextStyle(fontSize: 28),
@@ -501,7 +512,7 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                                       spacing: 16,
                                       runSpacing: 16,
                                       alignment: WrapAlignment.center,
-                                      children: defaultMoods.map((m) {
+                                      children: _moodList.map((m) {
                                         final isSel = m.id == _selectedMood;
                                         return GestureDetector(
                                           onTap: () {
@@ -576,10 +587,10 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
                             child: Row(
                               children: [
                                 Text(
-                                  defaultMoods
+                                  _moodList
                                       .firstWhere(
                                         (m) => m.id == _selectedMood,
-                                        orElse: () => defaultMoods.first,
+                                        orElse: () => _moodList.first,
                                       )
                                       .emoji,
                                   style: const TextStyle(fontSize: 22),

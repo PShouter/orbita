@@ -269,10 +269,29 @@ class TasksNotifier extends Notifier<List<TaskMap>> {
       ref
           .read(gamificationProvider.notifier)
           .addExp(ExpSource.task, isHigh ? 20 : 10);
+
+      _applyOverduePenalty(current);
     }
 
     await loadTasks();
     SyncService.instance.syncAll();
+  }
+
+  void _applyOverduePenalty(TaskMap task) {
+    final taskDate = task['date'] as DateTime?;
+    final isNoDate = task['isNoDate'] as bool? ?? false;
+
+    if (isNoDate || taskDate == null) return;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(taskDate.year, taskDate.month, taskDate.day);
+
+    if (dueDay.isBefore(today)) {
+      ref
+          .read(gamificationProvider.notifier)
+          .removeExp(ExpSource.task, 10);
+    }
   }
 
   Future<void> toggleSubtask(String taskId, int subtaskIndex, bool done) async {

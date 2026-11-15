@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/budget_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/cashback_manager.dart';
 import '../settings/sections/budget_settings_screen.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
@@ -59,6 +60,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       _buildAccountsPage(budget, notifier, colors),
       _buildOperationsPage(budget, notifier, colors),
       _buildAnalyticsPage(budget, colors),
+      _buildCashbackPage(colors),
       _buildMorePage(budget, notifier, colors),
     ];
 
@@ -111,6 +113,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.pie_chart_outline_rounded),
                 label: 'Аналитика',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.local_offer_outlined),
+                label: 'Кэшбэк',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.more_horiz_rounded),
@@ -1162,6 +1168,19 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
   // ==========================================
   // 5. СТРАНИЦА: ЕЩЕ
+  // ==========================================
+  Widget _buildCashbackPage(AppColorsExtension colors) {
+    return CashbackManager(
+      isDark: colors.isDark,
+      cardColor: colors.card,
+      nestedColor: colors.nested,
+      textColor: colors.text,
+      accentColor: colors.accent,
+    );
+  }
+
+  // ==========================================
+  // 6. СТРАНИЦА: ЕЩЕ
   // ==========================================
   Widget _buildMorePage(
     BudgetState budget,
