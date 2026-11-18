@@ -24,11 +24,9 @@ class _FriendsScreenState extends State<FriendsScreen>
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
-  bool _isSearching = false;
 
   List<Map<String, dynamic>> _acceptedFriends = [];
   List<Map<String, dynamic>> _incomingRequests = [];
-  List<Map<String, dynamic>> _outgoingRequests = [];
   bool _isLoading = true;
 
   String? _myInviteCode;
@@ -77,7 +75,6 @@ class _FriendsScreenState extends State<FriendsScreen>
 
       final List accepted = [];
       final List incoming = [];
-      final List outgoing = [];
 
       final Set<String> profileIdsToFetch = {};
 
@@ -93,9 +90,6 @@ class _FriendsScreenState extends State<FriendsScreen>
           if (friendId == uid) {
             incoming.add(item);
             profileIdsToFetch.add(userId);
-          } else {
-            outgoing.add(item);
-            profileIdsToFetch.add(friendId);
           }
         }
       }
@@ -136,16 +130,6 @@ class _FriendsScreenState extends State<FriendsScreen>
         };
       }).toList();
 
-      _outgoingRequests = outgoing.map((item) {
-        final otherId = item['friend_id'];
-        final prof = profilesMap[otherId] ?? {};
-        return {
-          'friendshipId': item['id'],
-          'userId': otherId,
-          'name': prof['display_name'] ?? 'Пользователь',
-          'username': prof['username'] ?? 'user',
-        };
-      }).toList();
     } catch (e) {
       debugPrint('Ошибка загрузки списка друзей: $e');
     } finally {
@@ -155,12 +139,12 @@ class _FriendsScreenState extends State<FriendsScreen>
 
   Future<void> _searchUsers(String query) async {
     final clean = query.trim().replaceAll('@', '');
+    setState(() {
+      _searchResults = [];
+    });
     if (clean.isEmpty) {
-      setState(() => _searchResults = []);
       return;
     }
-
-    setState(() => _isSearching = true);
 
     try {
       final uid = _currentUserId;
@@ -178,8 +162,6 @@ class _FriendsScreenState extends State<FriendsScreen>
       }
     } catch (e) {
       debugPrint('Ошибка поиска пользователей: $e');
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
     }
   }
 
