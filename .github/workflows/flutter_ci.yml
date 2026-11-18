@@ -29,6 +29,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Create .env from secrets
+        run: |
+          printf 'SUPABASE_URL=%s\n' "${{ secrets.SUPABASE_URL }}" > .env
+          printf 'SUPABASE_ANON_KEY=%s\n' "${{ secrets.SUPABASE_ANON_KEY }}" >> .env
+
       - name: Analyze code
         run: flutter analyze
 
