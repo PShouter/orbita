@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../services/diary_lock_service.dart';
 import '../../../theme/app_theme.dart';
 
 class DiaryLockSettingsScreen extends StatefulWidget {
@@ -303,13 +304,12 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                   }
 
                   final prefs = await SharedPreferences.getInstance();
-                  await prefs.setString('diary_lock_secret', secret);
+                  await DiaryLockService().saveLockData(secret, answer);
                   await prefs.setString('diary_lock_type', effectiveType);
                   await prefs.setString(
                     'diary_lock_question',
                     selectedQuestion,
                   );
-                  await prefs.setString('diary_lock_answer', answer);
                   await prefs.setBool('diary_lock_enabled', true);
 
                   setState(() {
@@ -320,6 +320,7 @@ class _DiaryLockSettingsScreenState extends State<DiaryLockSettingsScreen> {
                     _isLockEnabled = true;
                   });
 
+                  if (!ctx.mounted) return;
                   Navigator.pop(ctx, true);
                 },
                 child: const Text(

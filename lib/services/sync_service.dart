@@ -151,7 +151,20 @@ class SyncService {
 
         final targetTable = (table == 'diaries') ? 'diary_entries' : table;
 
-        final success = await _retryOperation(
+        // Tombstone: мягко помечаем запись удалённой в облаке (deleted_at),
+        // чтобы pull на других устройствах удалял её локально, а не воскрешал.
+        var success = await _retryOperation(
+          () => _supabase
+              .from(targetTable)
+              .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
+              .eq('id', recordId)
+              .timeout(const Duration(seconds: 8)),
+          opName: 'Пометить удалённой $targetTable ($recordId)',
+        );
+
+        // Фоллбек для старой схемы (колонки deleted_at ещё нет в Supabase):
+        // если tombstone не удался — деградируем на физическое удаление.
+        success ??= await _retryOperation(
           () => _supabase
               .from(targetTable)
               .delete()
@@ -232,6 +245,13 @@ class SyncService {
             'attachments': attachData,
             'subtasks': subtasksData,
             'tags': tagsData,
+            'category': t['category'] ?? 'Личное',
+            'is_all_day': (t['is_all_day'] == 1) ? 1 : 0,
+            'is_no_date': (t['is_no_date'] == 1) ? 1 : 0,
+            'color': t['color'] is int ? t['color'] : 4281373137,
+            'reminder_minutes': t['reminder_minutes'] ?? -1,
+            'recurrence': t['recurrence'] ?? 'none',
+            'status': t['status'] ?? 'todo',
             'created_at': t['updated_at'] ?? DateTime.now().toIso8601String(),
           });
         }
@@ -463,6 +483,8 @@ class SyncService {
             'image_url': n['image_path'] ?? '',
             'tags': n['tags']?.toString(),
             'attachments': n['attachments']?.toString(),
+            'category': n['category'] ?? 'Общее',
+            'is_pinned': (n['is_pinned'] == 1) ? 1 : 0,
             'created_at': n['created_at'] ?? DateTime.now().toIso8601String(),
             'updated_at': n['updated_at'] ?? DateTime.now().toIso8601String(),
           });
@@ -767,6 +789,35 @@ class SyncService {
     return full ?? [];
   }
 
+  /// Резолв конфликта по updated_at: применяем облачную версию, только если
+  /// она не старее локальной (или локальной записи ещё нет).
+  Future<bool> _remoteIsNewer(
+    DatabaseExecutor txn,
+    String table,
+    String id,
+    String? remoteUpdatedAt,
+  ) async {
+    final remote = DateTime.tryParse(remoteUpdatedAt ?? '');
+    if (remote == null) return true; // нет метки — применить
+    try {
+      final rows = await txn.query(
+        table,
+        columns: ['updated_at'],
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (rows.isEmpty) return true;
+      final localRaw = rows.first['updated_at'];
+      if (localRaw == null) return true;
+      final local = DateTime.tryParse(localRaw.toString());
+      if (local == null) return true;
+      // Облачная версия новее или равна локальной — применить.
+      return !remote.isBefore(local);
+    } catch (_) {
+      return true;
+    }
+  }
+
   Future<void> pullAllFromCloud({bool forceReplace = false}) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -817,6 +868,21 @@ class SyncService {
         final batch = txn.batch();
 
         for (final t in remoteTasks) {
+          // Tombstone: облако пометило запись удалённой — удаляем локально
+          if (t['deleted_at'] != null &&
+              t['deleted_at'].toString().isNotEmpty) {
+            txn.delete('tasks',
+                where: 'id = ?', whereArgs: [t['id'].toString()]);
+            continue;
+          }
+          if (!await _remoteIsNewer(
+            txn,
+            'tasks',
+            t['id'].toString(),
+            t['updated_at'] ?? t['created_at'],
+          )) {
+            continue;
+          }
           batch.insert(
               'tasks',
               {
@@ -825,9 +891,13 @@ class SyncService {
                 'title': t['title'] ?? '',
                 'description': t['description'] ?? '',
                 'date': t['due_date'],
-                'time': null,
-                'is_no_date': (t['due_date'] == null) ? 1 : 0,
-                'is_all_day': 1,
+                'time': t['time'],
+                'is_no_date': (t['is_no_date'] == 1 || t['is_no_date'] == true)
+                    ? 1
+                    : (t['due_date'] == null ? 1 : 0),
+                'is_all_day': (t['is_all_day'] == 1 || t['is_all_day'] == true)
+                    ? 1
+                    : 0,
                 'priority': _parseIntToPriority(t['priority']),
                 'done': (t['is_completed'] == true) ? 1 : 0,
                 'subtasks': t['subtasks'] != null
@@ -843,14 +913,36 @@ class SyncService {
                         ? t['attachments']
                         : jsonEncode(t['attachments']))
                     : null,
+                'category': t['category'] ?? 'Личное',
+                'color': t['color'] is int ? t['color'] : 4281373137,
+                'reminder_minutes': t['reminder_minutes'] ?? -1,
+                'recurrence': t['recurrence'] ?? 'none',
+                'status': t['status'] ?? 'todo',
                 'is_synced': 1,
                 'updated_at':
-                    t['created_at'] ?? DateTime.now().toIso8601String(),
+                    t['updated_at'] ??
+                        t['created_at'] ??
+                        DateTime.now().toIso8601String(),
               },
               conflictAlgorithm: ConflictAlgorithm.replace);
         }
 
         for (final e in remoteEvents) {
+          // Tombstone: облако пометило запись удалённой — удаляем локально
+          if (e['deleted_at'] != null &&
+              e['deleted_at'].toString().isNotEmpty) {
+            txn.delete('calendar_events',
+                where: 'id = ?', whereArgs: [e['id'].toString()]);
+            continue;
+          }
+          if (!await _remoteIsNewer(
+            txn,
+            'calendar_events',
+            e['id'].toString(),
+            e['updated_at'],
+          )) {
+            continue;
+          }
           final isAllDayInt =
               (e['is_all_day'] == 1 || e['is_all_day'] == true) ? 1 : 0;
           batch.insert(
@@ -878,6 +970,21 @@ class SyncService {
         }
 
         for (final h in remoteHabits) {
+          // Tombstone: облако пометило запись удалённой — удаляем локально
+          if (h['deleted_at'] != null &&
+              h['deleted_at'].toString().isNotEmpty) {
+            txn.delete('habits',
+                where: 'id = ?', whereArgs: [h['id'].toString()]);
+            continue;
+          }
+          if (!await _remoteIsNewer(
+            txn,
+            'habits',
+            h['id'].toString(),
+            h['updated_at'],
+          )) {
+            continue;
+          }
           List<int> fDays = [];
           if (h['frequency_days'] != null) {
             try {
@@ -889,6 +996,28 @@ class SyncService {
           final createdAtStr = h['created_at'] ??
               h['updated_at'] ??
               DateTime.now().toIso8601String();
+
+          // History: если в облаке истории нет — сохраняем локальную,
+          // чтобы pull не сбрасывал прогресс привычки
+          String history = jsonEncode({});
+          if (h['history'] != null && h['history'].toString().isNotEmpty) {
+            history = h['history'] is String
+                ? h['history'].toString()
+                : jsonEncode(h['history']);
+          } else {
+            try {
+              final existing = await txn.query(
+                'habits',
+                columns: ['history'],
+                where: 'id = ?',
+                whereArgs: [h['id'].toString()],
+              );
+              if (existing.isNotEmpty &&
+                  existing.first['history'] != null) {
+                history = existing.first['history'].toString();
+              }
+            } catch (_) {}
+          }
 
           batch.insert(
               'habits',
@@ -911,7 +1040,7 @@ class SyncService {
                 'position': h['position'] ?? 0,
                 'streak': h['streak'] ?? 0,
                 'is_archived': h['is_archived'] ?? 0,
-                'history': jsonEncode({}),
+                'history': history,
                 'is_synced': 1,
                 'created_at': createdAtStr,
                 'updated_at':
@@ -921,6 +1050,46 @@ class SyncService {
         }
 
         for (final n in remoteNotes) {
+          // Tombstone: облако пометило запись удалённой — удаляем локально
+          if (n['deleted_at'] != null &&
+              n['deleted_at'].toString().isNotEmpty) {
+            txn.delete('notes',
+                where: 'id = ?', whereArgs: [n['id'].toString()]);
+            continue;
+          }
+          if (!await _remoteIsNewer(
+            txn,
+            'notes',
+            n['id'].toString(),
+            n['updated_at'],
+          )) {
+            continue;
+          }
+          // Для category/is_pinned берём облачные значения с fallback,
+          // а если облако их не несёт — сохраняем уже существующие локальные
+          // (не затираем при повторных pull)
+          String category = (n['category'] != null &&
+                  n['category'].toString().isNotEmpty)
+              ? n['category'].toString()
+              : 'Общее';
+          int pinned = (n['is_pinned'] == 1 || n['is_pinned'] == true) ? 1 : 0;
+          try {
+            final existing = await txn.query(
+              'notes',
+              columns: ['category', 'is_pinned'],
+              where: 'id = ?',
+              whereArgs: [n['id'].toString()],
+            );
+            if (existing.isNotEmpty) {
+              if (n['category'] == null || n['category'].toString().isEmpty) {
+                category = existing.first['category'] as String? ?? 'Общее';
+              }
+              if (n['is_pinned'] == null) {
+                pinned = (existing.first['is_pinned'] == 1) ? 1 : 0;
+              }
+            }
+          } catch (_) {}
+
           batch.insert(
               'notes',
               {
@@ -931,8 +1100,8 @@ class SyncService {
                 'image_path': n['image_url'],
                 'tags': n['tags'],
                 'attachments': n['attachments'],
-                'category': 'Общее',
-                'is_pinned': 0,
+                'category': category,
+                'is_pinned': pinned,
                 'is_synced': 1,
                 'created_at':
                     n['created_at'] ?? DateTime.now().toIso8601String(),
@@ -943,6 +1112,24 @@ class SyncService {
         }
 
         for (final d in remoteDiary) {
+          // Tombstone: облако пометило запись удалённой — удаляем локально
+          if (d['deleted_at'] != null &&
+              d['deleted_at'].toString().isNotEmpty) {
+            txn.delete('diaries',
+                where: 'id = ?', whereArgs: [d['id'].toString()]);
+            txn.delete('diary_entries',
+                where: 'id = ?', whereArgs: [d['id'].toString()]);
+            continue;
+          }
+          // Резолв по updated_at: пропускаем, если локальная запись новее
+          if (!await _remoteIsNewer(
+            txn,
+            'diaries',
+            d['id'].toString(),
+            d['updated_at'] ?? d['created_at'],
+          )) {
+            continue;
+          }
           final text = (d['text'] as String?) ?? '';
           final lines = text.split('\n\n');
           final title = lines.isNotEmpty ? lines.first : '';

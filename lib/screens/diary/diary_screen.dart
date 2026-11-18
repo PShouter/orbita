@@ -8,6 +8,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/diary_provider.dart';
+import '../../services/diary_lock_service.dart';
 import '../../theme/app_theme.dart';
 import '../settings/sections/diary_settings_screen.dart';
 import 'diary_detail_screen.dart';
@@ -29,9 +30,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   bool _isLockEnabled = false;
   bool _hidePreview = false;
   String _lockType = 'pin';
-  String? _savedSecret;
   String _securityQuestion = 'Любимый цвет';
-  String? _securityAnswer;
   bool _useBiometrics = false;
   bool _hasAutoTriggeredBio = false;
 
@@ -46,9 +45,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     final lockEnabled = prefs.getBool('diary_lock_enabled') ?? false;
     final hidePreview = prefs.getBool('diary_hide_preview') ?? false;
     final lockType = prefs.getString('diary_lock_type') ?? 'pin';
-    final secret = prefs.getString('diary_lock_secret');
     final question = prefs.getString('diary_lock_question') ?? 'Любимый цвет';
-    final answer = prefs.getString('diary_lock_answer');
     final useBiometrics = prefs.getBool('diary_lock_use_biometrics') ?? false;
 
     if (!mounted) return;
@@ -56,9 +53,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       _isLockEnabled = lockEnabled;
       _hidePreview = hidePreview;
       _lockType = lockType;
-      _savedSecret = secret;
       _securityQuestion = question;
-      _securityAnswer = answer;
       _useBiometrics = useBiometrics;
       _isUnlocked = !lockEnabled;
     });
@@ -187,12 +182,17 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                 ),
                 minimumSize: const Size(80, 44),
               ),
-              onPressed: () {
-                if (inputCtrl.text.trim() == _savedSecret) {
+              onPressed: () async {
+                final valid = await DiaryLockService().verifyLockData(
+                  inputCtrl.text.trim(),
+                  isRecoveryAnswer: false,
+                );
+                if (!ctx.mounted) return;
+                if (valid) {
                   Navigator.pop(ctx);
                   setState(() => _isUnlocked = true);
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
                       content: const Text(
                         'Неверный код доступа',
@@ -290,12 +290,16 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                 ),
                 minimumSize: const Size(100, 44),
               ),
-              onPressed: () {
-                if (answerCtrl.text.trim().toLowerCase() ==
-                    (_securityAnswer ?? '').toLowerCase()) {
+              onPressed: () async {
+                final valid = await DiaryLockService().verifyLockData(
+                  answerCtrl.text.trim(),
+                  isRecoveryAnswer: true,
+                );
+                if (!ctx.mounted) return;
+                if (valid) {
                   Navigator.pop(ctx);
                   setState(() => _isUnlocked = true);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
                       content: const Text(
                         'Доступ подтвержден контрольным вопросом',
@@ -305,7 +309,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     ),
                   );
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
                       content: const Text(
                         'Неверный ответ на вопрос',
@@ -438,6 +442,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                     ),
                     onPressed: () async {
                       final ok = await _tryBiometricUnlock();
+                      if (!context.mounted) return;
                       if (!ok) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(

@@ -847,6 +847,8 @@ class _MainShellState extends ConsumerState<MainShell> {
         colorFilter: ColorFilter.mode(colors.text, BlendMode.srcIn),
         placeholderBuilder: (_) =>
             Icon(fallbackIcon, size: 22, color: colors.text),
+        errorBuilder: (_, __, ___) =>
+            Icon(fallbackIcon, size: 22, color: colors.text),
       );
     }
 
@@ -1002,7 +1004,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                   // 3. Друзья
                   ListTile(
                     leading: buildDrawerIcon(
-                      'assets/icons/svg-icons/profiles-and-users-filled/users-profiles-01.svg',
+                      'assets/icons/friends.svg',
                       Icons.people_outline,
                     ),
                     title: Text(

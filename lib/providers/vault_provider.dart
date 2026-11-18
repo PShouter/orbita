@@ -91,39 +91,42 @@ class VaultNotifier extends Notifier<VaultState> {
       final db = await DatabaseService.instance.database;
       final rows = await db.query('vault_documents');
 
-      // Перешифровываем все документы новым PIN-кодом
-      for (final row in rows) {
-        final id = row['id'] as String;
-        final encTitle = row['encrypted_title'] as String;
-        final encPayload = row['encrypted_payload'] as String;
-        final iv = row['iv'] as String;
+      // Перешифровываем все документы новым PIN-кодом в одной транзакции,
+      // чтобы при сбое не остался частично перешифрованный сейф
+      await db.transaction((txn) async {
+        for (final row in rows) {
+          final id = row['id'] as String;
+          final encTitle = row['encrypted_title'] as String;
+          final encPayload = row['encrypted_payload'] as String;
+          final iv = row['iv'] as String;
 
-        final title = _service.decryptString(encTitle, iv, oldPin);
-        String payload = '';
-        if (encPayload.contains(':::')) {
-          final parts = encPayload.split(':::');
-          payload = _service.decryptString(parts[0], parts[1], oldPin);
-        } else {
-          payload = _service.decryptString(encPayload, iv, oldPin);
+          final title = _service.decryptString(encTitle, iv, oldPin);
+          String payload = '';
+          if (encPayload.contains(':::')) {
+            final parts = encPayload.split(':::');
+            payload = _service.decryptString(parts[0], parts[1], oldPin);
+          } else {
+            payload = _service.decryptString(encPayload, iv, oldPin);
+          }
+
+          final newEncTitle = _service.encryptString(title, newPin);
+          final newEncPayload = _service.encryptString(payload, newPin);
+          final combinedPayload =
+              '${newEncPayload['cipherText']!}:::${newEncPayload['iv']!}';
+
+          await txn.update(
+            'vault_documents',
+            {
+              'encrypted_title': newEncTitle['cipherText']!,
+              'encrypted_payload': combinedPayload,
+              'iv': newEncTitle['iv']!,
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+            where: 'id = ?',
+            whereArgs: [id],
+          );
         }
-
-        final newEncTitle = _service.encryptString(title, newPin);
-        final newEncPayload = _service.encryptString(payload, newPin);
-        final combinedPayload =
-            '${newEncPayload['cipherText']!}:::${newEncPayload['iv']!}';
-
-        await db.update(
-          'vault_documents',
-          {
-            'encrypted_title': newEncTitle['cipherText']!,
-            'encrypted_payload': combinedPayload,
-            'iv': newEncTitle['iv']!,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-      }
+      });
 
       await _service.setPin(newPin);
       state = state.copyWith(activePin: newPin, errorMessage: null);
@@ -204,13 +207,20 @@ class VaultNotifier extends Notifier<VaultState> {
       final iv = row['iv'] as String;
       final category = row['category'] as String? ?? 'text';
 
-      String title = _service.decryptString(encTitle, iv, state.activePin!);
+      String title;
       String payload = '';
-      if (encPayload.contains(':::')) {
-        final parts = encPayload.split(':::');
-        payload = _service.decryptString(parts[0], parts[1], state.activePin!);
-      } else {
-        payload = _service.decryptString(encPayload, iv, state.activePin!);
+      try {
+        title = _service.decryptString(encTitle, iv, state.activePin!);
+        if (encPayload.contains(':::')) {
+          final parts = encPayload.split(':::');
+          payload =
+              _service.decryptString(parts[0], parts[1], state.activePin!);
+        } else {
+          payload = _service.decryptString(encPayload, iv, state.activePin!);
+        }
+      } on VaultCryptoException catch (e) {
+        debugPrint('Пропущена повреждённая запись сейфа: $e');
+        continue;
       }
 
       if (category == 'image' || category == 'document') {

@@ -195,6 +195,8 @@ class VaultService {
 
       final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
       return encrypter.decrypt64(cipherBase64, iv: iv);
+    } on FormatException {
+      rethrow;
     } catch (_) {}
 
     // 2. Fallback: расшифровка старых данных в AES-CBC
@@ -210,7 +212,17 @@ class VaultService {
       );
       return encrypter.decrypt64(cipherBase64, iv: iv);
     } catch (_) {
-      return '[Ошибка расшифровки]';
+      throw VaultCryptoException(
+        'Не удалось расшифровать данные сейфа. Вероятно, PIN указан неверно или данные повреждены.',
+      );
     }
   }
+}
+
+class VaultCryptoException implements Exception {
+  const VaultCryptoException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
 }

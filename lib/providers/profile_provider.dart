@@ -138,6 +138,13 @@ class ProfileNotifier extends Notifier<ProfileState> {
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // Сначала форсируем финальный синк несинхронизированных данных в облако,
+    // пока пользователь ещё залогинен (syncAll требует currentUser != null).
+    try {
+      await SyncService.instance.syncAll();
+    } catch (_) {}
+
     await _supabase.auth.signOut();
     await prefs.setBool('is_guest_mode', false);
 

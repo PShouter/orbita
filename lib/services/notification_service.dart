@@ -31,7 +31,9 @@ class NotificationService {
       try {
         final offset = DateTime.now().timeZoneOffset;
         final hours = offset.inHours;
-        final sign = hours >= 0 ? '+' : '-';
+        // В tz-базе имена Etc/GMT обратны по знаку: Etc/GMT-3 == UTC+3 (Москва),
+        // а Etc/GMT+3 == UTC-3. Поэтому знак инвертируем относительно offset.
+        final sign = hours >= 0 ? '-' : '+';
         final locationName = 'Etc/GMT$sign${hours.abs()}';
         tz.setLocalLocation(tz.getLocation(locationName));
       } catch (_) {
