@@ -85,7 +85,6 @@ class ManageCalendarsScreen extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: Material(
                 color: colors.card,
-                borderRadius: BorderRadius.circular(18),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
                   side: BorderSide(color: colors.nested),

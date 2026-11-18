@@ -46,16 +46,6 @@ class _BankCondition {
 
 class _CashbackManagerState extends State<CashbackManager> {
   static const String _prefsKey = 'budget_cashback_banks';
-  static const List<String> _defaultCategories = [
-    'Продукты',
-    'АЗС',
-    'Кафе',
-    'Аптеки',
-    'Кино',
-    'Транспорт',
-    'Одежда',
-    'Другое',
-  ];
 
   List<_BankCondition> _banks = [];
   bool _loading = true;
@@ -162,13 +152,13 @@ class _CashbackManagerState extends State<CashbackManager> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setMState) {
-            final activeCategories = _defaultCategories.map((c) {
-              final existing = bank.rates
-                  .where((r) => r['category'] == c)
-                  .firstOrNull;
-              final percent = existing?['percent']?.toString() ?? '0';
-              return (category: c, percent: percent);
-            }).toList();
+            final catCtrl = TextEditingController();
+            final localRates = List<Map<String, dynamic>>.from(bank.rates);
+
+            void commitRates() {
+              bank.rates = List<Map<String, dynamic>>.from(localRates);
+              _save();
+            }
 
             return Padding(
               padding: EdgeInsets.only(
@@ -199,12 +189,12 @@ class _CashbackManagerState extends State<CashbackManager> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    for (final item in activeCategories) ...[
+                    for (final item in localRates) ...[
                       Row(
                         children: [
                           Expanded(
                             child: Text(
-                              item.category,
+                              item['category'] as String? ?? '',
                               style: TextStyle(
                                 color: widget.textColor,
                                 fontSize: 14,
@@ -215,7 +205,7 @@ class _CashbackManagerState extends State<CashbackManager> {
                             width: 90,
                             child: TextField(
                               controller: TextEditingController(
-                                text: item.percent,
+                                text: item['percent']?.toString() ?? '0',
                               ),
                               keyboardType:
                                   const TextInputType.numberWithOptions(
@@ -225,7 +215,8 @@ class _CashbackManagerState extends State<CashbackManager> {
                               decoration: InputDecoration(
                                 suffixText: '%',
                                 suffixStyle: TextStyle(
-                                  color: widget.textColor.withValues(alpha: 0.5),
+                                  color: widget.textColor
+                                      .withValues(alpha: 0.5),
                                 ),
                                 isDense: true,
                                 filled: true,
@@ -238,29 +229,80 @@ class _CashbackManagerState extends State<CashbackManager> {
                                 ),
                               ),
                               onChanged: (val) {
-                                final updated = bank.rates;
-                                updated.removeWhere(
-                                  (r) => r['category'] == item.category,
-                                );
                                 final v = double.tryParse(
                                       val.replaceAll(',', '.'),
                                     ) ??
                                     0;
-                                if (v > 0) {
-                                  updated.add({
-                                    'category': item.category,
-                                    'percent': v,
-                                  });
-                                }
-                                bank.rates = updated;
+                                item['percent'] = v;
+                                commitRates();
                               },
                             ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.close,
+                              size: 18,
+                              color: widget.textColor.withValues(alpha: 0.5),
+                            ),
+                            onPressed: () {
+                              localRates.remove(item);
+                              setMState(() {});
+                              commitRates();
+                            },
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                     ],
                     const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: catCtrl,
+                            style: TextStyle(color: widget.textColor),
+                            decoration: InputDecoration(
+                              hintText: 'Новая категория',
+                              hintStyle: TextStyle(
+                                color: widget.textColor.withValues(alpha: 0.4),
+                              ),
+                              isDense: true,
+                              filled: true,
+                              fillColor:
+                                  widget.nestedColor.withValues(alpha: 0.3),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide:
+                                    BorderSide(color: widget.nestedColor),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: widget.accentColor,
+                            side: BorderSide(color: widget.accentColor),
+                          ),
+                          onPressed: () {
+                            final name = catCtrl.text.trim();
+                            if (name.isEmpty) return;
+                            if (localRates.any(
+                              (r) =>
+                                  (r['category'] as String? ?? '') == name,
+                            )) {
+                              return;
+                            }
+                            localRates.add({'category': name, 'percent': 0});
+                            catCtrl.clear();
+                            setMState(() {});
+                            commitRates();
+                          },
+                          child: const Text('Добавить'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(

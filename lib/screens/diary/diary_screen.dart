@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../providers/diary_provider.dart';
@@ -31,6 +32,8 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
   String? _savedSecret;
   String _securityQuestion = 'Любимый цвет';
   String? _securityAnswer;
+  bool _useBiometrics = false;
+  bool _hasAutoTriggeredBio = false;
 
   @override
   void initState() {
@@ -46,6 +49,7 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
     final secret = prefs.getString('diary_lock_secret');
     final question = prefs.getString('diary_lock_question') ?? 'Любимый цвет';
     final answer = prefs.getString('diary_lock_answer');
+    final useBiometrics = prefs.getBool('diary_lock_use_biometrics') ?? false;
 
     if (!mounted) return;
     setState(() {
@@ -55,8 +59,36 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
       _savedSecret = secret;
       _securityQuestion = question;
       _securityAnswer = answer;
+      _useBiometrics = useBiometrics;
       _isUnlocked = !lockEnabled;
     });
+
+    if (mounted && lockEnabled && useBiometrics && !_hasAutoTriggeredBio) {
+      _hasAutoTriggeredBio = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _tryBiometricUnlock();
+      });
+    }
+  }
+
+  Future<bool> _tryBiometricUnlock() async {
+    if (!_isLockEnabled || _isUnlocked) return false;
+    try {
+      final auth = LocalAuthentication();
+      final canCheck = await auth.canCheckBiometrics;
+      if (!canCheck) return false;
+      final authenticated = await auth.authenticate(
+        localizedReason: 'Подтвердите личность для входа в Дневник',
+        biometricOnly: true,
+      );
+      if (authenticated && mounted) {
+        setState(() => _isUnlocked = true);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Ошибка биометрии дневника: $e');
+    }
+    return false;
   }
 
   void _showUnlockDialog(AppColorsExtension colors) {
@@ -385,6 +417,40 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen> {
                   ),
                   onPressed: () => _showUnlockDialog(colors),
                 ),
+                if (_useBiometrics) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colors.accent),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      minimumSize: const Size(180, 48),
+                    ),
+                    icon: Icon(Icons.fingerprint, size: 20, color: colors.accent),
+                    label: Text(
+                      'Войти по биометрии',
+                      style: TextStyle(
+                        fontFamily: 'Onest',
+                        fontWeight: FontWeight.bold,
+                        color: colors.accent,
+                      ),
+                    ),
+                    onPressed: () async {
+                      final ok = await _tryBiometricUnlock();
+                      if (!ok) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Биометрия недоступна. Введите код',
+                              style: TextStyle(fontFamily: 'Onest'),
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ],
               ],
             ),
           ),

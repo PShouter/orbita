@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AppThemeType { space, dawn, aurora, sunset, amoled }
+enum AppThemeType { space, dawn, aurora, sunset, amoled, sage, strawberry }
 
 enum AppTextScale { small, normal, large }
 
@@ -86,6 +86,32 @@ class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
     warning: Color(0xFFFFC869),
     error: Color(0xFFFF8080),
     isDark: true,
+  );
+
+  // Шалфей — мягкая светлая тема в свежих травяных тонах
+  static const sage = AppColorsExtension(
+    bg: Color(0xFFF1F6F1),
+    card: Color(0xFFFFFFFF),
+    nested: Color(0xFFE2EBE3),
+    text: Color(0xFF1A2420),
+    accent: Color(0xFF5E9E6B),
+    success: Color(0xFF2E7D4F),
+    warning: Color(0xFF9A6B00),
+    error: Color(0xFFB53A3A),
+    isDark: false,
+  );
+
+  // Клубника — тёплая светлая тема с розово-персиковыми акцентами
+  static const strawberry = AppColorsExtension(
+    bg: Color(0xFFFFF4F4),
+    card: Color(0xFFFFFFFF),
+    nested: Color(0xFFFFE3E3),
+    text: Color(0xFF2A1518),
+    accent: Color(0xFFE8617C),
+    success: Color(0xFF3C9D77),
+    warning: Color(0xFFC07A22),
+    error: Color(0xFFD64545),
+    isDark: false,
   );
 
   @override

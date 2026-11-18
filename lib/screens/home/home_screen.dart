@@ -128,225 +128,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildDailyFocusCard({
-    required List focusTasks,
-    required ShiftType? todayShift,
-    required AppColorsExtension colors,
-  }) {
-    if (focusTasks.isEmpty) return const SizedBox.shrink();
-
-    final Map<String, dynamic> mainTask = Map<String, dynamic>.from(
-      focusTasks.first as Map,
-    );
-    final isDone = mainTask['done'] == true;
-    final priority =
-        (mainTask['priority'] as String? ?? 'normal').toLowerCase();
-    final time = mainTask['time'] as String?;
-    final isShiftOverlap = todayShift != null && todayShift.isWork && !isDone;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: colors.card,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: colors.accent.withValues(alpha: 0.5),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: colors.accent.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: colors.accent.withValues(alpha: 0.12),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(21),
-                topRight: Radius.circular(21),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.gps_fixed, size: 16, color: colors.accent),
-                const SizedBox(width: 8),
-                Text(
-                  'ФОКУС ДНЯ',
-                  style: TextStyle(
-                    fontFamily: 'Onest',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
-                    color: colors.accent,
-                  ),
-                ),
-                const Spacer(),
-                if (priority == 'high')
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.error.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: Text(
-                      'Высокий приоритет',
-                      style: TextStyle(
-                        fontFamily: 'Onest',
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: colors.error,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: Checkbox(
-                        value: isDone,
-                        activeColor: colors.accent,
-                        checkColor: colors.isDark ? Colors.black : Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        side: BorderSide(
-                          color: colors.text.withValues(alpha: 0.4),
-                          width: 1.5,
-                        ),
-                        onChanged: (v) {
-                          HapticFeedback.lightImpact();
-                          ref.read(tasksProvider.notifier).toggleTask(
-                                mainTask['id'].toString(),
-                                v ?? false,
-                              );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            mainTask['title'] ?? '',
-                            style: TextStyle(
-                              fontFamily: 'Onest',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDone
-                                  ? colors.text.withValues(alpha: 0.45)
-                                  : colors.text,
-                              decoration:
-                                  isDone ? TextDecoration.lineThrough : null,
-                            ),
-                          ),
-                          if (mainTask['description'] != null &&
-                              (mainTask['description'] as String)
-                                  .isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              mainTask['description'] as String,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'Onest',
-                                fontSize: 13,
-                                color: colors.text.withValues(alpha: 0.6),
-                              ),
-                            ),
-                          ],
-                          if (time != null) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  size: 13,
-                                  color: colors.accent,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  time,
-                                  style: TextStyle(
-                                    fontFamily: 'Onest',
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.accent,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (isShiftOverlap) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.warning.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(
-                        color: colors.warning.withValues(alpha: 0.4),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 14,
-                          color: colors.warning,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Сегодня смена: ${todayShift.name} (${todayShift.startTime}-${todayShift.endTime})',
-                            style: TextStyle(
-                              fontFamily: 'Onest',
-                              fontSize: 11,
-                              color: colors.warning,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final today = DateTime.now();
@@ -378,29 +159,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (d is DateTime) {
         return d.year == today.year &&
             d.month == today.month &&
-            d.day == today.day;
+            d.day == today.day &&
+            t['done'] != true;
       }
       return false;
     }).toList();
 
-    final activeTodayTasks =
-        todayTasks.where((t) => t['done'] != true).toList();
-    activeTodayTasks.sort((a, b) {
-      final aHigh = (a['priority'] == 'high') ? 1 : 0;
-      final bHigh = (b['priority'] == 'high') ? 1 : 0;
-      if (aHigh != bHigh) return bHigh.compareTo(aHigh);
-
-      final aTime = a['time'] as String? ?? '99:99';
-      final bTime = b['time'] as String? ?? '99:99';
-      return aTime.compareTo(bTime);
-    });
+    int toMinutes(String time) {
+      final parts = time.split(':');
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+      return h * 60 + m;
+    }
 
     final todayEvents = allEvents.where((e) {
       final d = e['date'];
       if (d is DateTime) {
-        return d.year == today.year &&
-            d.month == today.month &&
-            d.day == today.day;
+        final isToday =
+            d.year == today.year && d.month == today.month && d.day == today.day;
+        if (!isToday) return false;
+        // Прошедшие события не показываем: вседневные и без времени конца всегда оставляем,
+        // с временем — только если оно ещё не наступило.
+        if (e['isAllDay'] == true) return true;
+        final endTime = e['endTime'] as String?;
+        if (endTime == null || endTime.isEmpty) return true;
+        final nowMinutes = today.hour * 60 + today.minute;
+        return toMinutes(endTime) > nowMinutes;
       }
       return false;
     }).toList();
@@ -486,13 +270,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Фокус дня
-        _buildDailyFocusCard(
-          focusTasks: activeTodayTasks,
-          todayShift: todayShift,
-          colors: colors,
-        ),
 
         // Сдвоенная карточка: Календарь и Задачи
         Container(
@@ -913,8 +690,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   fontFamily: 'Unbounded',
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color:
-                      freeMoney >= 0 ? colors.accent : colors.error,
+                  color: freeMoney >= 0
+                      ? colors.text.withValues(alpha: 0.75)
+                      : colors.error,
                 ),
               ),
               const SizedBox(height: 6),

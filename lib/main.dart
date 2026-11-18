@@ -30,6 +30,7 @@ import 'providers/shift_provider.dart';
 import 'providers/budget_provider.dart';
 import 'providers/gamification_provider.dart';
 import 'providers/navigation_tabs_provider.dart';
+import 'providers/notification_settings_provider.dart';
 
 // Виджеты диалогов
 import 'widgets/update_dialog.dart';
@@ -287,6 +288,12 @@ class _OrbitaAppState extends ConsumerState<OrbitaApp> {
         case AppThemeType.amoled:
           activePalette = AppColorsExtension.amoled;
           break;
+        case AppThemeType.sage:
+          activePalette = AppColorsExtension.sage;
+          break;
+        case AppThemeType.strawberry:
+          activePalette = AppColorsExtension.strawberry;
+          break;
       }
     }
 
@@ -387,6 +394,8 @@ class _MainShellState extends ConsumerState<MainShell> {
   void initState() {
     super.initState();
     MainShell._instance = this;
+
+    ref.read(notificationSettingsProvider.notifier).loadSettings();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
@@ -1145,7 +1154,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Demo 0.4.3',
+                    'Версия: Demo 0.4.4',
                     style: TextStyle(
                       fontFamily: 'Onest',
                       color: colors.text.withValues(alpha: 0.5),

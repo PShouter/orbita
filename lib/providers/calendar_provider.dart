@@ -62,9 +62,63 @@ class UserCalendarsNotifier extends Notifier<List<UserCalendar>> {
   Future<void> loadCalendars() async {
     try {
       final db = await DatabaseService.instance.database;
-      final rows = await db.query('user_calendars');
-      final googleCals = rows.map((r) {
-        final m = Map<String, dynamic>.from(r);
+
+      // Сидируем встроенные календари при первом запуске, чтобы пользовательские
+      // правки (название/цвет, включая Google-календарь) сохранялись в БД.
+      const defaults = [
+        {
+          'id': 'cal_main',
+          'title': 'Основной',
+          'color': 0xFF2C69D1,
+          'account_type': 'local',
+        },
+        {
+          'id': 'cal_work',
+          'title': 'Работа',
+          'color': 0xFFF97316,
+          'account_type': 'local',
+        },
+        {
+          'id': 'cal_shifts',
+          'title': 'Смены',
+          'color': 0xFF10B981,
+          'account_type': 'local',
+        },
+        {
+          'id': 'cal_google',
+          'title': 'Google',
+          'color': 0xFF4285F4,
+          'account_type': 'google',
+        },
+      ];
+      for (final d in defaults) {
+        final exists = await db.query(
+          'user_calendars',
+          columns: ['id'],
+          where: 'id = ?',
+          whereArgs: [d['id']],
+          limit: 1,
+        );
+        if (exists.isEmpty) {
+          await db.insert('user_calendars', {
+            'id': d['id'],
+            'user_id': null,
+            'title': d['title'],
+            'color': d['color'],
+            'is_visible': 1,
+            'account_type': d['account_type'],
+            'is_synced': 0,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        }
+      }
+
+      final rows =
+          (await db.query('user_calendars', orderBy: 'updated_at ASC'))
+              .map((r) => Map<String, dynamic>.from(r))
+              .toList();
+
+      state = rows.map((m) {
         return UserCalendar(
           id: m['id'] as String,
           title: m['title'] as String,
@@ -73,26 +127,6 @@ class UserCalendarsNotifier extends Notifier<List<UserCalendar>> {
           accountType: m['account_type'] as String? ?? 'local',
         );
       }).toList();
-
-      final defaults = const [
-        UserCalendar(
-          id: 'cal_main',
-          title: 'Основной',
-          color: Color(0xFF2C69D1),
-        ),
-        UserCalendar(
-          id: 'cal_work',
-          title: 'Работа',
-          color: Color(0xFFF97316),
-        ),
-        UserCalendar(
-          id: 'cal_shifts',
-          title: 'Смены',
-          color: Color(0xFF10B981),
-        ),
-      ];
-
-      state = [...defaults, ...googleCals];
     } catch (e) {
       debugPrint('Ошибка загрузки списка календарей: $e');
     }
@@ -120,26 +154,63 @@ class UserCalendarsNotifier extends Notifier<List<UserCalendar>> {
     }
   }
 
-  void addCalendar(String title, Color color) {
-    final newCal = UserCalendar(
-      id: 'cal_${DateTime.now().millisecondsSinceEpoch}',
-      title: title,
-      color: color,
-    );
-    state = [...state, newCal];
+  Future<void> addCalendar(String title, Color color) async {
+    try {
+      final newCal = UserCalendar(
+        id: 'cal_${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        color: color,
+        accountType: 'local',
+      );
+      state = [...state, newCal];
+      final db = await DatabaseService.instance.database;
+      await db.insert('user_calendars', {
+        'id': newCal.id,
+        'user_id': null,
+        'title': title,
+        'color': color.toARGB32(),
+        'is_visible': 1,
+        'account_type': 'local',
+        'is_synced': 0,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    } catch (e) {
+      debugPrint('Ошибка сохранения календаря: $e');
+    }
   }
 
-  void updateCalendar(String id, String title, Color color) {
+  Future<void> updateCalendar(String id, String title, Color color) async {
     state = state.map((c) {
       if (c.id == id) {
         return c.copyWith(title: title, color: color);
       }
       return c;
     }).toList();
+    try {
+      final db = await DatabaseService.instance.database;
+      await db.update(
+        'user_calendars',
+        {
+          'title': title,
+          'color': color.toARGB32(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } catch (e) {
+      debugPrint('Ошибка обновления календаря: $e');
+    }
   }
 
-  void deleteCalendar(String id) {
+  Future<void> deleteCalendar(String id) async {
     state = state.where((c) => c.id != id).toList();
+    try {
+      final db = await DatabaseService.instance.database;
+      await db.delete('user_calendars', where: 'id = ?', whereArgs: [id]);
+    } catch (e) {
+      debugPrint('Ошибка удаления календаря: $e');
+    }
   }
 }
 

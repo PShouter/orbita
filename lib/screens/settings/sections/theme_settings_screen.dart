@@ -114,6 +114,33 @@ class ThemeSettingsScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: _buildThemeCard(
+                  title: 'Шалфей',
+                  palette: AppColorsExtension.sage,
+                  isSelected: themeState.currentTheme == AppThemeType.sage &&
+                      !themeState.followSystem,
+                  onTap: () => notifier.setTheme(AppThemeType.sage),
+                  colors: colors,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildThemeCard(
+                  title: 'Клубника',
+                  palette: AppColorsExtension.strawberry,
+                  isSelected:
+                      themeState.currentTheme == AppThemeType.strawberry &&
+                          !themeState.followSystem,
+                  onTap: () => notifier.setTheme(AppThemeType.strawberry),
+                  colors: colors,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildThemeCard(
                   title: 'AMOLED',
                   palette: AppColorsExtension.amoled,
                   isSelected: themeState.currentTheme == AppThemeType.amoled &&

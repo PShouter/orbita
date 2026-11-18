@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../widgets/friend_avatar.dart';
+
 class FriendProfileScreen extends StatefulWidget {
   final bool isDarkMode;
   final String friendshipId;
@@ -280,26 +282,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                       colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
                     ),
                   ),
-                  child: CircleAvatar(
+                  child: FriendAvatar(
+                    url: widget.friendAvatarUrl,
+                    name: widget.friendName,
                     radius: 30,
-                    backgroundColor: const Color(0xFF1E293B),
-                    backgroundImage: (widget.friendAvatarUrl != null &&
-                            widget.friendAvatarUrl!.isNotEmpty)
-                        ? NetworkImage(widget.friendAvatarUrl!)
-                        : null,
-                    child: widget.friendAvatarUrl == null ||
-                            widget.friendAvatarUrl!.isEmpty
-                        ? Text(
-                            widget.friendName.isNotEmpty
-                                ? widget.friendName[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          )
-                        : null,
                   ),
                 ),
                 const SizedBox(width: 14),

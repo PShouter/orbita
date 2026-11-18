@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'friend_profile_screen.dart';
 import '../../services/friends_service.dart';
+import '../../widgets/friend_avatar.dart';
 import '../../services/notification_service.dart';
 
 typedef JsonMap = Map<String, dynamic>;
@@ -735,24 +736,10 @@ class _FriendsScreenState extends State<FriendsScreen>
 
                   return ListTile(
                     dense: true,
-                    leading: CircleAvatar(
+                    leading: FriendAvatar(
+                      url: user.avatarUrl,
+                      name: user.displayName,
                       radius: 16,
-                      backgroundColor: const Color(0xFF7C3AED),
-                      backgroundImage: (user.avatarUrl.isNotEmpty)
-                          ? NetworkImage(user.avatarUrl)
-                          : null,
-                      child: user.avatarUrl.isNotEmpty
-                          ? null
-                          : Text(
-                              user.displayName.isNotEmpty
-                                  ? user.displayName[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
                     ),
                     title: Text(
                       user.displayName,
@@ -831,35 +818,10 @@ class _FriendsScreenState extends State<FriendsScreen>
                                     ),
                                     child: Row(
                                       children: [
-                                        CircleAvatar(
+                                        FriendAvatar(
+                                          url: f['avatarUrl'] as String?,
+                                          name: f['name'] as String? ?? '',
                                           radius: 22,
-                                          backgroundColor: const Color(
-                                            0xFF1E293B,
-                                          ),
-                                          backgroundImage:
-                                              (f['avatarUrl'] != null &&
-                                                      (f['avatarUrl'] as String)
-                                                          .isNotEmpty)
-                                                  ? NetworkImage(
-                                                      f['avatarUrl'] as String,
-                                                    )
-                                                  : null,
-                                          child: (f['avatarUrl'] == null ||
-                                                  (f['avatarUrl'] as String)
-                                                      .isEmpty)
-                                              ? Text(
-                                                  f['name'].isNotEmpty
-                                                      ? f['name'][0]
-                                                          .toUpperCase()
-                                                      : '?',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontWeight:
-                                                        FontWeight.bold,
-                                                    fontSize: 16,
-                                                  ),
-                                                )
-                                              : null,
                                         ),
                                         const SizedBox(width: 14),
                                         Expanded(
@@ -958,27 +920,12 @@ class _FriendsScreenState extends State<FriendsScreen>
                                 ),
                                 child: Row(
                                   children: [
-                                    CircleAvatar(
-                                      backgroundColor: const Color(0xFF8B5CF6)
-                                          .withValues(alpha: 0.2),
-                                      backgroundImage:
-                                          (req['avatarUrl'] != null &&
-                                                  (req['avatarUrl'] as String)
-                                                      .isNotEmpty)
-                                              ? NetworkImage(
-                                                  req['avatarUrl'] as String,
-                                                )
-                                              : null,
-                                      child: (req['avatarUrl'] == null ||
-                                              (req['avatarUrl'] as String)
-                                                  .isEmpty)
-                                          ? const Icon(
-                                              Icons.person_add,
-                                              color: Color(0xFF8B5CF6),
-                                              size: 18,
-                                            )
-                                          : null,
-                                    ),
+                                    FriendAvatar(
+                                          url: req['avatarUrl'] as String?,
+                                          name: req['name'] as String? ?? '',
+                                          radius: 18,
+                                          fallbackIcon: Icons.person_add,
+                                        ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
