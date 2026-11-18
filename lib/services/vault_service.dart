@@ -173,50 +173,70 @@ class VaultService {
     await _secureStorage.delete(key: _secBiometricKey);
   }
 
-  /// Шифрование текста алгоритмом AES-GCM (12-байтный nonce)
-  Map<String, String> encryptString(String plainText, String pin) {
-    final keyBytes = _pbkdf2DeriveKey(pin, 'orbita_vault_static_salt_v2');
+/// Шифрование текста алгоритмом AES-GCM (12-байтный nonce) с
+/// пер-документной случайной солью для производного ключа.
+/// Возвращает {cipherText, iv}, где iv = "ivBase64:::saltBase64".
+Map<String, String> encryptString(String plainText, String pin) {
+  final salt = _generateSalt();
+  final keyBytes = _pbkdf2DeriveKey(pin, salt);
+  final key = enc.Key(keyBytes);
+  final iv = enc.IV.fromSecureRandom(12);
+
+  final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
+  final encrypted = encrypter.encrypt(plainText, iv: iv);
+
+  return {'cipherText': encrypted.base64, 'iv': '${iv.base64}:::$salt'};
+}
+
+/// Разбирает значение iv (возможно "iv:::salt"), возвращает соль для
+/// производного ключа. Для старых записей (без соли) — статичная соль.
+String _extractSalt(String ivBase64) {
+  if (ivBase64.contains(':::')) {
+    final parts = ivBase64.split(':::');
+    if (parts.length >= 2 && parts[1].isNotEmpty) return parts[1];
+  }
+  return 'orbita_vault_static_salt_v2';
+}
+
+/// Расшифровка текста с поддержкой обратной совместимости.
+/// ivBase64 может содержать "iv:::salt" (новые записи) или только iv (старые).
+String decryptString(String cipherBase64, String ivBase64, String pin) {
+  // Извлекаем соль: пер-документная (если в iv) либо статичная (legacy).
+  final salt = _extractSalt(ivBase64);
+  final rawIv = ivBase64.contains(':::')
+      ? ivBase64.split(':::').first
+      : ivBase64;
+
+  // 1. Попытка расшифровать методом AES-GCM
+  try {
+    final keyBytes = _pbkdf2DeriveKey(pin, salt);
     final key = enc.Key(keyBytes);
-    final iv = enc.IV.fromSecureRandom(12);
+    final iv = enc.IV.fromBase64(rawIv);
 
     final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
-    final encrypted = encrypter.encrypt(plainText, iv: iv);
+    return encrypter.decrypt64(cipherBase64, iv: iv);
+  } on FormatException {
+    rethrow;
+  } catch (_) {}
 
-    return {'cipherText': encrypted.base64, 'iv': iv.base64};
+  // 2. Fallback: расшифровка старых данных в AES-CBC
+  try {
+    final legacyKeyBytes = sha256
+        .convert(utf8.encode('$pin:orbita_vault_salt_v1'))
+        .bytes;
+    final legacyKey = enc.Key(Uint8List.fromList(legacyKeyBytes));
+    final iv = enc.IV.fromBase64(rawIv);
+
+    final encrypter = enc.Encrypter(
+      enc.AES(legacyKey, mode: enc.AESMode.cbc),
+    );
+    return encrypter.decrypt64(cipherBase64, iv: iv);
+  } catch (_) {
+    throw VaultCryptoException(
+      'Не удалось расшифровать данные сейфа. Вероятно, PIN указан неверно или данные повреждены.',
+    );
   }
-
-  /// Расшифровка текста с поддержкой обратной совместимости с legacy CBC
-  String decryptString(String cipherBase64, String ivBase64, String pin) {
-    // 1. Попытка расшифровать методом AES-GCM
-    try {
-      final keyBytes = _pbkdf2DeriveKey(pin, 'orbita_vault_static_salt_v2');
-      final key = enc.Key(keyBytes);
-      final iv = enc.IV.fromBase64(ivBase64);
-
-      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.gcm));
-      return encrypter.decrypt64(cipherBase64, iv: iv);
-    } on FormatException {
-      rethrow;
-    } catch (_) {}
-
-    // 2. Fallback: расшифровка старых данных в AES-CBC
-    try {
-      final legacyKeyBytes = sha256
-          .convert(utf8.encode('$pin:orbita_vault_salt_v1'))
-          .bytes;
-      final legacyKey = enc.Key(Uint8List.fromList(legacyKeyBytes));
-      final iv = enc.IV.fromBase64(ivBase64);
-
-      final encrypter = enc.Encrypter(
-        enc.AES(legacyKey, mode: enc.AESMode.cbc),
-      );
-      return encrypter.decrypt64(cipherBase64, iv: iv);
-    } catch (_) {
-      throw VaultCryptoException(
-        'Не удалось расшифровать данные сейфа. Вероятно, PIN указан неверно или данные повреждены.',
-      );
-    }
-  }
+}
 }
 
 class VaultCryptoException implements Exception {
