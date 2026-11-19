@@ -10,6 +10,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Сервисы
+import 'services/error_report_service.dart';
 import 'services/notification_service.dart';
 import 'services/permission_service.dart';
 import 'services/sync_service.dart';
@@ -57,7 +58,15 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: OrbitaBootstrap()));
+  // История происходит в изолированной зоне: любые необработанные ошибки
+  // попадают в ErrorReportService и отправляются разработчику.
+  await runZonedGuarded(() async {
+    await ErrorReportService.instance.init();
+    runApp(const ProviderScope(child: OrbitaBootstrap()));
+  }, (error, stack) {
+    ErrorReportService.instance.logError('unhandled', error, stack);
+    debugPrint('Unhandled error: $error\n$stack');
+  });
 }
 
 /// Показывает сплэш, пока идёт инициализация сервисов,
@@ -1156,7 +1165,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Версия: Demo 0.4.4',
+                    'Версия: Demo 0.4.5',
                     style: TextStyle(
                       fontFamily: 'Onest',
                       color: colors.text.withValues(alpha: 0.5),

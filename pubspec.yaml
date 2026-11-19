@@ -2,7 +2,7 @@ name: orbita
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 0.4.4+12
+version: 0.4.5+13
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
